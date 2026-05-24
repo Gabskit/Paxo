@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
-#include <complex.h>
 
 /* Definiciones Base de Arreglos de Axolang */
 typedef struct {
@@ -20,7 +19,7 @@ typedef struct {
     char letra;
     double gd;
     char* (*saludar)();
-    AxoArray_int (*suma)(int a, int b);
+    int (*suma)(int a, int b);
 } algo;
 
 
@@ -29,28 +28,18 @@ char* _algo_saludar() {
     return "Hola desde variable";
 }
 
-AxoArray_int _algo_suma(int a, int b) {
+int _algo_suma(int a, int b) {
     // Al transpilearse, interceptamos esto para usar malloc dinámico;
-    int sum[] = {0,0};
+    int sum[] = {0,0}
     sum[0] = a + b;
     sum[1] = a + a + b;
+    return 0;
 }
 
 
 
-    int num[] = {0,3,5,7,3};
-    char saludo[] = "hola";
-    double complex miComplejo = 2.1 * I;
-    int edad = 25;
-    double pi = 3.1416;
-    bool activo = true;
-    auto miCopia = &edad;
-    AxoArray_int _ret = { .data = sum, .length = sizeof(sum)/sizeof(sum[0]) };
-    return _ret;
-    void* variableComodin = "adios";
     void hola2() {
     printf("Hola desde funcion globql\n");
-    }
     int main() {
     algo p1;
     p1.saludar = _algo_saludar;
@@ -62,14 +51,3 @@ AxoArray_int _algo_suma(int a, int b) {
     printf("%s\n", (char*)variableComodin);
     for (int i = 0; i < 5; i++){
     printf("%d\n", num[i]);
-    }
-    hola2();
-    printf("%.1f %.1fi\n", creal(miComplejo), cimag(miComplejo));
-    printf("%p\n", miCopia);
-    // CAPTURA INTELIGENTE DEL ARREGLO RETORNADO;
-    auto resultado = p1.suma(2, 4);
-    printf("Resultado 1: %d\n", resultado.data[0]);
-    printf("Resultado 2: %d\n", resultado.data[1]);
-    printf("Elementos devueltos: %zu\n", resultado.length);
-    return 0;
-    }
