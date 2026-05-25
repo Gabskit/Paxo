@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
+#include <complex.h>
 
 /* Definiciones Base de Arreglos de Axolang */
 typedef struct {
@@ -38,16 +39,47 @@ int _algo_suma(int a, int b) {
 
 
 
+/* Variables Globales de Axolang */
+int num[] = {0,3,5,7,3};
+char saludo[] = "hola";
+double complex miComplejo = 2.1 * I;
+int edad = 25;
+double pi = 3.1416;
+bool activo = true;
+auto miCopia = &edad;
+void* variableComodin = "adios";
+hola2();
+printf("%.1f %.1fi\n", creal(miComplejo), cimag(miComplejo));
+printf("%p\n", miCopia);
+// CAPTURA INTELIGENTE DEL ARREGLO RETORNADO;
+auto resultado = p1.suma(2, 4);
+printf("Resultado 1: %d\n", resultado.data[0]);
+printf("Resultado 2: %d\n", resultado.data[1]);
+printf("Elementos devueltos: %zu\n", resultado.length);
+return 0;
+
+
     void hola2() {
-    printf("Hola desde funcion globql\n");
+    void hola2() {
+    }
     int main() {
     algo p1;
     p1.saludar = _algo_saludar;
     p1.suma = _algo_suma;
-    p1.letra = 'a';
-    printf("%s\n", saludo);
-    printf("%s\n", p1.saludar());
-    printf("%c\n", p1.letra);
-    printf("%s\n", (char*)variableComodin);
-    for (int i = 0; i < 5; i++){
-    printf("%d\n", num[i]);
+    algo p1;
+    p1.saludar = _algo_saludar;
+    p1.suma = _algo_suma;
+    algo p1;
+    p1.saludar = _algo_saludar;
+    p1.suma = _algo_suma;
+    algo p1;
+    p1.saludar = _algo_saludar;
+    p1.suma = _algo_suma;
+    algo p1;
+    p1.saludar = _algo_saludar;
+    p1.suma = _algo_suma;
+    algo p1;
+    p1.saludar = _algo_saludar;
+    p1.suma = _algo_suma;
+    }
+    }
