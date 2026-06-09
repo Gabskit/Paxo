@@ -1,0 +1,47 @@
+int main(int argc, char* argv[]) {
+      if (argc < 3) {
+        printf("Uso: %s <archivo.axo> <salida.c>\n", argv[0]); return 1;
+      }
+
+      FILE* origen = fopen(argv[1], "r");
+      if (!origen) {
+        printf("Error: No se pudo abrir el archivo fuente '%s'\n", argv[1]); return 1;
+      }
+
+      fseek(origen, 0, SEEK_END); long tamano = ftell(origen); fseek(origen, 0, SEEK_SET);
+      char* codigo_axolang = malloc(tamano + 1);
+      if (!codigo_axolang) {
+        printf("Error: Memoria insuficiente.\n"); fclose(origen); return 1;
+      }
+
+      size_t leidos = fread(codigo_axolang, 1, tamano, origen); codigo_axolang[leidos] = '\0'; fclose(origen);
+
+      FILE* salida_c = fopen(argv[2], "w");
+      if (!salida_c) {
+        printf("Error: No se pudo crear el archivo de salida '%s'\n", argv[2]); free(codigo_axolang); return 1;
+      }
+
+      fprintf(salida_c, "// --- C23 AUTO-GENERATED CODE FROM AXOLANG ---\n");
+      fprintf(salida_c, "#include <complex.h>\n#include <math.h>\n#include <tgmath.h>\n");
+      fprintf(salida_c, "#include <string.h>\n#include <stdbool.h>\n#include <stdio.h>\n#include <stdlib.h>\n\n");
+      fprintf(salida_c, "typedef enum { TYPE_INT, TYPE_DEC, TYPE_COMPLEX, TYPE_CHAR, TYPE_STRING, TYPE_FUNC, TYPE_PKG } AxoType;\n");
+      fprintf(salida_c, "typedef struct {\n    AxoType type;\n    union {\n        int i_val;\n        double d_val;\n        double _Complex cmplx_val;\n        char c_val;\n        char* s_val;\n        void (*func_val)();\n        void* pkg_val;\n    };\n} Axoany_Struct;\n\n");
+      fprintf(salida_c, "typedef struct { int* data; size_t length; } Axoarray_int;\n");
+      fprintf(salida_c, "typedef struct { double* data; size_t length; } Axoarray_dec;\n");
+      fprintf(salida_c, "typedef struct { char* data; size_t length; } Axoarray_char;\n");
+      fprintf(salida_c, "typedef struct { Axoany_Struct* data; size_t length; } Axoarray_any;\n\n");
+
+      transpilar(codigo_axolang, salida_c);
+      fclose(salida_c); free(codigo_axolang);
+
+      printf("[Axolang] Código intermedio '%s' generado con éxito.\n", argv[2]);
+      printf("[Axolang] Compilando binario nativo en estándar C23...\n");
+
+      char comando[512]; sprintf(comando, "gcc %s -o programa_ejecutable -std=c23 -lm", argv[2]);
+      int resultado_compilacion = system(comando);
+
+      if (resultado_compilacion == 0) printf("[Axolang] ¡Compilación exitosa! Ejecutable creado como './programa_ejecutable'\n");
+      else printf("[Axolang] Error durante la compilación nativa de C.\n");
+
+      return resultado_compilacion;
+    }

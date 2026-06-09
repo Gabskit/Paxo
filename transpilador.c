@@ -1,64 +1,49 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
 
-// Enumeración de Tokens para Axolang
-typedef enum {
-  TOKEN_EOF,
-  TOKEN_NEWLINE,
-  TOKEN_UNKNOWN,
-  TOKEN_INT,
-  TOKEN_DEC,
-  TOKEN_COM,
-  TOKEN_CHAR,
-  TOKEN_BOOL,
-  TOKEN_PKG,
-  TOKEN_FUNC,
-  TOKEN_PUNT,
-  TOKEN_ANY,
-  TOKEN_AUTO,
-  TOKEN_VOID,
-  TOKEN_ADD,
-  TOKEN_IDENTIFIER,
-  TOKEN_NUMBER,
-  TOKEN_STRING,
-  TOKEN_CHAR_LITERAL,
-  TOKEN_ASSIGN,
-  TOKEN_REF_ARROW,
-  TOKEN_COLON,
-  TOKEN_COMMA,
-  TOKEN_SEMICOLON,
-  TOKEN_LPAREN,
-  TOKEN_RPAREN,
-  TOKEN_LBRACE,
-  TOKEN_RBRACE,
-  TOKEN_LARRAY,
-  TOKEN_RARRAY,
-  TOKEN_OP_MULT,
-  TOKEN_OP_DIV,
-  TOKEN_OP_SQRT,
-  TOKEN_OP_EXP,
-  TOKEN_OP_AND,
-  TOKEN_OP_OR,
-  TOKEN_OP_NOT,
-  TOKEN_OP_XOR,
-  TOKEN_OP_EQUAL,
-  TOKEN_OP_GE,
-  TOKEN_OP_LE,
-  TOKEN_OP_NOTEQUAL
-} TokenType;
+// Catálogo interno para registrar los tipos PKG válidos y evitar falsos positivos
+char catalogo_paquetes[32][64];
+int conteo_paquetes = 0;
+// Catálogo interno para registrar variables declaradas como 'any'
+char catalogo_comodines[128][64];
+int conteo_comodines = 0;
 
-typedef struct {
-  TokenType type;
-  char lexeme[512];
-} Token;
+void registrar_comodit(const char* nombre) {
+  for (int i = 0; i < conteo_comodines; i++) {
+    if (strcmp(catalogo_comodines[i], nombre) == 0) return;
+  }
+  strcpy(catalogo_comodines[conteo_comodines++], nombre);
+}
+
+bool es_comodin_registrado(const char* nombre) {
+  for (int i = 0; i < conteo_comodines; i++) {
+    if (strcmp(catalogo_comodines[i], nombre) == 0) return true;
+  }
+  return false;
+}
+void registrar_paquete(const char* nombre) {
+  for (int i = 0; i < conteo_paquetes; i++) {
+    if (strcmp(catalogo_paquetes[i], nombre) == 0) return;
+  }
+  strcpy(catalogo_paquetes[conteo_paquetes++], nombre);
+}
+
+bool es_paquete_registrado(const char* nombre) {
+  for (int i = 0; i < conteo_paquetes; i++) {
+    if (strcmp(catalogo_paquetes[i], nombre) == 0) return true;
+  }
+  return false;
+}
 
 // Búferes globales para almacenar código extraído
 char funciones_extraidas[65536] = "";
 char constructores_inicializadores[16384] = "";
 char prototipos_lambdas[16384] = "";
 
+// Forward declaration del motor léxico
+Token get_next_token(const char **src);
+
+// =====================================================================
+// ANALIZADOR LÉXICO (LEXER)
+// =====================================================================
 Token get_next_token(const char **src) {
   Token token = {
     TOKEN_EOF,
@@ -213,83 +198,93 @@ Token get_next_token(const char **src) {
   token.type = TOKEN_UNKNOWN; token.lexeme[0] = **src; token.lexeme[1] = '\0'; (*src)++; return token;
 }
 
-void transpilar(const char *codigo_axolang, FILE *f_salida) {
-  const char *ptr = codigo_axolang;
-  bool in_pkg = false;
-  bool needs_semicolon = false;
-  char current_pkg_name[128] = "";
-  char temp_constructor[4096] = "";
-
-  Token token = get_next_token(&ptr);
-
+// =====================================================================
+// MOTOR DE TRANSPILACIÓN SEMÁNTICA RECURSIVA
+// =====================================================================
+void transpilar_bloque(const char **src_ptr, FILE *destino, bool in_pkg, const char* current_pkg_name, char* temp_constructor, bool *needs_semicolon, bool context_any) {
+  Token token = get_next_token(src_ptr);
+  bool asignando_a_any = context_any; // Heredar estado del contexto superior si existe
+  bool ignorar_hasta_nueva_linea_pkg = false;
+  char tipo_retorno_actual[64] = "void";
+  bool mapeando_arreglo_literal = false;
+  int conteo_elementos_arreglo = 0;
+  char nombre_arreglo_actual[64] = "";
   while (token.type != TOKEN_EOF) {
     if (token.type == TOKEN_NEWLINE) {
-      if (needs_semicolon) {
-        fprintf(f_salida, ";"); needs_semicolon = false;
+      if (*needs_semicolon) {
+        fprintf(destino, ";"); *needs_semicolon = false;
       }
-      fprintf(f_salida, "\n");
-      token = get_next_token(&ptr);
+      fprintf(destino, "\n");
+      asignando_a_any = false; // Resetear contexto al cambiar de línea
+      token = get_next_token(src_ptr);
       continue;
     }
 
     switch (token.type) {
       case TOKEN_ADD: {
-        token = get_next_token(&ptr);
-        if (strstr(token.lexeme, "Basic.axo")) fprintf(f_salida, "#include <stdio.h>\n#include <stdlib.h>\n#include <stddef.h>\n");
-        else if (strstr(token.lexeme, "Text.axo")) fprintf(f_salida, "#include <ctype.h>\n");
-        else if (strstr(token.lexeme, "Time.axo")) fprintf(f_salida, "#include <time.h>\n");
-        else if (strstr(token.lexeme, "Signal.axo")) fprintf(f_salida, "#include <signal.h>\n");
-        while (token.type != TOKEN_NEWLINE && token.type != TOKEN_EOF) token = get_next_token(&ptr);
-        needs_semicolon = false;
+        token = get_next_token(src_ptr);
+        if (strstr(token.lexeme, "Basic.axo")) fprintf(destino, "#include <stdio.h>\n#include <stdlib.h>\n#include <stddef.h>\n");
+        while (token.type != TOKEN_NEWLINE && token.type != TOKEN_EOF) token = get_next_token(src_ptr);
+        *needs_semicolon = false;
         continue;
       }
 
-      case TOKEN_INT: fprintf(f_salida, "int "); needs_semicolon = false; break;
-      case TOKEN_DEC: fprintf(f_salida, "double "); needs_semicolon = false; break;
-      case TOKEN_CHAR: fprintf(f_salida, "char "); needs_semicolon = false; break;
-      case TOKEN_BOOL: fprintf(f_salida, "bool "); needs_semicolon = false; break;
-      case TOKEN_VOID: fprintf(f_salida, "void "); needs_semicolon = false; break;
-      case TOKEN_AUTO: fprintf(f_salida, "auto "); needs_semicolon = false; break;
-      case TOKEN_COM: fprintf(f_salida, "double _Complex "); needs_semicolon = false; break;
-      case TOKEN_ANY: fprintf(f_salida, "Axoany_Struct "); needs_semicolon = false; break;
-      case TOKEN_PUNT: fprintf(f_salida, "auto "); needs_semicolon = false; break;
+      case TOKEN_INT: fprintf(destino, "int "); *needs_semicolon = false; break;
+      case TOKEN_DEC: fprintf(destino, "double "); *needs_semicolon = false; break;
+      case TOKEN_CHAR: fprintf(destino, "char "); *needs_semicolon = false; break;
+      case TOKEN_BOOL: fprintf(destino, "bool "); *needs_semicolon = false; break;
+      case TOKEN_VOID: fprintf(destino, "void "); *needs_semicolon = false; break;
+      case TOKEN_AUTO: fprintf(destino, "auto "); *needs_semicolon = false; break;
+      case TOKEN_COM: fprintf(destino, "double _Complex "); *needs_semicolon = false; break;
+      case TOKEN_PUNT: fprintf(destino, "auto "); *needs_semicolon = false; break;
+
+      case TOKEN_ANY:
+      fprintf(destino, "Axoany_Struct ");
+      asignando_a_any = true; // El siguiente identificador y asignación pertenecen a un comodín
+      *needs_semicolon = false;
+
+      // Mirar hacia adelante para registrar el nombre de la variable comodín
+      const char *look_name = *src_ptr;
+      Token name_tok = get_next_token(&look_name);
+      if (name_tok.type == TOKEN_IDENTIFIER) {
+        registrar_comodit(name_tok.lexeme);
+      }
+
+      break;
 
       case TOKEN_PKG: {
-        in_pkg = true;
-        token = get_next_token(&ptr);
-        strcpy(current_pkg_name, token.lexeme);
-        fprintf(f_salida, "typedef struct {\n");
+        token = get_next_token(src_ptr);
+        char nuevo_pkg[128]; strcpy(nuevo_pkg, token.lexeme);
+        registrar_paquete(nuevo_pkg);
 
-        sprintf(temp_constructor, "%s init_%s() {\n    %s instancia;\n", current_pkg_name, current_pkg_name, current_pkg_name);
+        fprintf(destino, "typedef struct {\n");
+        char sub_constructor[4096];
+        sprintf(sub_constructor, "%s init_%s() {\n    %s instancia;\n", nuevo_pkg, nuevo_pkg, nuevo_pkg);
 
-        get_next_token(&ptr); // Consumir '='
-        get_next_token(&ptr); // Consumir '{'
-        needs_semicolon = false;
+        while (token.type != TOKEN_LBRACE && token.type != TOKEN_EOF) token = get_next_token(src_ptr);
+
+        bool sub_needs_semi = false;
+        transpilar_bloque(src_ptr, destino, true, nuevo_pkg, sub_constructor, &sub_needs_semi, false);
+        *needs_semicolon = false;
         break;
       }
 
       case TOKEN_FUNC: {
-        token = get_next_token(&ptr); // Leer nombre de la función (ej: "suma")
-        char func_name[128];
-        strcpy(func_name, token.lexeme);
+        token = get_next_token(src_ptr);
+        char func_name[128]; strcpy(func_name, token.lexeme);
 
-        get_next_token(&ptr); // Consumir '='
-        get_next_token(&ptr); // Consumir '('
+        get_next_token(src_ptr); // '='
+        get_next_token(src_ptr); // '('
 
-        // Parsear y traducir argumentos para la firma
         char argumentos[256] = "";
         char argumentos_cuerpo[256] = "";
-        Token arg_token = get_next_token(&ptr);
-        bool primer_arg = true;
+        Token arg_token = get_next_token(src_ptr);
 
         while (arg_token.type != TOKEN_RPAREN && arg_token.type != TOKEN_EOF) {
           if (arg_token.type == TOKEN_COMMA) {
-            strcat(argumentos, ", ");
-            strcat(argumentos_cuerpo, ", ");
-            arg_token = get_next_token(&ptr);
-            continue;
+            strcat(argumentos, ", "); strcat(argumentos_cuerpo, ", ");
+            arg_token = get_next_token(src_ptr); continue;
           }
-
           char tipo_arg[64] = "";
           if (strcmp(arg_token.lexeme, "dec") == 0) strcpy(tipo_arg, "double");
           else if (strcmp(arg_token.lexeme, "int") == 0) strcpy(tipo_arg, "int");
@@ -297,187 +292,118 @@ void transpilar(const char *codigo_axolang, FILE *f_salida) {
           else if (strcmp(arg_token.lexeme, "bool") == 0) strcpy(tipo_arg, "bool");
           else strcpy(tipo_arg, arg_token.lexeme);
 
-          // Leer el identificador del argumento
-          Token name_arg = get_next_token(&ptr);
-
+          Token name_arg = get_next_token(src_ptr);
           char arg_completo[128];
           sprintf(arg_completo, "%s %s", tipo_arg, name_arg.lexeme);
-          strcat(argumentos, arg_completo);
-          strcat(argumentos_cuerpo, arg_completo);
-
-          arg_token = get_next_token(&ptr);
+          strcat(argumentos, arg_completo); strcat(argumentos_cuerpo, arg_completo);
+          arg_token = get_next_token(src_ptr);
         }
 
-        // Determinar el tipo de retorno resolviendo el operador ':'
         char ret_type[64] = "void";
-        Token next_tok = get_next_token(&ptr);
+        Token next_tok = get_next_token(src_ptr);
 
+        // ... dentro de la detección del tipo de retorno en TOKEN_FUNC ...
         if (next_tok.type == TOKEN_COLON) {
           char raw_ret[128] = "";
-          next_tok = get_next_token(&ptr);
+          next_tok = get_next_token(src_ptr);
           while (next_tok.type != TOKEN_LBRACE && next_tok.type != TOKEN_NEWLINE && next_tok.type != TOKEN_EOF) {
             strcat(raw_ret, next_tok.lexeme);
-            next_tok = get_next_token(&ptr);
+            next_tok = get_next_token(src_ptr);
           }
+
+          // Guardamos el tipo de retorno para usarlo en los returns internos
+          strcpy(tipo_retorno_actual, raw_ret);
+
           if (strcmp(raw_ret, "int") == 0) strcpy(ret_type, "int");
           else if (strcmp(raw_ret, "dec") == 0) strcpy(ret_type, "double");
-          else if (strcmp(raw_ret, "void") == 0) strcpy(ret_type, "void");
+          else if (strcmp(raw_ret, "char") == 0) strcpy(ret_type, "char");
           else if (strcmp(raw_ret, "[]int") == 0) strcpy(ret_type, "Axoarray_int");
           else if (strcmp(raw_ret, "[]dec") == 0) strcpy(ret_type, "Axoarray_dec");
-          else if (strcmp(raw_ret, "[]any") == 0) strcpy(ret_type, "Axoarray_any");
           else if (strcmp(raw_ret, "[]char") == 0) strcpy(ret_type, "Axoarray_char");
-          else if (strstr(raw_ret, "char")) strcpy(ret_type, "char*");
+          else if (strcmp(raw_ret, "[]any") == 0) strcpy(ret_type, "Axoarray_any");
         }
 
-        // Asegurar que el puntero se posicione al inicio del bloque '{'
-        while (next_tok.type != TOKEN_LBRACE && next_tok.type != TOKEN_EOF) next_tok = get_next_token(&ptr);
+        while (next_tok.type != TOKEN_LBRACE && next_tok.type != TOKEN_EOF) next_tok = get_next_token(src_ptr);
 
         if (in_pkg) {
-          // 1. Escribir limpiamente el puntero a función dentro de la estructura física en C
-          fprintf(f_salida, "    %s (*%s)(%s);\n", ret_type, func_name, argumentos);
+          fprintf(destino, "    %s (*%s)(%s);\n", ret_type, func_name, argumentos);
 
-          // 2. Acumular la asignación del puntero en el constructor
           char buffer_vinc[256];
           sprintf(buffer_vinc, "    instancia.%s = &%s_%s;\n", func_name, current_pkg_name, func_name);
           strcat(temp_constructor, buffer_vinc);
 
-          // 3. Extraer y traducir el cuerpo interno del método hacia funciones_extraidas
           char buf_func[8192] = "";
-          sprintf(buf_func, "%s %s_%s(%s) {\n", ret_type, current_pkg_name, func_name, argumentos_cuerpo);
+          FILE *f_mem = fmemopen(buf_func, sizeof(buf_func), "w");
+          fprintf(f_mem, "%s %s_%s(%s) {\n", ret_type, current_pkg_name, func_name, argumentos_cuerpo);
 
-          int brace_count = 1;
-          Token cuerpo_tok = get_next_token(&ptr);
-          bool linea_necesita_punto_coma = false;
+          bool sub_needs_semi = false;
+          transpilar_bloque(src_ptr, f_mem, false, NULL, NULL, &sub_needs_semi, false);
+          fclose(f_mem);
 
-          while (cuerpo_tok.type != TOKEN_EOF) {
-            if (cuerpo_tok.type == TOKEN_NEWLINE) {
-              if (linea_necesita_punto_coma) {
-                strcat(buf_func, ";"); linea_necesita_punto_coma = false;
-              }
-              strcat(buf_func, "\n");
-              cuerpo_tok = get_next_token(&ptr);
-              continue;
-            }
-
-            if (cuerpo_tok.type == TOKEN_LBRACE) brace_count++;
-            if (cuerpo_tok.type == TOKEN_RBRACE) {
-              brace_count--;
-              if (brace_count == 0) break;
-            }
-
-            if (strcmp(cuerpo_tok.lexeme, "dec") == 0) {
-              strcat(buf_func, "double* ");
-              linea_necesita_punto_coma = false;
-            }
-            else if (strstr(cuerpo_tok.lexeme, "[]") != NULL) {
-              char nombre_limpio[128];
-              strcpy(nombre_limpio, cuerpo_tok.lexeme);
-              nombre_limpio[strlen(nombre_limpio) - 2] = '\0';
-              strcat(buf_func, nombre_limpio);
-              strcat(buf_func, " ");
-            }
-            else if (strcmp(cuerpo_tok.lexeme, "=") == 0) {
-              const char *look_ahead_malloc = ptr;
-              while(*look_ahead_malloc == ' ' || *look_ahead_malloc == '\t') look_ahead_malloc++;
-
-              if (strncmp(look_ahead_malloc, "«", 2) == 0) {
-                linea_necesita_punto_coma = false; // El inicializador del array dinámico maneja su punto y coma
-              } else {
-                strcat(buf_func, "= ");
-              }
-            }
-            else if (strcmp(cuerpo_tok.lexeme, "return") == 0) {
-              Token next_val = get_next_token(&ptr);
-              if (next_val.type == TOKEN_STRING) {
-                char ret_obj[512];
-                sprintf(ret_obj, "return (%s){ .data = \"%s\", .length = %zu }", ret_type, next_val.lexeme, strlen(next_val.lexeme));
-                strcat(buf_func, ret_obj);
-                linea_necesita_punto_coma = true;
-              } else if (strcmp(next_val.lexeme, "sum") == 0) {
-                char ret_obj[512];
-                sprintf(ret_obj, "return (%s){ .data = sum, .length = 2 }", ret_type);
-                strcat(buf_func, ret_obj);
-                linea_necesita_punto_coma = true;
-              } else {
-                strcat(buf_func, "return ");
-                strcat(buf_func, next_val.lexeme);
-                linea_necesita_punto_coma = true;
-              }
-            }
-            else if (strcmp(cuerpo_tok.lexeme, "×") == 0) {
-              strcat(buf_func, "* ");
-              linea_necesita_punto_coma = false;
-            }
-            else if (strcmp(cuerpo_tok.lexeme, "«") == 0) {
-              // Traducción de la inicialización de Slices (ej: « a + b , a * b »)
-              strcat(buf_func, "= malloc(2 * sizeof(double));\n    ");
-              strcat(buf_func, "sum[0] = a + b;\n    sum[1] = a * b");
-              while(cuerpo_tok.type != TOKEN_RARRAY && cuerpo_tok.type != TOKEN_EOF) {
-                cuerpo_tok = get_next_token(&ptr);
-              }
-              linea_necesita_punto_coma = true;
-            }
-            else {
-              strcat(buf_func, cuerpo_tok.lexeme);
-              strcat(buf_func, " ");
-              if (cuerpo_tok.type == TOKEN_IDENTIFIER || cuerpo_tok.type == TOKEN_NUMBER) {
-                linea_necesita_punto_coma = true;
-              }
-            }
-            cuerpo_tok = get_next_token(&ptr);
-          }
-          strcat(buf_func, ";\n}\n\n");
           strcat(funciones_extraidas, buf_func);
-          needs_semicolon = false;
+          strcat(funciones_extraidas, "\n");
+          *needs_semicolon = false;
         }
         else {
-          // Manejo estándar de funciones globales fuera de un paquete (como main)
           if (strcmp(func_name, "main") == 0) {
-            fprintf(f_salida, "\n// --- PROTOTIPOS DE LAMBDAS EXTRAÍDAS ---\n%s\n", prototipos_lambdas);
-            fprintf(f_salida, "\n// --- METODOS DE COMPORTAMIENTO EXTRAIDOS ---\n%s", funciones_extraidas);
-            fprintf(f_salida, "// --- CONSTRUCTORES DE INICIALIZACION ---\n%s\n", constructores_inicializadores);
+            fprintf(destino, "\n// --- PROTOTIPOS DE LAMBDAS EXTRAÍDAS ---\n%s\n", prototipos_lambdas);
+            fprintf(destino, "\n// --- METODOS DE COMPORTAMIENTO EXTRAIDOS ---\n%s", funciones_extraidas);
+            fprintf(destino, "// --- CONSTRUCTORES DE INICIALIZACION ---\n%s\n", constructores_inicializadores);
             funciones_extraidas[0] = '\0';
             constructores_inicializadores[0] = '\0';
             prototipos_lambdas[0] = '\0';
           }
-          fprintf(f_salida, "%s %s(%s) {\n", ret_type, func_name, argumentos);
-          needs_semicolon = false;
+          fprintf(destino, "%s %s(%s) {\n", ret_type, func_name, argumentos);
+          *needs_semicolon = false;
+          transpilar_bloque(src_ptr, destino, false, NULL, NULL, needs_semicolon, false);
         }
         break;
       }
 
       case TOKEN_IDENTIFIER: {
+        // 1. Validaciones previas de inicialización de miembros en PKG
         if (in_pkg) {
-          char var_member[128];
-          strcpy(var_member, token.lexeme);
-
-          const char *look = ptr;
+          char var_member[128]; strcpy(var_member, token.lexeme);
+          const char *look = *src_ptr;
           while (*look == ' ' || *look == '\t') look++;
-          if (*look == '=') {
-            get_next_token(&ptr); // consumir '='
-            Token val_tok = get_next_token(&ptr);
 
+          if (*look == '=') {
+            get_next_token(src_ptr);
+            Token val_tok = get_next_token(src_ptr);
             char buffer_init[256];
             sprintf(buffer_init, "    instancia.%s = %s;\n", var_member, val_tok.lexeme);
             strcat(temp_constructor, buffer_init);
-
-            fprintf(f_salida, "    ");
-            needs_semicolon = true;
+            fprintf(destino, "%s", var_member);
+            *needs_semicolon = true;
+            ignorar_hasta_nueva_linea_pkg = true;
             break;
           }
         }
 
-        if (strcmp(token.lexeme, "algo") == 0 || strcmp(token.lexeme, "clase") == 0) {
-          char pkg_type[128];
-          strcpy(pkg_type, token.lexeme);
-          Token obj_tok = get_next_token(&ptr);
-          fprintf(f_salida, "%s %s = init_%s()", pkg_type, obj_tok.lexeme, pkg_type);
-          needs_semicolon = true;
-          break;
+        // 2. Validación de instanciación de paquetes
+        if (es_paquete_registrado(token.lexeme)) {
+          char pkg_type[128]; strcpy(pkg_type, token.lexeme);
+          Token obj_tok = get_next_token(src_ptr);
+          fprintf(destino, "%s %s = init_%s()", pkg_type, obj_tok.lexeme, pkg_type);
+          *needs_semicolon = true; break;
         }
 
+        // 3. DINÁMICO (Sin Hardcoding): Invocación de función guardada en un 'any'
+        if (es_comodin_registrado(token.lexeme)) {
+          const char *look_call = *src_ptr;
+          while (*look_call == ' ' || *look_call == '\t') look_call++;
+
+          if (*look_call == '(') {
+            // Se castea dinámicamente solo si está registrado en la tabla de símbolos comodín
+            fprintf(destino, "((void(*)())%s.func_val) ", token.lexeme);
+            *needs_semicolon = true;
+            break;
+          }
+        }
+
+        // 4. Palabra reservada Stop del sistema
         if (strcmp(token.lexeme, "Stop") == 0) {
-          const char *look = ptr;
+          const char *look = *src_ptr;
           while (*look == ' ' || *look == '\t') look++;
           if (*look == '(') {
             const char *look2 = look + 1;
@@ -486,163 +412,225 @@ void transpilar(const char *codigo_axolang, FILE *f_salida) {
               const char *look3 = look2 + 6;
               while (*look3 == ' ' || *look3 == '\t') look3++;
               if (*look3 == ')') {
-                ptr = look3 + 1; fprintf(f_salida, "exit(0)"); needs_semicolon = true; break;
+                *src_ptr = look3 + 1; fprintf(destino, "exit(0)"); *needs_semicolon = true; break;
               }
             }
           }
         }
+        // Si vemos "double sum[] =" o "int sum[] ="
+        if ((strcmp(token.lexeme, "double") == 0 || strcmp(token.lexeme, "int") == 0 || strcmp(token.lexeme, "char") == 0) && strncmp(tipo_retorno_actual, "[]", 2) == 0) {
+          char tipo_base[32];
+          strcpy(tipo_base, strcmp(token.lexeme, "double") == 0 ? "double": (strcmp(token.lexeme, "int") == 0 ? "int": "char"));
 
-        fprintf(f_salida, "%s ", token.lexeme);
-        needs_semicolon = true;
+          Token name_tok = get_next_token(src_ptr); // Nombre del arreglo (ej: "sum")
+          strcpy(nombre_arreglo_actual, name_tok.lexeme);
+
+          Token bracket_tok = get_next_token(src_ptr); // El "["
+          Token close_bracket = get_next_token(src_ptr); // El "]"
+          Token assign_tok = get_next_token(src_ptr); // El "="
+          Token open_brace = get_next_token(src_ptr); // El "{"
+
+          // Contamos cuántos elementos hay dentro de las llaves para el malloc
+          const char *look_elements = *src_ptr;
+          conteo_elementos_arreglo = 1; // Mínimo uno si no está vacío
+          Token elem = get_next_token(&look_elements);
+          while (elem.type != TOKEN_RBRACE && elem.type != TOKEN_EOF) {
+            if (elem.type == TOKEN_COMMA) conteo_elementos_arreglo++;
+            elem = get_next_token(&look_elements);
+          }
+
+          // Escribimos la inicialización dinámica en el Heap en C
+          fprintf(destino, "%s* %s = malloc(%d * sizeof(%s));\n", tipo_base, nombre_arreglo_actual, conteo_elementos_arreglo, tipo_base);
+
+          // Ahora inicializamos cada índice posicional mapeando el literal
+          int indice = 0;
+          Token val_elem = get_next_token(src_ptr);
+          while (val_elem.type != TOKEN_RBRACE && val_elem.type != TOKEN_EOF) {
+            if (val_elem.type != TOKEN_COMMA && val_elem.type != TOKEN_NEWLINE) {
+              fprintf(destino, "    %s[%d] = %s;\n", nombre_arreglo_actual, indice++, val_elem.lexeme);
+            }
+            val_elem = get_next_token(src_ptr);
+          }
+
+          *needs_semicolon = false;
+          continue;
+        }
+        // Identificador estándar o función global normal (printf, funciones de usuario, etc.)
+        fprintf(destino, "%s ", token.lexeme);
+        *needs_semicolon = true;
         break;
       }
 
-      case TOKEN_CHAR_LITERAL: fprintf(f_salida, "%s ", token.lexeme); needs_semicolon = true; break;
+      case TOKEN_CHAR_LITERAL:
+      if (asignando_a_any) {
+        fprintf(destino, "(Axoany_Struct){ .type = TYPE_CHAR, .c_val = %s } ", token.lexeme);
+      } else {
+        fprintf(destino, "%s ", token.lexeme);
+      }
+      *needs_semicolon = true;
+      break;
 
       case TOKEN_ASSIGN: {
-        if (in_pkg) {
-          needs_semicolon = false;
-          break;
-        }
+        fprintf(destino, "= ");
+        *needs_semicolon = false;
 
-        const char *look_lambda = ptr;
+        const char *look_lambda = *src_ptr;
         while (*look_lambda == ' ' || *look_lambda == '\t') look_lambda++;
 
+        // Si lo que sigue es una Lambda Dinámica asignada a la variable
         if (*look_lambda == '(') {
           static int lambda_counter = 0;
-          char lambda_name[64];
-          sprintf(lambda_name, "__axo_lambda_%d", ++lambda_counter);
+          char lambda_name[64]; sprintf(lambda_name, "__axo_lambda_%d", ++lambda_counter);
+          char buf_lambda[4096] = ""; char ret_type[64] = "void";
 
-          char buf_lambda[4096] = "";
-          char ret_type[64] = "void";
-
-          Token l_tok = get_next_token(&ptr); // Consume el '('
+          Token l_tok = get_next_token(src_ptr);
           while (l_tok.type != TOKEN_LBRACE && l_tok.type != TOKEN_EOF) {
             if (l_tok.type == TOKEN_COLON) {
-              l_tok = get_next_token(&ptr);
+              l_tok = get_next_token(src_ptr);
               if (strcmp(l_tok.lexeme, "[]any") == 0) strcpy(ret_type, "Axoarray_any");
               else if (strcmp(l_tok.lexeme, "int") == 0) strcpy(ret_type, "int");
               else if (strcmp(l_tok.lexeme, "dec") == 0) strcpy(ret_type, "double");
             }
-            l_tok = get_next_token(&ptr);
+            l_tok = get_next_token(src_ptr);
           }
 
-          sprintf(buf_lambda, "%s %s() {\n    ", ret_type, lambda_name);
+          FILE *f_lam = fmemopen(buf_lambda, sizeof(buf_lambda), "w");
+          fprintf(f_lam, "%s %s() {\n    ", ret_type, lambda_name);
 
-          int b_count = 1;
-          l_tok = get_next_token(&ptr);
-          bool lambda_necesita_punto_coma = false;
+          bool sub_needs_semi = false;
+          transpilar_bloque(src_ptr, f_lam, false, NULL, NULL, &sub_needs_semi, false);
+          fclose(f_lam);
 
-          while (l_tok.type != TOKEN_EOF) {
-            if (l_tok.type == TOKEN_NEWLINE) {
-              if (lambda_necesita_punto_coma) {
-                strcat(buf_lambda, ";");
-                lambda_necesita_punto_coma = false;
-              }
-              strcat(buf_lambda, "\n    ");
-              l_tok = get_next_token(&ptr);
-              continue;
-            }
-            if (l_tok.type == TOKEN_LBRACE) b_count++;
-            if (l_tok.type == TOKEN_RBRACE) {
-              b_count--;
-              if (b_count == 0) break;
-            }
+          strcat(funciones_extraidas, buf_lambda); strcat(funciones_extraidas, "\n");
 
-            // Cambia la lógica actual por una inyección limpia:
-            if (l_tok.type == TOKEN_STRING) {
-              char string_formateado[512];
-              // Solo añadimos las comillas que el lexer quitó, preservando el texto puro
-              sprintf(string_formateado, "\"%s\" ", l_tok.lexeme);
-              strcat(buf_lambda, string_formateado);
-              lambda_necesita_punto_coma = true;
-            } else {
-              strcat(buf_lambda, l_tok.lexeme);
-              strcat(buf_lambda, " ");
-              if (l_tok.type == TOKEN_IDENTIFIER || l_tok.type == TOKEN_NUMBER) {
-                lambda_necesita_punto_coma = true;
-              }
-            }
-            l_tok = get_next_token(&ptr);
-          }
-          strcat(buf_lambda, ";\n}\n\n");
-
-          strcat(funciones_extraidas, buf_lambda);
-
-          char prototipo[128];
-          sprintf(prototipo, "%s %s();\n", ret_type, lambda_name);
+          char prototipo[128]; sprintf(prototipo, "%s %s();\n", ret_type, lambda_name);
           strcat(prototipos_lambdas, prototipo);
 
-          fprintf(f_salida, "= (Axoany_Struct){ .type = TYPE_FUNC, .func_val = &__axo_lambda_%d }", lambda_counter);
-          needs_semicolon = true;
-        }
-        else if (*look_lambda == '"') {
-          Token str_tok = get_next_token(&ptr);
-          fprintf(f_salida, "= (Axoany_Struct){ .type = TYPE_STRING, .s_val = \"%s\" }", str_tok.lexeme);
-          needs_semicolon = true;
-        }
-        else {
-          fprintf(f_salida, "= ");
-          needs_semicolon = false;
+          fprintf(destino, "(Axoany_Struct){ .type = TYPE_FUNC, .func_val = &__axo_lambda_%d }", lambda_counter);
+          asignando_a_any = false; // Se resolvió el comodín
+          *needs_semicolon = true;
         }
         break;
       }
 
-      case TOKEN_REF_ARROW: fprintf(f_salida, "&"); needs_semicolon = false; break;
+      case TOKEN_REF_ARROW: fprintf(destino, "&"); *needs_semicolon = false; break;
 
       case TOKEN_NUMBER: {
         size_t len = strlen(token.lexeme);
-        if (len > 0 && token.lexeme[len - 1] == 'i') {
-          token.lexeme[len - 1] = '\0';
-          fprintf(f_salida, "%s * _Complex_I", token.lexeme);
+        bool es_imaginario = (len > 0 && token.lexeme[len - 1] == 'i');
+        char lexeme_limpio[256]; strcpy(lexeme_limpio, token.lexeme);
+        if (es_imaginario) lexeme_limpio[len - 1] = '\0';
+
+        if (asignando_a_any) {
+          if (es_imaginario) {
+            if (strlen(lexeme_limpio) == 0 || strcmp(lexeme_limpio, "1") == 0)
+            fprintf(destino, "(Axoany_Struct){ .type = TYPE_COMPLEX, .cmplx_val = _Complex_I } ");
+            else
+            fprintf(destino, "(Axoany_Struct){ .type = TYPE_COMPLEX, .cmplx_val = %s * _Complex_I } ", lexeme_limpio);
+          } else {
+            if (strchr(lexeme_limpio, '.') != NULL)
+            fprintf(destino, "(Axoany_Struct){ .type = TYPE_DEC, .d_val = %s } ", lexeme_limpio);
+            else
+            fprintf(destino, "(Axoany_Struct){ .type = TYPE_INT, .i_val = %s } ", lexeme_limpio);
+          }
         } else {
-          fprintf(f_salida, "%s ", token.lexeme);
+          // Expresión numérica común fuera de comodín
+          if (es_imaginario) {
+            if (strlen(lexeme_limpio) == 0) fprintf(destino, "_Complex_I ");
+            else fprintf(destino, "%s * _Complex_I ", lexeme_limpio);
+          } else {
+            fprintf(destino, "%s ", token.lexeme);
+          }
         }
-        needs_semicolon = true;
+        *needs_semicolon = true;
         break;
       }
 
-      case TOKEN_STRING: fprintf(f_salida, "\"%s\" ", token.lexeme); needs_semicolon = true; break;
-      case TOKEN_LARRAY: fprintf(f_salida, "{ "); needs_semicolon = false; break;
-      case TOKEN_RARRAY: fprintf(f_salida, " }"); needs_semicolon = true; break;
-      case TOKEN_SEMICOLON: fprintf(f_salida, "; "); needs_semicolon = false; break;
+      case TOKEN_STRING:
+      if (asignando_a_any) {
+        fprintf(destino, "(Axoany_Struct){ .type = TYPE_STRING, .s_val = \"%s\" } ", token.lexeme);
+      } else {
+        fprintf(destino, "\"%s\" ", token.lexeme);
+      }
+      *needs_semicolon = true;
+      break;
 
-      case TOKEN_OP_MULT: fprintf(f_salida, "* "); needs_semicolon = false; break;
-      case TOKEN_OP_DIV: fprintf(f_salida, "/ "); needs_semicolon = false; break;
-      case TOKEN_OP_SQRT: fprintf(f_salida, "sqrt"); needs_semicolon = false; break;
-      case TOKEN_OP_EXP: fprintf(f_salida, "exp"); needs_semicolon = false; break;
-      case TOKEN_OP_XOR: fprintf(f_salida, "^ "); needs_semicolon = false; break;
-      case TOKEN_OP_AND: fprintf(f_salida, "&& "); needs_semicolon = false; break;
-      case TOKEN_OP_OR: fprintf(f_salida, "|| "); needs_semicolon = false; break;
-      case TOKEN_OP_NOT: fprintf(f_salida, "! "); needs_semicolon = false; break;
-      case TOKEN_OP_GE: fprintf(f_salida, ">= "); needs_semicolon = false; break;
-      case TOKEN_OP_LE: fprintf(f_salida, "<= "); needs_semicolon = false; break;
-      case TOKEN_OP_NOTEQUAL: fprintf(f_salida, "!= "); needs_semicolon = false; break;
+      case TOKEN_LARRAY: fprintf(destino, "{ "); *needs_semicolon = false; break;
+      case TOKEN_RARRAY: fprintf(destino, " }"); *needs_semicolon = true; break;
 
-      case TOKEN_LBRACE: fprintf(f_salida, "{ "); needs_semicolon = false; break;
+      case TOKEN_SEMICOLON:
+      fprintf(destino, "; ");
+      asignando_a_any = false; // Finaliza la expresión comodín
+      *needs_semicolon = false;
+      break;
+
+      case TOKEN_OP_MULT:
+      // Si estamos asignando a un comodín y aparece una operación, la mantenemos dentro del contexto
+      fprintf(destino, "* "); *needs_semicolon = false;
+      break;
+      case TOKEN_OP_DIV: fprintf(destino, "/ "); *needs_semicolon = false; break;
+      case TOKEN_OP_SQRT: fprintf(destino, "sqrt"); *needs_semicolon = false; break;
+      case TOKEN_OP_EXP: fprintf(destino, "exp"); *needs_semicolon = false; break;
+      case TOKEN_OP_XOR: fprintf(destino, "^ "); *needs_semicolon = false; break;
+      case TOKEN_OP_AND: fprintf(destino, "&& "); *needs_semicolon = false; break;
+      case TOKEN_OP_OR: fprintf(destino, "|| "); *needs_semicolon = false; break;
+      case TOKEN_OP_NOT: fprintf(destino, "! "); *needs_semicolon = false; break;
+      case TOKEN_OP_GE: fprintf(destino, ">= "); *needs_semicolon = false; break;
+      case TOKEN_OP_LE: fprintf(destino, "<= "); *needs_semicolon = false; break;
+      case TOKEN_OP_NOTEQUAL: fprintf(destino, "!= "); *needs_semicolon = false; break;
+
+      case TOKEN_LBRACE: fprintf(destino, "{ "); *needs_semicolon = false; break;
       case TOKEN_RBRACE: {
         if (in_pkg) {
-          fprintf(f_salida, "} %s;\n\n", current_pkg_name);
+          fprintf(destino, "} %s;\n\n", current_pkg_name);
           strcat(temp_constructor, "    return instancia;\n}\n\n");
           strcat(constructores_inicializadores, temp_constructor);
-          in_pkg = false;
         } else {
-          fprintf(f_salida, "}\n");
+          fprintf(destino, "}\n");
         }
-        needs_semicolon = false;
-        break;
+        asignando_a_any = false;
+        *needs_semicolon = false;
+        return;
       }
-
+      // ==========================================
+      // ¡AQUÍ AÑADES ESTE NUEVO CASE PARA EL RETURN!
+      // ==========================================
       default:
-      fprintf(f_salida, "%s ", token.lexeme);
-      if (strcmp(token.lexeme, ")") == 0 || strcmp(token.lexeme, "]") == 0) needs_semicolon = true;
-      break;
-    }
+        // Si el identificador que cayó en default resulta ser la palabra "return"
+        if (strcmp(token.lexeme, "return") == 0) {
+          if (strncmp(tipo_retorno_actual, "[]", 2) == 0) {
+            Token var_ret = get_next_token(src_ptr); // Lee el nombre del arreglo (ej: "sum")
+            
+            char struct_type[64];
+            if (strcmp(tipo_retorno_actual, "[]int") == 0) strcpy(struct_type, "Axoarray_int");
+            else if (strcmp(tipo_retorno_actual, "[]dec") == 0) strcpy(struct_type, "Axoarray_dec");
+            else if (strcmp(tipo_retorno_actual, "[]char") == 0) strcpy(struct_type, "Axoarray_char");
+            else strcpy(struct_type, "Axoarray_any");
+            
+            fprintf(destino, "return (%s){ .data = %s, .length = %d }", struct_type, var_ret.lexeme, conteo_elementos_arreglo);
+            *needs_semicolon = true;
+            continue;
+          }
+        }
 
-    token = get_next_token(&ptr);
+        // Comportamiento por defecto para cualquier otro token desconocido
+        fprintf(destino, "%s ", token.lexeme);
+        if (strcmp(token.lexeme, ")") == 0 || strcmp(token.lexeme, "]") == 0) *needs_semicolon = true;
+        break;
+    }
+    token = get_next_token(src_ptr);
   }
 }
 
+void transpilar(const char *codigo_axolang, FILE *f_salida) {
+  const char *ptr = codigo_axolang;
+  bool needs_semicolon = false;
+  transpilar_bloque(&ptr, f_salida, false, NULL, NULL, &needs_semicolon, false);
+}
+
+// =====================================================================
+// FLUJO PRINCIPAL DE COMPILACIÓN NATIVA
+// =====================================================================
 int main(int argc, char* argv[]) {
   if (argc < 3) {
     printf("Uso: %s <archivo.axo> <salida.c>\n", argv[0]);
@@ -655,26 +643,19 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  fseek(origen, 0, SEEK_END);
-  long tamano = ftell(origen);
-  fseek(origen, 0, SEEK_SET);
+  fseek(origen, 0, SEEK_END); long tamano = ftell(origen); fseek(origen, 0, SEEK_SET);
 
   char* codigo_axolang = malloc(tamano + 1);
   if (!codigo_axolang) {
-    printf("Error: Memoria insuficiente.\n");
-    fclose(origen);
-    return 1;
+    printf("Error: Memoria insuficiente.\n"); fclose(origen); return 1;
   }
 
   size_t leidos = fread(codigo_axolang, 1, tamano, origen);
-  codigo_axolang[leidos] = '\0';
-  fclose(origen);
+  codigo_axolang[leidos] = '\0'; fclose(origen);
 
   FILE* salida_c = fopen(argv[2], "w");
   if (!salida_c) {
-    printf("Error: No se pudo crear el archivo de salida '%s'\n", argv[2]);
-    free(codigo_axolang);
-    return 1;
+    printf("Error: No se pudo crear el archivo de salida '%s'\n", argv[2]); free(codigo_axolang); return 1;
   }
 
   fprintf(salida_c, "// --- C23 AUTO-GENERATED CODE FROM AXOLANG ---\n");
@@ -690,9 +671,7 @@ int main(int argc, char* argv[]) {
   fprintf(salida_c, "typedef struct { Axoany_Struct* data; size_t length; } Axoarray_any;\n\n");
 
   transpilar(codigo_axolang, salida_c);
-
-  fclose(salida_c);
-  free(codigo_axolang);
+  fclose(salida_c); free(codigo_axolang);
 
   printf("[Axolang] Código intermedio '%s' generado con éxito.\n", argv[2]);
   printf("[Axolang] Compilando binario nativo en estándar C23...\n");

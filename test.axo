@@ -5,7 +5,8 @@ com miComplejo = 2 + 2.1i
 int edad = 25
 dec pi = 3.1416
 bool activo = true
-punt miCopia = *edad
+auto varauto = 3
+pint miCopia = =>edad
 pkg algo = {
   char letra
   dec gd
@@ -19,11 +20,9 @@ pkg algo = {
     sum[1] = a × b
     return sum
   }
-}
-any variableComodin = 2i
-any dinamico2 = «xd»
-any dinfun = ():[]any {
-printf(«Hola desde variable dinamica»)
+  func prueba = (){
+  scanf(«%s», =>saludo)
+  }
 }
 func hola2 = (){
   printf(«Hola desde funcion globql\n»)
@@ -34,7 +33,6 @@ func main = ():int {
   printf(«%s\n», saludo)
   printf(«%s\n», p1.saludar())
   printf(«%c\n», p1.letra)
-  printf(«%.1fI\n», cimag(variableComodin))
   for (int i = 0; i < 5; i++){
     printf(«%d\n», num[i])
   }
