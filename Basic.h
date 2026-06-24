@@ -1,0 +1,16 @@
+
+#include <stdio.h>
+#include <complex.h>
+
+// Macro genérico corregido que detecta el tipo y llama a la impresión correcta
+#define print(X) _Generic((X), \
+    int: printf("%d\n", (int)(X)), \
+    double: printf("%f\n", (double)(X)), \
+    float: printf("%f\n", (float)(X)), \
+    char*: printf("%s\n", (char*)(X)), \
+    const char*: printf("%s\n", (const char*)(X)), \
+    double complex: printf("%f + %fi\n", creal(X), cimag(X)), \
+    _Decimal128: printf("%DDf\n", (_Decimal128)(X)), \
+    default: printf("[Tipo desconocido]\n") \
+)
+

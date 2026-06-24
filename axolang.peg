@@ -1,0 +1,133 @@
+# Axoc.peg - Gramática unificada para Axolang
+%prefix "axolang"
+%value "char *"
+
+%source{
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* 0 = LuaJIT, 1 = C23 */
+int BACKEND_TARGET = 0;
+}
+
+# --- REGLAS SINTÁCTICAS (El cerebro del Parser) ---
+
+Programa <- _ SeccionScript SeccionUI EOF
+
+SeccionScript <- "#script" _ {
+if (BACKEND_TARGET == 1) {
+printf("int main() {\n");
+}
+$$ = strdup("");
+} Declaracion* {
+if (BACKEND_TARGET == 1) {
+printf("    return 0;\n}\n");
+}
+$$ = strdup("");
+}
+SeccionUI <- "#ui" _ ComponenteUI* / ""
+
+# Una declaración termina opcionalmente en ';' o consume obligatoriamente el fin de línea
+Declaracion <- ( DirectivaAdd / DefFuncion / DeclArreglo / DeclVariable / BloqueInline / InstruccionExpresion ) ( ";" _ / _ )
+DefFuncion <- "func" _ [a-zA-Z0-9_]+ _ "=" _ "()" _ "{" _ (BloqueInline / _)* "}" _
+
+BloqueInline <- BloqueInlineLua / BloqueInlineC
+
+BloqueInlineLua <- "inline_lua" _ "«" < [^»]* > "»" _ {
+if (BACKEND_TARGET == 0) printf("%s\n", $1);
+}
+
+BloqueInlineC <- "inline_c" _ "«" < [^»]* > "»" _ {
+if (BACKEND_TARGET == 1) printf("%s\n", $1);
+}
+DirectivaAdd <- "add" _ "<" _ < [a-zA-Z0-9_]+ > ".axo" _ ">" {
+if (BACKEND_TARGET == 1) printf("#include \"%s.h\"\n", $1);
+else printf("local %s = require(\"%s\")\n", $1, $1);
+}
+
+DeclVariable <- Tipo _ < Identificador > _ "=" _ < Expresion > {
+if (BACKEND_TARGET == 0) {
+printf("local %s = %s\n", $1, $2);
+} else {
+char *clean_val = strdup($2);
+char *dl_ptr = strstr(clean_val, "DL");
+if (dl_ptr) {
+dl_ptr[0] = 'Q';  // Reemplaza 'D' por 'Q'
+dl_ptr[1] = '\0'; // Corta la 'L' -> Queda el sufijo 'Q' para C
+}
+printf("auto %s = %s;\n", $1, clean_val);
+free(clean_val);
+}
+$$ = strdup("");
+}
+
+DeclArreglo <- Tipo _ < Identificador > "[]" _ "=" _ "⟨" _ < ListaElementos > _ "⟩" {
+if (BACKEND_TARGET == 0) {
+printf("local %s = {%s}\n", $1, $2);
+} else {
+char *clean_list = strdup($2);
+char *p;
+while ((p = strstr(clean_list, "DL")) != NULL) {
+p[0] = 'Q';   // Convierte "DL" en "Q "
+p[1] = ' ';
+}
+// Evaluamos el tipo de Axolang para poner el tipo real en C
+char *tipo_c = "int";
+if (strcmp($0, "dec") == 0) tipo_c = "__float128";
+else if (strcmp($0, "int") == 0) tipo_c = "int";
+else if (strcmp($0, "flt") == 0) tipo_c = "double";
+else if (strcmp($0, "chara") == 0) tipo_c = "char";
+
+printf("    %s %s[] = {%s};\n", tipo_c, $1, clean_list);
+free(clean_list);
+}
+$$ = strdup("");
+}
+
+InstruccionExpresion <- < Expresion > {
+if (BACKEND_TARGET == 0) printf("%s\n", $1);
+else printf("%s;\n", $1);
+}
+
+ListaElementos <- Expresion ( _ "," _ Expresion )*
+
+# --- REGLAS DE EXPRESIONES (Matemáticas y llamadas) ---
+
+Expresion <- Termino ( _ [+\-] _ Termino )*
+
+Termino <- Primario ( _ [X/] _ Primario )*
+
+# Añadimos soporte para llamadas a funciones antes de evaluar identificadores simples
+Primario <- LlamadaFuncion / Factor
+
+LlamadaFuncion <- < Identificador > _ "(" _ < ListaElementos? > _ ")" {
+char buf[512];
+sprintf(buf, "%s(%s)", $1, $2 ? $2 : "");
+$$ = strdup(buf);
+}
+
+Factor <- Literal / Identificador
+
+Literal <- NumDecimal / NumComplejo / NumEntero / Cadena / Caracter
+
+# --- REGLAS LÉXICAS (Tokens / Terminales) ---
+
+Tipo <- "int" / "flt" / "dec" / "boo" / "chara" / "com" / "auto"
+
+Identificador <- [a-zA-Z_][a-zA-Z0-9_]*
+
+NumComplejo <- [0-9]+ ("+" / "-")? [0-9.]+ "i"
+NumDecimal  <- [0-9]+ "." [0-9]+ "DL"
+NumEntero   <- [0-9]+
+
+# Tus comillas tipográficas « » capturadas de forma limpia en UTF-8
+Cadena <- "«" < [^»]* > "»"
+Caracter <- "'" < . > "'"
+
+ComponenteUI <- "<" _ [a-zA-Z_]+ _ "id" _ "=" _ Cadena _ ">" _ "{" _ ComponenteUI* _ "}" _ ";" _
+
+# Gestión de Espacios y Comentarios
+_ <- ( [ \t\r\n] / Comentario )*
+Comentario <- "//" [^\n]* "\n"
+EOF <- !.
