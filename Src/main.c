@@ -17,10 +17,17 @@ int main(int argc, char** argv) {
   char *resultado_parser = NULL;
 
   // 2. Pasamos el contexto y la dirección de memoria del retorno
-  axolang_parse(ctx, &resultado_parser);
+  //    FIX: el éxito/fracaso lo indica el valor de RETORNO de axolang_parse,
+  //    no el puntero de salida. resultado_parser siempre queda como strdup("")
+  //    (un puntero válido, no NULL) cuando la regla Programa hace match, así
+  //    que "resultado_parser != 0" era casi siempre verdadero incluso con
+  //    una entrada válida -> siempre reportaba error.
+  int ok = axolang_parse(ctx, &resultado_parser);
+
+  free(resultado_parser); // era un strdup("") de la acción de Programa; toca liberarlo
 
   // 3. Verificamos si el análisis fue exitoso
-  if (resultado_parser != 0) {
+  if (!ok) {
     fprintf(stderr, "Error: El análisis sintáctico de Axolang falló.\n");
     axolang_destroy(ctx); // Limpieza de memoria
     return 1;

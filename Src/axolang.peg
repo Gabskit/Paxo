@@ -37,7 +37,8 @@ SeccionUI <- "#ui" _ ComponenteUI* / ""
 Declaracion <- ( DefFuncion / DeclArreglo / DeclVariable / BloqueInline / InstruccionExpresion ) ( ";" _ / _ )
 
 # Las funciones e inline van globales, NO abren el main
-DefFuncion <- "func" _ [a-zA-Z0-9_]+ _ "=" _ "()" _ "{" _ (BloqueInline / _)* "}" _
+# FIX 2: la palabra clave del boceto es "fun", no "func"
+DefFuncion <- "fun" _ [a-zA-Z0-9_]+ _ "=" _ "()" _ "{" _ (BloqueInline / _)* "}" _
 
 BloqueInline <- BloqueInlineLua / BloqueInlineC
 
@@ -50,26 +51,40 @@ BloqueInlineC <- "inline_c" _ "«" < [^»]* > "»" _ {
 if (BACKEND_TARGET == 1) printf("%s\n", $1);
 $$ = strdup("");
 }
+
 # Añadimos AccesArreglo en la jerarquía alta de los primarios
+# FIX 1: esta es ahora la ÚNICA definición de Primario (se eliminó el duplicado
+# de más abajo, que no incluía AccesArreglo y pisaba esta versión)
 Primario <- LlamadaFuncion / AccesArreglo / < Factor > { $$ = strdup($1); }
 
 AccesArreglo <- < Identificador > _ "[" _ < Expresion > _ "]" {
-// Calculamos el espacio exacto: tamaño de $1 + tamaño de $3 + 3 caracteres ("[" , "]" y "\0")
-    int tamanio_necesario = strlen($1) + strlen($3) + 3;
-    
-    char buf[tamanio_necesario]; // El arreglo se adapta mágicamente al tamaño exacto
-    sprintf(buf, "%s[%s]", $1, $3);
-    $$ = strdup(buf);
-    }
+// FIX 3: solo hay 2 capturas (Identificador, Expresion) => $1 y $2, no $3
+// FIX 7: sin buffer estático ni VLA en el stack; tamaño exacto vía snprintf + heap
+int len = snprintf(NULL, 0, "%s[%s]", $1, $2);
+char* buf = malloc(len + 1);
+sprintf(buf, "%s[%s]", $1, $2);
+$$ = strdup(buf);
+free(buf);
+}
+
 DirectivaAdd <- "add" _ "<" _ < [a-zA-Z0-9_]+ > ".axo" _ ">" {
+// FIX 7: sin buffer estático; tamaño exacto vía snprintf + heap
+// FIX 9: el backend Lua ahora también compila la dependencia de forma recursiva
+// (antes solo emitía el require() asumiendo que el .lua ya existía por otro lado)
+char* ext = (BACKEND_TARGET == 1) ? "h" : "lua";
+char* flag = (BACKEND_TARGET == 1) ? "--c" : "--lua";
+int cmd_len = snprintf(NULL, 0, "./axoc %s < %s.axo > %s.%s", flag, $1, $1, ext);
+char* cmd = malloc(cmd_len + 1);
+sprintf(cmd, "./axoc %s < %s.axo > %s.%s", flag, $1, $1, ext);
+
 if (BACKEND_TARGET == 1){
 printf("#include \"%s.h\"\n", $1);
-
-char lib[512];
-sprintf(lib, "./axoc --c < %s.axo > %s.h", $1, $1);
-system(lib);
+} else {
+printf("local %s = require(\"%s\")\n", $1, $1);
 }
-else printf("local %s = require(\"%s\")\n", $1, $1);
+system(cmd);
+free(cmd);
+$$ = strdup("");
 }
 
 # Las variables, arreglos y expresiones SÍ abren el main automáticamente
@@ -116,14 +131,17 @@ ListaElementos <- < Expresion ( _ "," _ Expresion )* > { $$ = strdup($1); }
 
 Expresion <- < Termino ( _ [+\-] _ Termino )* > { $$ = strdup($1); }
 
-Termino <- < Primario ( _ [X/] _ Primario )* > { $$ = strdup($1); }
-
-Primario <- LlamadaFuncion / < Factor > { $$ = strdup($1); }
+# FIX 6: era [X/] (la letra X no es un operador del boceto, que define "×"->"*") -> [*\/]
+Termino <- < Primario ( _ [*\/] _ Primario )* > { $$ = strdup($1); }
 
 LlamadaFuncion <- < Identificador > _ "(" _ < ListaElementos? > _ ")" {
-char buf[512];
-sprintf(buf, "%s(%s)", $1, $2 ? $2 : "");
+// FIX 7: sin buffer estático; tamaño exacto vía snprintf + heap
+const char* args = $2 ? $2 : "";
+int len = snprintf(NULL, 0, "%s(%s)", $1, args);
+char* buf = malloc(len + 1);
+sprintf(buf, "%s(%s)", $1, args);
 $$ = strdup(buf);
+free(buf);
 }
 
 Factor <- < Literal / Identificador > { $$ = strdup($1); }
@@ -136,14 +154,20 @@ Tipo <- "int" / "flt" / "dec" / "boo" / "chara" / "com" / "auto"
 
 Identificador <- [a-zA-Z_][a-zA-Z0-9_]*
 
-NumComplejo <- [0-9]+ ("+" / "-")? [0-9.]+ "i"
+# FIX 5: el signo ahora es obligatorio (separa la parte real de la imaginaria sin
+# ambigüedad) y se permite espacio alrededor, para soportar "5 + 7i" igual que "5+7i"
+NumComplejo <- [0-9]+ _ ("+" / "-") _ [0-9.]+ "i"
 NumDecimal  <- [0-9]+ "." [0-9]+ "DL"
 NumEntero   <- [0-9]+
 
 Cadena <- "«" < [^»]* > "»"
 Caracter <- "'" < . > "'"
 
-ComponenteUI <- "<" _ [a-zA-Z_]+ _ "id" _ "=" _ Cadena _ ">" _ "{" _ ComponenteUI* _ "}" _ ";" _
+# FIX 4: ahora admite múltiples atributos (incluyendo nombres con ":", como on:click)
+# y elementos auto-cerrados sin cuerpo ("<text id=...>;"), además del caso con cuerpo
+ComponenteUI <- "<" _ [a-zA-Z_]+ _ Atributo* ">" _ ( "{" _ ComponenteUI* _ "}" _ ";" _ / ";" _ )
+
+Atributo <- [a-zA-Z_:]+ _ "=" _ Cadena _
 
 _ <- ( [ \t\r\n] / Comentario )*
 Comentario <- "//" [^\n]* "\n"

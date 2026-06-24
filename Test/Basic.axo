@@ -1,5 +1,5 @@
 #script
-func print = () {
+fun print = () {
 inline_lua «
 function print(...)
     _G.print(...)
