@@ -1,23 +1,127 @@
 #script
-func print = () {
+add <stdio.h>
+add <inttypes.h>
+add <complex.h>
+add <stdbool.h>
+
+// Definición de print variádico. El compilador de Axolang expandirá
+// las llamadas usando desenrollado (unrolling) directo en el AST.
+fun print = (any valor...) {
 inline_lua «
 function print(...)
-    _G.print(...)
+local args = {...}
+for i = 1, #args do
+_G.io.write(tostring(args[i]) .. "\t")
+end
+_G.print()
 end
 »
-inline_c «
-#include <stdio.h>
-#include <complex.h>
 
-// Macro genérico corregido que detecta el tipo y llama a la impresión correcta
-#define print(X) _Generic((X), \
-    int: printf("%d\n", (int)(X)), \
-    double: printf("%f\n", (double)(X)), \
-    float: printf("%f\n", (float)(X)), \
-    char*: printf("%s\n", (char*)(X)), \
-    double complex: printf("%f + %fi\n", creal(X), cimag(X)), \
-    _Decimal128: printf("%DDf\n", (_Decimal128)(X)), \
-    default: printf("[Tipo desconocido]\n") \
+inline_c «
+// Evaluador unitario C23 _Generic para inyección directa
+#define axo_print_single(X) _Generic((X), \
+bool: printf((X) ? "true\t" : "false\t"), \
+int8_t: printf("%" PRId8 "\t", (int8_t)(X)), \
+uint8_t: printf("%" PRIu8 "\t", (uint8_t)(X)), \
+int16_t: printf("%" PRId16 "\t", (int16_t)(X)), \
+uint16_t: printf("%" PRIu16 "\t", (uint16_t)(X)), \
+int32_t: printf("%" PRId32 "\t", (int32_t)(X)), \
+uint32_t: printf("%" PRIu32 "\t", (uint32_t)(X)), \
+int64_t: printf("%" PRId64 "\t", (int64_t)(X)), \
+uint64_t: printf("%" PRIu64 "\t", (uint64_t)(X)), \
+_Float16: printf("%f\t", (float)(X)), \
+float: printf("%f\t", (float)(X)), \
+double: printf("%f\t", (double)(X)), \
+long double: printf("%Lf\t", (long double)(X)), \
+char: printf("%c\t", (char)(X)), \
+char*: printf("%s\t", (char*)(X)), \
+const char*: printf("%s\t", (const char*)(X)), \
+_Float16 complex: printf("%f + %fi\t", crealf(X), cimagf(X)), \
+float complex: printf("%f + %fi\t", crealf(X), cimagf(X)), \
+double complex: printf("%lf + %lfi\t", creal(X), cimag(X)), \
+long double complex: printf("%Lf + %Lfi\t", creall(X), cimagl(X)), \
+_Decimal32: printf("%Hf\t", (_Decimal32)(X)), \
+_Decimal64: printf("%Df\t", (_Decimal64)(X)), \
+_Decimal128: printf("%DDf\t", (_Decimal128)(X)), \
+default: printf("[Estructura/any]\t") \
+)
+»
+}
+
+// Definición de scan variádico por referencia.
+fun scan = (any* valor...){
+inline_lua «
+function axo_runtime_scan(...)
+local ptrs = {...}
+for i = 1, #ptrs do
+local token = io.read("*w")
+if not token then return end
+ptrs[i][0] = token
+end
+end
+»
+
+inline_c «
+// 1. Funciones auxiliares primero para que estén en scope
+static inline void axo_scan_string_safe(char* dest, size_t max_len) {
+char *formato = malloc(sizeof(max_len));
+snprintf(formato, sizeof(formato), "%%%zds", max_len - 1);
+formato[max_len] = '\n';
+scanf(formato, dest);
+free(formato);
+}
+
+static inline void axo_scan_xscom(_Float16 complex* ptr) {
+float r, i;
+if (scanf("%f %f", &r, &i) == 2) {
+*ptr = r + i * I;
+}
+}
+
+static inline void axo_scan_scom(float complex* ptr) {
+float r, i;
+if (scanf("%f %f", &r, &i) == 2) {
+*ptr = r + i * I;
+}
+}
+
+static inline void axo_scan_com(double complex* ptr) {
+double r, i;
+if (scanf("%lf %lf", &r, &i) == 2) {
+*ptr = r + i * I;
+}
+}
+
+static inline void axo_scan_lcom(long double complex* ptr) {
+long double r, i; // Corregido a long double
+if (scanf("%Lf %Lf", &r, &i) == 2) {
+*ptr = r + i * I;
+}
+}
+
+// 2. Macro evaluadora de punteros para Scan
+#define axo_scan_single(X) _Generic((X), \
+int8_t*: scanf("%" SCNd8, (int8_t*)(X)), \
+uint8_t*: scanf("%" SCNu8, (uint8_t*)(X)), \
+int16_t*: scanf("%" SCNd16, (int16_t*)(X)), \
+uint16_t*: scanf("%" SCNu16, (uint16_t*)(X)), \
+int32_t*: scanf("%" SCNd32, (int32_t*)(X)), \
+uint32_t*: scanf("%" SCNu32, (uint32_t*)(X)), \
+int64_t*: scanf("%" SCNd64, (int64_t*)(X)), \
+uint64_t*: scanf("%" SCNu64, (uint64_t*)(X)), \
+_Float16*: scanf("%f", (float*)(X)), \
+float*: scanf("%f", (float*)(X)), \
+double*: scanf("%lf", (double*)(X)), \
+long double*: scanf("%Lf", (long double*)(X)), \
+char*: axo_scan_string_safe((char*)(X), 128), \
+_Float16 complex*: axo_scan_xscom((_Float16 complex*)(X)), \
+float complex*: axo_scan_scom((float complex*)(X)), \
+double complex*: axo_scan_com((double complex*)(X)), \
+long double complex*: axo_scan_lcom((long double complex*)(X)), \
+_Decimal32*: scanf("%Hf", (_Decimal32*)(X)), \
+_Decimal64*: scanf("%Df", (_Decimal64*)(X)), \
+_Decimal128*: scanf("%DDf", (_Decimal128*)(X)), \
+default: printf("[Error: Tipo no escaneable]\n") \
 )
 »
 }

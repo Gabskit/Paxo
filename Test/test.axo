@@ -1,6 +1,4 @@
 #script
 add <Basic.axo>
 int num = 69
-dec foo[] = ⟨2.2DL, 3.14DL⟩
-chara letra = 'u'
 print(num)
