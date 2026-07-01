@@ -41,6 +41,33 @@ export default class AxolangListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by AxolangParser#matchStatement.
+	enterMatchStatement(ctx) {
+	}
+
+	// Exit a parse tree produced by AxolangParser#matchStatement.
+	exitMatchStatement(ctx) {
+	}
+
+
+	// Enter a parse tree produced by AxolangParser#matchCase.
+	enterMatchCase(ctx) {
+	}
+
+	// Exit a parse tree produced by AxolangParser#matchCase.
+	exitMatchCase(ctx) {
+	}
+
+
+	// Enter a parse tree produced by AxolangParser#declaration.
+	enterDeclaration(ctx) {
+	}
+
+	// Exit a parse tree produced by AxolangParser#declaration.
+	exitDeclaration(ctx) {
+	}
+
+
 	// Enter a parse tree produced by AxolangParser#expression.
 	enterExpression(ctx) {
 	}
