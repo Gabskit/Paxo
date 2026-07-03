@@ -68,6 +68,24 @@ export default class AxolangListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
+	// Enter a parse tree produced by AxolangParser#pkgVar.
+	enterPkgVar(ctx) {
+	}
+
+	// Exit a parse tree produced by AxolangParser#pkgVar.
+	exitPkgVar(ctx) {
+	}
+
+
+	// Enter a parse tree produced by AxolangParser#pkgDeclaration.
+	enterPkgDeclaration(ctx) {
+	}
+
+	// Exit a parse tree produced by AxolangParser#pkgDeclaration.
+	exitPkgDeclaration(ctx) {
+	}
+
+
 	// Enter a parse tree produced by AxolangParser#expression.
 	enterExpression(ctx) {
 	}

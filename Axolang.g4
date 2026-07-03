@@ -27,16 +27,19 @@ matchStatement
 
 matchCase
 : expression '->' declaration ';'
-| expression '->' '{' declaration* '}'
+| expression '->' '{' OTHER '}'
 | '_' '->' declaration ';' // Caso por defecto (Gleam style)
 ;
 
 declaration
 : IDENTIFIER '=' expression
-| IDENTIFIER '(' expression* ')'
+| IDENTIFIER '(' OTHER ')'
 | statement
 ;
 
+pkgDeclaration
+: '{' OTHER '}'
+;
 // Expresión matemática o literal simple por ahora
 expression
 : INT_LITERAL
@@ -47,18 +50,20 @@ expression
 | CHAR_LITERAL
 | DECIMAL_LITERAL
 | BOOLEAN
+| pkgDeclaration
 ;
 
 // --- TOKENS LÉXICOS ---
-IDENTIFIER    : [a-zA-Z_][a-zA-Z0-9_]* ;
-CHAR_LITERAL  : '\'' [a-zA-Z0-9_]* '\'';
-INT_LITERAL   : [+-]? [0-9]+ ;
-UINT_LITERAL  : [0-9]+ [uU];
-FLOAT_LITERAL : [+-]? [0-9]+ '.' [0-9]+;
-DECIMAL_LITERAL: [+-]? [0-9]+ '.' [0-9]+ [dD] | [+-]? [0-9]+ [dD] ;//3.3D y 3D
+IDENTIFIER    : [\u{1F4A9}\u{1F926}\p{Alpha}\p{General_Category=Other_Letter}] [\u{1F4A9}\u{1F926}\p{Alnum}\p{General_Category=Other_Letter}]* ;
+CHAR_LITERAL  : '\'' [\u{1F4A9}\u{1F926}\p{Alnum}\p{General_Category=Other_Letter}] '\'';
+INT_LITERAL   : [+-]? [ \t]* [0-9]+ ;
+UINT_LITERAL  : [0-9]+ [ \t]* 'u';
+FLOAT_LITERAL : [+-]? [ \t]* [0-9]+ ('.' [0-9]+)?;
+DECIMAL_LITERAL: [+-]? [ \t]* [0-9]+ ('.' [0-9]+)? 'D';//3.3D y 3D
 COMPLEX_LITERAL
-: [+-]? [0-9]+ ('.' [0-9]+)? [ \t]* [+-] [ \t]* [0-9]+ ('.' [0-9]+)? [iI]  // Ej: 4+5i, 3.14 - 2.5i, 4 + 2i
-| [+-]? [0-9]+ ('.' [0-9]+)? [iI];                                    // Ej: 2i, 0.5i (Imaginarios puros)
+: [+-]? [ \t]* [0-9]+ ('.' [0-9]+)? [ \t]* [+-] [ \t]* [0-9]+ ('.' [0-9]+)? [ \t]* 'i'  // Ej: 4+5i, 3.14 - 2.5i, 4 + 2i
+| [+-]? [ \t]* [0-9]+ ('.' [0-9]+)? [ \t]* 'i';                                    // Ej: 2i, 0.5i (Imaginarios puros)
 BOOLEAN :[★†];
 //FUN_DECLARATION : '(' [a-zA-Z_][a-zA-Z0-9_]* ')' ':' [a-zA-Z_] '{' '}'
 WS            : [ \t\r\n]+ -> skip ;
+OTHER : .?*;
