@@ -1,4 +1,3 @@
 #script
-add <Basic.axo>
-int num = 69
+var num = 69
 print(num)

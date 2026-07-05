@@ -32,15 +32,6 @@ export default class AxolangListener extends antlr4.tree.ParseTreeListener {
 	}
 
 
-	// Enter a parse tree produced by AxolangParser#assignmentStatement.
-	enterAssignmentStatement(ctx) {
-	}
-
-	// Exit a parse tree produced by AxolangParser#assignmentStatement.
-	exitAssignmentStatement(ctx) {
-	}
-
-
 	// Enter a parse tree produced by AxolangParser#type.
 	enterType(ctx) {
 	}
