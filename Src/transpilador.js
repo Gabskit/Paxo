@@ -96,8 +96,17 @@ class AxolangToCListener extends AxolangListener {
     } else {
       chkmrk = ["DD", "U", "* I"];
     }
-
-    if (ctx.arrayLiteral()) {
+if (type == "pkg"){
+  let pkgvars = ctx.expression().pkg().varDeclaration()
+  let pvdec = []
+  for(let p = 0; p < pkgvars.length;p++){
+    let pvid = pkgvars[p].IDENTIFIER().getText()
+    let pvtp = pkgvars[p].getChild(0).getText()
+    pvdec.push(`${pvtp} ${pvid};`)
+  }
+  this.outputC += `\ntypedef struct{ ${pvdec.join("\n")} }${id};`
+}
+    else if (ctx.arrayLiteral()) {
       const values = ctx.arrayLiteral().expression();
       const numval = values.length;
       let vars = [];
@@ -128,10 +137,11 @@ class AxolangToCListener extends AxolangListener {
           vars.push(`{ .axo_other = ${thisval} }`);
         } else if (values[a].IDENTIFIER()) {
           vars.push(`{ .axo_other = ${thisval} }`);
-        } /*else if (values[a].arrayLiteral()) {
-          this.enterVarDeclaration(values[a].arrayLiteral());
+        } else if (values[a].arrayLiteral()) {
+          
+          this.enterVarDeclaration(values[a]);
           vars.push(`{ .axo_other = ${thisval} }`);
-        }*/ else {
+        } else {
           vars.push(`{ .axo_int = ${thisval} }`);
         }
       }
@@ -158,7 +168,7 @@ class AxolangToCListener extends AxolangListener {
       } else if (value.startsWith("'")) {
         this.outputC += `\n${id}.axo_chara= ${chkmrk[1]}${value};`;
       } else if (value.startsWith('"')) {
-        this.outputC += `\n${id}.axo_other = ${chkmrk[1]}${value};`;
+        this.outputC += `\n${id}.axo_other = ${chkmrk[1]}${value}";`;
       } else if (value.startsWith("&")) {
         this.outputC += `\n${id}.axo_other = ${value};`;
       } else if (thisvar.IDENTIFIER()) {
@@ -191,13 +201,13 @@ function transpile(inputCode) {
   return finalCode;
 }
 const test = `
-var hi[] = «5, 6u, 5.5-6i»
+var hi[] = «5, 6u, 5.5-6i, «7, 7.8»»
 var go = "Hola"
 var text = go
 lvar hi2 = 7 - 8i
 xsvar oh = 8.7
-fun hola = (){
-lvar = 8.7
+pkg hola = {
+  var numero
 }
 `;
 console.log(transpile(test));

@@ -4,13 +4,17 @@
     "main": "transpilador.js",
     "type": "module",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "antlr": "antlr-ng -Dlanguage=JavaScript -o ./Src ./Src/Axolang.g4"
     },
     "keywords": [],
     "author": "",
     "license": "ISC",
     "description": "",
     "dependencies": {
-        "antlr4": "^4.13.1"
+        "antlr4": "^4.13.2"
+    },
+    "devDependencies": {
+        "antlr-ng": "^1.0.10",
+        "antlr4ng-cli": "^2.0.0"
     }
 }

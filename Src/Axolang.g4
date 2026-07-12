@@ -68,9 +68,9 @@ arrayAccess
 ;
 
 // --- TOKENS LÉXICOS LIMPIOS (Sin capturar espacios previos) ---
-IDENTIFIER : [a-zA-Z_\u{1F4A9}\u{1F926}\p{Alpha}\p{General_Category=Other_Letter}] [a-zA-Z0-9_\u{1F4A9}\u{1F926}\p{Alnum}\p{General_Category=Other_Letter}]* ;
-CHAR_LITERAL : '\'' [\u{1F4A9}\u{1F926}\p{Alnum}\p{General_Category=Other_Letter}] '\'';
-STRING_LITERAL : '"' [ \t\n\u{1F4A9}\u{1F926}\p{Alnum}\p{General_Category=Other_Letter}]* '"';
+IDENTIFIER : [a-zA-Z_\u{1F4A9}\u{1F926}\p{L}\p{General_Category=Other_Letter}] [a-zA-Z0-9_\u{1F4A9}\u{1F926}\p{L}\p{General_Category=Other_Letter}]* ;
+CHAR_LITERAL : '\'' [\u{1F4A9}\u{1F926}\p{N}\p{General_Category=Other_Letter}] '\'';
+STRING_LITERAL : '"' [ \t\n\u{1F4A9}\u{1F926}\p{N}\p{General_Category=Other_Letter}]* '"';
 INT_LITERAL : [+-]? [0-9]+ ;
 UINT_LITERAL : [0-9]+ 'u';
 FLOAT_LITERAL : [+-]? [0-9]+ ('.' [0-9]+)?;
