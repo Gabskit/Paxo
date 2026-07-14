@@ -61,7 +61,8 @@ typedef union {
   dec_complex(_Decimal32) paxo_comdec;
   char32_t paxo_chara;
   bool paxo_boo;
-  float paxo_vec[2];
+  _Float32 paxo_vec[2];
+  _Float16 paxo_vec4d[4];
   char paxo_str[8];
   void* paxo_other;
 } var;
@@ -75,7 +76,8 @@ typedef union {
   dec_complex(_Decimal64) paxo_comdec;
   char32_t paxo_chara;
   bool paxo_boo;
-  float paxo_vec[4];
+  _Float64 paxo_vec[2];
+  _Float32 paxo_vec4d[4];
   struct { void* ptr; size_t len; } paxo_slice;
   struct { int64_t sec; int64_t nsec; } paxo_time;
   char paxo_str[16];
@@ -99,7 +101,8 @@ typedef union {
   dec_complex(_Decimal128) paxo_comdec;
   char32_t paxo_chara;
   bool paxo_boo;
-  double paxo_vec[4];
+  _Float128 paxo_vec[2];
+  _Float64 paxo_vec4d[4];
   struct { void* ptr; size_t len; } paxo_slice;
   struct { int64_t sec; int64_t nsec; } paxo_time;
   char paxo_str[32];
