@@ -22,43 +22,48 @@ typedef struct {
   int64_t value;
   bool has_error;
   int32_t error_code;
-} axo_result_t;
+} paxo_result_t;
 
 typedef union {
-  int16_t axo_int;
-  uint16_t axo_intu;
-  _Float16 axo_dec;
-  char16_t axo_chara;
-  bool axo_boo;
+  int16_t paxo_int;
+  uint16_t paxo_intu;
+  _Float16 paxo_flt;
+  char16_t paxo_chara;
+  bool paxo_boo;
 } xsvar;
 
 typedef union {
-  char32_t axo_chara;
-  bool axo_boo;
-  int32_t axo_int;
-  uint32_t axo_intu;
-  _Float16 complex axo_com;
-  _Decimal32 axo_dec;
+  char32_t paxo_chara;
+  bool paxo_boo;
+  int32_t paxo_int;
+  uint32_t paxo_intu;
+  _Float16 complex paxo_com;
+  _Float32 paxo_flt;
+  _Decimal32 paxo_dec;
 } svar;
 
 typedef union {
-  char32_t axo_chara;
-  bool axo_boo;
-  int64_t axo_int;
-  uint64_t axo_intu;
-  dec_complex(_Decimal32) complex axo_com;
-  _Decimal64 axo_dec;
-  void* axo_other;
+  char32_t paxo_chara;
+  bool paxo_boo;
+  int64_t paxo_int;
+  uint64_t paxo_intu;
+  _Float64 paxo_flt;
+  _Float32 complex paxo_com;
+  dec_complex(_Decimal32) complex paxo_comdec;
+  _Decimal64 paxo_dec;
+  void* paxo_other;
 } var;
 
 typedef union {
-  char32_t axo_chara;
-  bool axo_boo;
-  _BitInt(128) axo_int;
-  unsigned _BitInt(128) axo_intu;
-  dec_complex(_Decimal64) complex axo_com;
-  _Decimal128 axo_dec;
-  void* axo_other;
+  char32_t paxo_chara;
+  bool paxo_boo;
+  _BitInt(128) paxo_int;
+  unsigned _BitInt(128) paxo_intu;
+  _Float128 paxo_flt;
+  _Float64 complex paxo_com;
+  dec_complex(_Decimal64) complex paxo_comdec;
+  _Decimal128 paxo_dec;
+  void* paxo_other;
 } lvar;
 
 `;
