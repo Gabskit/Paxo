@@ -25,6 +25,10 @@ var foo = «4, 5.08, "Arreglos", «6, 7»»
 pkg foo = {
   var goo = "Paquetes" //contiene variables y funciones
 }
+elc foo = {
+  var inte
+  svar ou
+} //como union
 fun foo = (){
 var goo = "Esto es una función"
 }
@@ -40,11 +44,6 @@ var //8 bytes 64 bits
 lvar //16 bytes 128 bits
 xlvar //32 bytes 256 bits
 ```
-- xxsvar acepta entero con signo y sin signo, caracteres y booleano
-- xsvar acepta entero con signo y sin signo, caracteres, booleano, texto embebido y flotante
-- svar acepta entero con signo y sin signo, caracteres, booleano, complejos y decimales
-- var y lvar aceptaa todos los tipos
-
 ## Funciones
 
 ```
@@ -112,6 +111,17 @@ try {
   //error
 }
 ```
+## Operadores
+==, =, <, >, ≤, ≥, ≠, ×, ÷, √, •«, »•, &, |, !, .&, .|, .!, §, +, -
+•« desplazamiento de bits L
+»• desplazamiento de bits R
+& and
+| or
+! not
+.& and bit
+.| or bit
+.! not bit
+§ xor
 
 ## Ejemplo
 
