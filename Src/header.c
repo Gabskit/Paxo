@@ -12,7 +12,7 @@ typedef _Decimal32  _dec_complex__Decimal32[2];
 typedef _Decimal64  _dec_complex__Decimal64[2];
 typedef _Decimal128 _dec_complex__Decimal128[2];
 
-typedef void* (*paxo_callable_t)(var* args, int arg_count);
+typedef void* (*paxo_callable_t)(void* args, int arg_count);
 
 typedef struct {
   int64_t value;
@@ -25,7 +25,6 @@ typedef union {
   uint8_t paxo_intu;
   char paxo_chara;
   bool paxo_boo;
-  uint8_t paxo_err_id;
 } xxsvar;
 
 typedef union {
@@ -34,23 +33,27 @@ typedef union {
   _Float16 paxo_flt;
   char16_t paxo_chara;
   bool paxo_boo;
+  uint8_t paxo_intuvec2d[2];
+  int8_t paxo_intvec2d[2];
   char paxo_str[2];
-  uint8_t paxo_err_id;
 } xsvar;
 
 typedef union {
   int32_t paxo_int;
   uint32_t paxo_intu;
-  int32_t paxo_enum;
   _Float32 paxo_flt;
   _Decimal32 paxo_dec;
-  _Float16 complex paxo_com;
+  _Float16 complex paxo_comflt;
   char32_t paxo_chara;
   bool paxo_boo;
-  uint32_t paxo_rgba;
-  _Float16 paxo_vec[2];
+  uint8_t paxo_intuvec4d[4];
+  int8_t paxo_intvec4d[4];
+  uint8_t paxo_intuvec3d[3];
+  int8_t paxo_intvec3d[3];
+  uint16_t paxo_intuvec2d[2];
+  int16_t paxo_intvec2d[2];
+  _Float16 paxo_fltvec[2];
   char paxo_str[4];
-  uint8_t paxo_err_id;
 } svar;
 
 typedef union {
@@ -63,12 +66,18 @@ typedef union {
   dec_complex(_Decimal32) paxo_comdec;
   char32_t paxo_chara;
   bool paxo_boo;
-  uint32_t paxo_rgba;
+  uint16_t paxo_intuvec4d[4];
+  int16_t paxo_intvec4d[4];
+  uint16_t paxo_intuvec3d[3];
+  int16_t paxo_intvec3d[3];
+  uint32_t paxo_intuvec2d[2];
+  int32_t paxo_intvec2d[2];
   _Float32 paxo_vec[2];
+  _Float16 paxo_vec3d[3];
   _Float16 paxo_vec4d[4];
   char paxo_str[8];
-  uint8_t paxo_err_id;
   paxo_callable_t paxo_func;
+  struct { uint8_t ip[4]; uint8_t mask_or_port[4]; } paxo_netv4;
   void* paxo_other;
 } var;
 
@@ -82,14 +91,21 @@ typedef union {
   dec_complex(_Decimal64) paxo_comdec;
   char32_t paxo_chara;
   bool paxo_boo;
-  uint32_t paxo_rgba;
+  uint32_t paxo_intuvec4d[4];
+  int32_t paxo_intvec4d[4];
+  uint32_t paxo_intuvec3d[3];
+  int32_t paxo_intvec3d[3];
+  uint64_t paxo_intuvec2d[2];
+  int64_t paxo_intvec2d[2];
   _Float64 paxo_vec[2];
+  _Float32 paxo_vec3d[3];
   _Float32 paxo_vec4d[4];
-  struct { void* ptr; size_t len; } paxo_slice;
+  struct { void* ptr; uint64_t len; } paxo_slice;
   struct { int64_t sec; int64_t nsec; } paxo_time;
   char paxo_str[16];
-  uint8_t paxo_err_id;
   paxo_callable_t paxo_func;
+  struct { uint8_t ip[4]; uint8_t mask_or_port[4]; } paxo_netv4;
+  uint8_t paxo_netv6[16];
   void* paxo_other;
 } lvar;
 
@@ -97,11 +113,7 @@ typedef union {
   _BitInt(256) paxo_int;
   unsigned _BitInt(256) paxo_intu;
   _BitInt(256) paxo_enum;
-  #ifdef __HAVE_FLOAT256
   _Float256 paxo_flt;
-  #else
-  _Float128 paxo_flt;
-  #endif
   #ifdef __HAVE_DECIMAL256
   _Decimal256 paxo_dec;
   #else
@@ -111,13 +123,20 @@ typedef union {
   dec_complex(_Decimal128) paxo_comdec;
   char32_t paxo_chara;
   bool paxo_boo;
-  uint32_t paxo_rgba;
+  uint64_t paxo_intuvec4d[4];
+  int64_t paxo_intvec4d[4];
+  uint64_t paxo_intuvec3d[3];
+  int64_t paxo_intvec3d[3];
+  unsigned _BitInt(128) paxo_intuvec2d[2];
+  _BitInt(128) paxo_intvec2d[2];
   _Float128 paxo_vec[2];
+  _Float64 paxo_vec3d[3];
   _Float64 paxo_vec4d[4];
-  struct { void* ptr; size_t len; } paxo_slice;
+  struct { void* ptr; uint64_t len; } paxo_slice;
   struct { int64_t sec; int64_t nsec; } paxo_time;
   char paxo_str[32];
-  uint8_t paxo_err_id;
   paxo_callable_t paxo_func;
+  struct { uint8_t ip[4]; uint8_t mask_or_port[4]; } paxo_netv4;
+  uint8_t paxo_netv6[16];
   void* paxo_other; //punteros, pkg, strings largos, etc.
 } xlvar;
