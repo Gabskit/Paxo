@@ -1,7 +1,7 @@
 // ejemplo
-var entero = false
-var i = 0
-fun main = () {
+📥 entero = false
+📥 i = 0
+📥 main = () {
   entero = 9
-  loop (i > 50): stop {
-    entero++}}
+  (i > 50): ⏸️ |:
+    entero++:|}

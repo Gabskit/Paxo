@@ -19,6 +19,8 @@ Paxo es un nuevo lenguaje de tipado dinamico, multiparadigma, transpilado a c23,
 📥 foo = 97:765 //nanotiempo
 📥 goo = &foo~2 //slice
 📥 goo = &foo //puntero
+📥 foo = 35.106.255.97 //ipv4
+📥 foo = 6a:aff:... //ipv6
 📥 foo = «4, 5.08, "Arreglos", «6, 7»»
 
 📦 foo = {

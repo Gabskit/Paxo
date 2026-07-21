@@ -146,7 +146,7 @@ NANOTIME_LITERAL: [0-9]+ ':' [0-9]+ ;
 SLICE_LITERAL   : '&' [a-zA-Z_\p{L}\p{Emoji}][a-zA-Z0-9_\p{L}\p{Emoji}]* '~' [0-9]+ ;
 POINTER_LITERAL : '&' [a-zA-Z_\p{L}\p{Emoji}][a-zA-Z0-9_\p{L}\p{Emoji}]* ;
 IPV4_LITERAL    : [0-9]+ ('.' [0-9]+)* ;
-IPV6_LITERAL    : [0-F]+ (':' [0-F]+)* ;
+IPV6_LITERAL    : [0-9a_fA-F]+ (':' [0-9a-fA-F]+)* ;
 LINE_COMMENT    : '//' ~[\r\n]* -> skip ;
 BLOCK_COMMENT   : '/*' .*? '*/' -> skip ;
 WS              : [ \t\r\n]+ -> skip ;
