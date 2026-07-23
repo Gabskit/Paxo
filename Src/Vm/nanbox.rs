@@ -1,12 +1,43 @@
 /// Representación de los tipos de datos BIV según tamaño de variable en Paxo
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PaxoValue {
-    Xxs(u8),         // 8 bits
-    Xs(u16),         // 16 bits
-    S(u32),          // 32 bits
-    M(u64),     // 64 bits (por defecto 📥)
-    L(u128),         // 128 bits
-    Xl([u64; 4]),    // 256 bits
+    /// Valor numérico legacy usado por el VM inicial.
+    Normal(u64),
+    /// 8 bits: entero pequeño / payload base.
+    Xxs(u8),
+    /// 16 bits: valor extendido.
+    Xs(u16),
+    /// 32 bits: valor standard.
+    S(u32),
+    /// 64 bits: valor medio.
+    M(u64),
+    /// 128 bits: valor largo.
+    L(u128),
+    /// 256 bits: valor extra largo.
+    Xl([u64; 4]),
+    /// Bit / trit / crit: representación mínima de valores boolean-like.
+    Bit(u8),
+    Trit(u8),
+    Crit(u8),
+    /// Caracteres codificados por ancho.
+    Utf8(u8),
+    Utf16(u16),
+    Utf32(u32),
+    Utf64(u64),
+    /// Vectores 2D y 4D.
+    Vec2D { x: i64, y: i64, polar: bool, width: u8 },
+    Vec4D { x: i64, y: i64, z: i64, w: i64, width: u8 },
+    /// Número complejo.
+    Complex { re: i64, im: i64, width: u8 },
+    /// IP y red.
+    Ipv4(u32),
+    Ipv6([u64; 2]),
+    /// Slice / nano-time / lista embebida.
+    Slice { ptr: u64, len: u64 },
+    NanoTime { sec: u64, nsec: u64 },
+    EmbeddedList(u64),
+    /// Rango reservado para uso futuro.
+    Future(u128),
 }
 
 impl PaxoValue {
