@@ -33,7 +33,7 @@ impl PaxoVM {
             (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1.wrapping_add(v2))),
             (PaxoValue::Normal(v1), PaxoValue::Normal(v2)) => Some(PaxoValue::Normal(v1.wrapping_add(v2))),
             (PaxoValue::Normal(v1), PaxoValue::S(v2)) => Some(PaxoValue::Normal(v1.wrapping_add(v2 as u64))),
-            (PaxoValue::S(v1), PaxoValue::Normal(v2)) => Some(PaxoValue::Normal(v1 as u64).wrapping_add(v2)),
+            (PaxoValue::S(v1), PaxoValue::Normal(v2)) => Some(PaxoValue::Normal((v1 as u64).wrapping_add(v2))),
             (PaxoValue::Ipv4(v1), PaxoValue::Ipv4(v2)) => Some(PaxoValue::Ipv4(v1.wrapping_add(v2))),
             (PaxoValue::Vec2D { x: x1, y: y1, polar: p1, width: w1 }, PaxoValue::Vec2D { x: x2, y: y2, polar: p2, width: w2 }) => {
                 let width = w1.max(w2);
