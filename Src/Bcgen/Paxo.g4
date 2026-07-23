@@ -55,8 +55,8 @@ loopStatement
     ;
 
 loopMode
-    : PAUSE_MODE // ⏸️ (Do-Until)
-    | PLAY_MODE  // ▶️ (While)
+    : PAUSE_MODE // ⏸️
+    | PLAY_MODE  // ▶️
     ;
 
 loopDelimiter    : '|:' | '𝄆' ;
@@ -87,20 +87,24 @@ argumentList
     ;
 
 expression
-    : expression ('<'|'>'|'≤'|'≥'|'=='|'≠') expression
-    | IDENTIFIER '(' argumentList? ')'
+    : IDENTIFIER '(' argumentList? ')'
+    | IDENTIFIER '[' expression ']'                         # arrayAccessExpr
+    | expression ( '÷' | '×' ) expression       # multDivExpr
+    | expression ( '+' | '-' ) expression                   # addSubExpr
+    | expression ( '•«' | '»•' ) expression                 # shiftExpr
+    | expression ( '<'|'>'|'≤'|'≥'|'=='|'≠' ) expression   # relationalExpr
+    | expression ( '&' | '|' | '.&' | '.|' ) expression     # bitwiseExpr
     | INT_LITERAL
-    | UINT_LITERAL
     | DECIMAL_LITERAL
     | COMPLEX_LITERAL
     | CHAR_LITERAL
     | STRING_LITERAL
-    | EMSTRING_LITERAL
-    | BOOLEAN
+    | BOOLEAN_BIT
+    | BOOLEAN_TRIT
+    | BOOLEAN_CRIT
     | VECTOR
     | NANOTIME_LITERAL
     | SLICE_LITERAL
-    | POINTER_LITERAL
     | IPV4_LITERAL
     | IPV6_LITERAL
     | arrayLiteral
@@ -124,7 +128,7 @@ VAR_DECL   : '📥' | 'var' ;
 PKG        : '📦' | 'pkg' ;
 TRY        : '↻' | 'try' ;
 CATCH      : '🪤' | 'catch' ;
-ARROW      : '→' | 'else' ;
+ARROW      : '→' ;
 INCLUDE    : '+📚' | 'add' ;
 
 PAUSE_MODE : '⏸️' | 'stop' ;
@@ -132,20 +136,19 @@ PLAY_MODE  : '▶️' | 'go' ;
 
 // Literales
 INT_LITERAL     : [+-]? [0-9]+ ;
-UINT_LITERAL    : [0-9]+ 'u' ;
 DECIMAL_LITERAL : [+-]? [0-9]+ '.' [0-9]+ ;
-BOOLEAN         : '×' | '✓' ;
+BOOLEAN_BIT     : '×' | '✓' ;
+BOOLEAN_TRIT    : '×' | '•' | '✓' ;
+BOOLEAN_CRIT    : '×' | '°' | '•' | '✓' ;
 COMPLEX_LITERAL : [+-]? [0-9]+ ('.' [0-9]+)? [+-] [0-9]+ ('.' [0-9]+)? 'i'
 | [+-]? [0-9]+ ('.' [0-9]+) 'i' ;
 IDENTIFIER      : [a-zA-Z_\p{L}\p{Emoji}][a-zA-Z0-9_\p{L}\p{Emoji}]* ;
 STRING_LITERAL  : '"' (~["\r\n])* '"' ;
 CHAR_LITERAL    : '\'' . '\'' ;
-EMSTRING_LITERAL: '"' (~["\r\n])* '"' 'il' ;
 VECTOR          : '[' [+-]? [0-9]+ ('.' [0-9]+) (',' [+-]? [0-9]+ ('.' [0-9]+)?)* ']' ;
 NANOTIME_LITERAL: [0-9]+ ':' [0-9]+ ;
 SLICE_LITERAL   : '&' [a-zA-Z_\p{L}\p{Emoji}][a-zA-Z0-9_\p{L}\p{Emoji}]* '~' [0-9]+ ;
-POINTER_LITERAL : '&' [a-zA-Z_\p{L}\p{Emoji}][a-zA-Z0-9_\p{L}\p{Emoji}]* ;
-IPV4_LITERAL    : [0-9]+ ('.' [0-9]+)* ;
+IPV4_LITERAL    : [0-9]{1,3} '.' [0-9]{1,3} '.' [0-9]{1,3} '.' [0-9]{1,3} ('\\' [0-9]+)? ;
 IPV6_LITERAL    : [0-9a_fA-F]+ (':' [0-9a-fA-F]+)* ;
 LINE_COMMENT    : '//' ~[\r\n]* -> skip ;
 BLOCK_COMMENT   : '/*' .*? '*/' -> skip ;

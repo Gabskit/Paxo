@@ -4,7 +4,7 @@
     "main": "transpilador.js",
     "type": "module",
     "scripts": {
-        "antlr": "antlr-ng -Dlanguage=TypeScript -o ./Src ./Src/Paxo.g4"
+        "antlr": "antlr-ng -Dlanguage=Go -o ./Src ./Src/Bcgen/Paxo.g4"
     },
     "keywords": [],
     "author": "",
