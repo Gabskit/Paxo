@@ -111,15 +111,9 @@ Declaración match
 & and
 | or
 ! not
-.& and bit
-.&& and trit
-.&&& and crit
-.| or bit
-.|| or trit
-.||| or crit
-.! not bit
-.!! not trit
-.!!! not crit
+.& and bit trit
+.| or bit trit
+.! not bit trit
 § xor
 
 ## Ejemplo
