@@ -78,16 +78,16 @@ impl PaxoValue {
 
     // Desempaquetado 
     pub fn unpack_char_xs(val: u16) -> char {
-        val as u8 as char}
+        (val as u8) as char}
 
     pub fn unpack_char_s(val: u32) -> char {
-        val as u16 as char}
+        (val as u16 as u8) as char}
 
     pub fn unpack_char_m(val: u64) -> char {
-        val as u32 as char}
+        (val as u32 as u8) as char}
 
     pub fn unpack_char_l(val: u128) -> char {
-        val as u32 as char}
+        (val as u32 as u8) as char}
 
     /// Vectores 2d 
     // Empaquetado 
@@ -225,7 +225,7 @@ impl PaxoValue {
     /// Trit
     // Empaquetado
     pub fn pack_trit_xs(val: u8) -> Self {
-        let tag_set: u8 = 0b1 << 15; // Signo 1 para segundo tag set
+        let tag_set: u16 = 0b1 << 15; // Signo 1 para segundo tag set
         let exp_mask: u16 = 0b11111 << 10; // 5 bits exponente en 1
         let tag: u16 = 0b00 << 8;           // Payload Tag 00 para Trit
         let val_bits = val as u16;
@@ -400,7 +400,128 @@ impl PaxoValue {
     
     // Desempaquetado
     pub fn unpack_pointer_l(val: u128) -> u64 {
-        val as u64}}
+        val as u64}
+
+    /// Interpretación IEEE 754 como Base 20 (Binary Integer Vigesimal)
+    /// Extrae componentes IEEE 754 e interpreta exponente como base 20
+    
+    // Xs: 1 signo | 5 exponente | 10 mantisa
+    pub fn ieee754_to_base20_xs(val: u16) -> f64 {
+        let signo = ((val >> 15) & 1) as f64;
+        let exp_raw = ((val >> 10) & 0x1F) as i32;
+        let mant_bits = (val & 0x3FF) as f64;
+        
+        let signo_mult = if signo == 0.0 { 1.0 } else { -1.0 };
+        let mantisa = 1.0 + (mant_bits / 1024.0); // 2^10 = 1024
+        
+        signo_mult * mantisa * (20.0_f64.powi(exp_raw - 15))
+    }
+
+    // S: 1 signo | 8 exponente | 23 mantisa
+    pub fn ieee754_to_base20_s(val: u32) -> f64 {
+        let signo = ((val >> 31) & 1) as f64;
+        let exp_raw = ((val >> 23) & 0xFF) as i32;
+        let mant_bits = (val & 0x7FFFFF) as f64;
+        
+        let signo_mult = if signo == 0.0 { 1.0 } else { -1.0 };
+        let mantisa = 1.0 + (mant_bits / 8388608.0); // 2^23
+        
+        signo_mult * mantisa * (20.0_f64.powi(exp_raw - 127))
+    }
+
+    // M: 1 signo | 11 exponente | 52 mantisa
+    pub fn ieee754_to_base20_m(val: u64) -> f64 {
+        let signo = ((val >> 63) & 1) as f64;
+        let exp_raw = ((val >> 52) & 0x7FF) as i32;
+        let mant_bits = (val & 0xFFFFFFFFFFFFF) as f64;
+        
+        let signo_mult = if signo == 0.0 { 1.0 } else { -1.0 };
+        let mantisa = 1.0 + (mant_bits / 4503599627370496.0); // 2^52
+        
+        signo_mult * mantisa * (20.0_f64.powi(exp_raw - 1023))
+    }
+
+    // L: 1 signo | 15 exponente | 112 mantisa
+    pub fn ieee754_to_base20_l(val: u128) -> f64 {
+        let signo = ((val >> 127) & 1) as f64;
+        let exp_raw = ((val >> 112) & 0x7FFF) as i32;
+        let mant_bits = (val & ((1u128 << 112) - 1)) as f64;
+        
+        let signo_mult = if signo == 0.0 { 1.0 } else { -1.0 };
+        let mantisa = 1.0 + (mant_bits / 5192296858534827628530496329220096.0); // 2^112
+        
+        signo_mult * mantisa * (20.0_f64.powi(exp_raw - 16383))
+    }
+
+    /// Convertir valor decimal a IEEE 754 interpretado como base 20
+    pub fn base20_to_ieee754_xs(valor: f64) -> u16 {
+        if valor == 0.0 {
+            return 0;
+        }
+        
+        let signo = if valor < 0.0 { 1u16 } else { 0u16 };
+        let abs_val = valor.abs();
+        
+        let exp_f = abs_val.log(20.0).floor() as i32 + 15;
+        let exp = (exp_f.max(0).min(31)) as u16;
+        
+        let mantisa_f = abs_val / (20.0_f64.powi(exp_f - 15));
+        let mant_bits = ((mantisa_f - 1.0) * 1024.0) as u16 & 0x3FF;
+        
+        (signo << 15) | (exp << 10) | mant_bits
+    }
+
+    pub fn base20_to_ieee754_s(valor: f64) -> u32 {
+        if valor == 0.0 {
+            return 0;
+        }
+        
+        let signo = if valor < 0.0 { 1u32 } else { 0u32 };
+        let abs_val = valor.abs();
+        
+        let exp_f = abs_val.log(20.0).floor() as i32 + 127;
+        let exp = (exp_f.max(0).min(255)) as u32;
+        
+        let mantisa_f = abs_val / (20.0_f64.powi(exp_f - 127));
+        let mant_bits = ((mantisa_f - 1.0) * 8388608.0) as u32 & 0x7FFFFF;
+        
+        (signo << 31) | (exp << 23) | mant_bits
+    }
+
+    pub fn base20_to_ieee754_m(valor: f64) -> u64 {
+        if valor == 0.0 {
+            return 0;
+        }
+        
+        let signo = if valor < 0.0 { 1u64 } else { 0u64 };
+        let abs_val = valor.abs();
+        
+        let exp_f = abs_val.log(20.0).floor() as i32 + 1023;
+        let exp = (exp_f.max(0).min(2047)) as u64;
+        
+        let mantisa_f = abs_val / (20.0_f64.powi(exp_f - 1023));
+        let mant_bits = ((mantisa_f - 1.0) * 4503599627370496.0) as u64 & 0xFFFFFFFFFFFFF;
+        
+        (signo << 63) | (exp << 52) | mant_bits
+    }
+
+    pub fn base20_to_ieee754_l(valor: f64) -> u128 {
+        if valor == 0.0 {
+            return 0;
+        }
+        
+        let signo = if valor < 0.0 { 1u128 } else { 0u128 };
+        let abs_val = valor.abs();
+        
+        let exp_f = abs_val.log(20.0).floor() as i32 + 16383;
+        let exp = (exp_f.max(0).min(32767)) as u128;
+        
+        let mantisa_f = abs_val / (20.0_f64.powi(exp_f - 16383));
+        let mant_bits = ((mantisa_f - 1.0) * 5192296858534827628530496329220096.0) as u128 & ((1u128 << 112) - 1);
+        
+        (signo << 127) | (exp << 112) | mant_bits
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -10,7 +10,7 @@ impl LEPVM {
     pub fn new(num_registers: usize) -> Self {
         Self {
             fifo_queue: VecDeque::with_capacity(256),
-            registers: vec![PaxoValue::Normal(0); num_registers],}}
+            registers: vec![PaxoValue::Xs(0); num_registers],}}
 
     fn register_index(arg: PaxoValue) -> Option<usize> {
         match arg {
@@ -22,51 +22,133 @@ impl LEPVM {
 
     fn add_numeric(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
         match (a, b) {
-            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1.wrapping_add(v2))),
-            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1.wrapping_add(v2))),
-            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1.wrapping_add(v2))),
-            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1.wrapping_add(v2))),
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => {
+                let val1 = PaxoValue::ieee754_to_base20_xs(v1);
+                let val2 = PaxoValue::ieee754_to_base20_xs(v2);
+                Some(PaxoValue::Xs(PaxoValue::base20_to_ieee754_xs(val1 + val2)))
+            },
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => {
+                let val1 = PaxoValue::ieee754_to_base20_s(v1);
+                let val2 = PaxoValue::ieee754_to_base20_s(v2);
+                Some(PaxoValue::S(PaxoValue::base20_to_ieee754_s(val1 + val2)))
+            },
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => {
+                let val1 = PaxoValue::ieee754_to_base20_m(v1);
+                let val2 = PaxoValue::ieee754_to_base20_m(v2);
+                Some(PaxoValue::M(PaxoValue::base20_to_ieee754_m(val1 + val2)))
+            },
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => {
+                let val1 = PaxoValue::ieee754_to_base20_l(v1);
+                let val2 = PaxoValue::ieee754_to_base20_l(v2);
+                Some(PaxoValue::L(PaxoValue::base20_to_ieee754_l(val1 + val2)))
+            },
             _ => None,}}
 
     fn sub_numeric(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
         match (a, b) {
-            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1.wrapping_sub(v2))),
-            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1.wrapping_sub(v2))),
-            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1.wrapping_sub(v2))),
-            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1.wrapping_sub(v2))),
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => {
+                let val1 = PaxoValue::ieee754_to_base20_xs(v1);
+                let val2 = PaxoValue::ieee754_to_base20_xs(v2);
+                Some(PaxoValue::Xs(PaxoValue::base20_to_ieee754_xs(val1 - val2)))
+            },
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => {
+                let val1 = PaxoValue::ieee754_to_base20_s(v1);
+                let val2 = PaxoValue::ieee754_to_base20_s(v2);
+                Some(PaxoValue::S(PaxoValue::base20_to_ieee754_s(val1 - val2)))
+            },
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => {
+                let val1 = PaxoValue::ieee754_to_base20_m(v1);
+                let val2 = PaxoValue::ieee754_to_base20_m(v2);
+                Some(PaxoValue::M(PaxoValue::base20_to_ieee754_m(val1 - val2)))
+            },
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => {
+                let val1 = PaxoValue::ieee754_to_base20_l(v1);
+                let val2 = PaxoValue::ieee754_to_base20_l(v2);
+                Some(PaxoValue::L(PaxoValue::base20_to_ieee754_l(val1 - val2)))
+            },
             _ => None,}}
 
     fn mul_numeric(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
         match (a, b) {
-            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1.wrapping_mul(v2))),
-            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1.wrapping_mul(v2))),
-            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1.wrapping_mul(v2))),
-            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1.wrapping_mul(v2))),
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => {
+                let val1 = PaxoValue::ieee754_to_base20_xs(v1);
+                let val2 = PaxoValue::ieee754_to_base20_xs(v2);
+                Some(PaxoValue::Xs(PaxoValue::base20_to_ieee754_xs(val1 * val2)))
+            },
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => {
+                let val1 = PaxoValue::ieee754_to_base20_s(v1);
+                let val2 = PaxoValue::ieee754_to_base20_s(v2);
+                Some(PaxoValue::S(PaxoValue::base20_to_ieee754_s(val1 * val2)))
+            },
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => {
+                let val1 = PaxoValue::ieee754_to_base20_m(v1);
+                let val2 = PaxoValue::ieee754_to_base20_m(v2);
+                Some(PaxoValue::M(PaxoValue::base20_to_ieee754_m(val1 * val2)))
+            },
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => {
+                let val1 = PaxoValue::ieee754_to_base20_l(v1);
+                let val2 = PaxoValue::ieee754_to_base20_l(v2);
+                Some(PaxoValue::L(PaxoValue::base20_to_ieee754_l(val1 * val2)))
+            },
             _ => None,}}
     
     fn div_numeric(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
         match (a, b) {
-            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1.wrapping_div(v2))),
-            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1.wrapping_div(v2))),
-            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1.wrapping_div(v2))),
-            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1.wrapping_div(v2))),
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => {
+                let val1 = PaxoValue::ieee754_to_base20_xs(v1);
+                let val2 = PaxoValue::ieee754_to_base20_xs(v2);
+                if val2 == 0.0 { return None; }
+                Some(PaxoValue::Xs(PaxoValue::base20_to_ieee754_xs(val1 / val2)))
+            },
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => {
+                let val1 = PaxoValue::ieee754_to_base20_s(v1);
+                let val2 = PaxoValue::ieee754_to_base20_s(v2);
+                if val2 == 0.0 { return None; }
+                Some(PaxoValue::S(PaxoValue::base20_to_ieee754_s(val1 / val2)))
+            },
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => {
+                let val1 = PaxoValue::ieee754_to_base20_m(v1);
+                let val2 = PaxoValue::ieee754_to_base20_m(v2);
+                if val2 == 0.0 { return None; }
+                Some(PaxoValue::M(PaxoValue::base20_to_ieee754_m(val1 / val2)))
+            },
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => {
+                let val1 = PaxoValue::ieee754_to_base20_l(v1);
+                let val2 = PaxoValue::ieee754_to_base20_l(v2);
+                if val2 == 0.0 { return None; }
+                Some(PaxoValue::L(PaxoValue::base20_to_ieee754_l(val1 / val2)))
+            },
             _ => None,}}
 
     fn bitshift_R(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
-        match (a, b) {
-            (PaxoValue::Xs(v1), i8) => Some(PaxoValue::Xs(v1 >> v2)),
-            (PaxoValue::S(v1), i8) => Some(PaxoValue::S(v1 >> v2)),
-            (PaxoValue::M(v1), i8) => Some(PaxoValue::M(v1 >> v2)),
-            (PaxoValue::L(v1), i8) => Some(PaxoValue::L(v1 >> v2)),
-            _ => None,}}
+        let shift = match b {
+            PaxoValue::Xs(v) => (v & 0xF) as u32,
+            PaxoValue::S(v) => (v & 0xFF) as u32,
+            PaxoValue::M(v) => (v & 0xFFFF) as u32,
+            PaxoValue::L(v) => (v & 0xFFFFFFFF) as u32,
+        };
+        match a {
+            PaxoValue::Xs(v1) => Some(PaxoValue::Xs(v1 >> shift)),
+            PaxoValue::S(v1) => Some(PaxoValue::S(v1 >> shift)),
+            PaxoValue::M(v1) => Some(PaxoValue::M(v1 >> shift)),
+            PaxoValue::L(v1) => Some(PaxoValue::L(v1 >> shift)),
+        }
+    }
 
     fn bitshift_L(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
-        match (a, b) {
-            (PaxoValue::Xs(v1), i8) => Some(PaxoValue::Xs(v1 << v2)),
-            (PaxoValue::S(v1), i8) => Some(PaxoValue::S(v1 << v2)),
-            (PaxoValue::M(v1), i8) => Some(PaxoValue::M(v1 << v2)),
-            (PaxoValue::L(v1), i8) => Some(PaxoValue::L(v1 << v2)),
-            _ => None,}}
+        let shift = match b {
+            PaxoValue::Xs(v) => (v & 0xF) as u32,
+            PaxoValue::S(v) => (v & 0xFF) as u32,
+            PaxoValue::M(v) => (v & 0xFFFF) as u32,
+            PaxoValue::L(v) => (v & 0xFFFFFFFF) as u32,
+        };
+        match a {
+            PaxoValue::Xs(v1) => Some(PaxoValue::Xs(v1 << shift)),
+            PaxoValue::S(v1) => Some(PaxoValue::S(v1 << shift)),
+            PaxoValue::M(v1) => Some(PaxoValue::M(v1 << shift)),
+            PaxoValue::L(v1) => Some(PaxoValue::L(v1 << shift)),
+        }
+    }
 
     /// Ejecuta una instrucción en la Cola FIFO
     pub fn step(&mut self, opcode: u8, arg: Option<PaxoValue>) {
