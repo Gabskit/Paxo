@@ -2,16 +2,16 @@ mod nanbox;
 mod vm;
 
 use nanbox::PaxoValue;
-use vm::PaxoVM;
+use vm::LEPVM;
 use std::fs;
 
 fn main() {
     println!("========================================");
-    println!("        🚀 PAXO VM ENGINE (FIFO)        ");
+    println!("        🚀 LEP VM ENGINE (FIFO)        ");
     println!("========================================\n");
 
     // Instanciamos la VM con 16 registros de almacenamiento
-    let mut vm = PaxoVM::new(16);
+    let mut vm = LEPVM::new(16);
 
     // Intentar leer el archivo compilado desde el Frontend en Go
     let bytecode_path = "Test/output.paxoc";
