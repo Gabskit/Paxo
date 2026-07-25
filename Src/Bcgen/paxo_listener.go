@@ -62,8 +62,14 @@ type PaxoListener interface {
 	// EnterArgumentList is called when entering the argumentList production.
 	EnterArgumentList(c *ArgumentListContext)
 
+	// EnterCallExpr is called when entering the callExpr production.
+	EnterCallExpr(c *CallExprContext)
+
 	// EnterArrayAccessExpr is called when entering the arrayAccessExpr production.
 	EnterArrayAccessExpr(c *ArrayAccessExprContext)
+
+	// EnterNotgateExpr is called when entering the notgateExpr production.
+	EnterNotgateExpr(c *NotgateExprContext)
 
 	// EnterMultDivExpr is called when entering the multDivExpr production.
 	EnterMultDivExpr(c *MultDivExprContext)
@@ -140,8 +146,14 @@ type PaxoListener interface {
 	// ExitArgumentList is called when exiting the argumentList production.
 	ExitArgumentList(c *ArgumentListContext)
 
+	// ExitCallExpr is called when exiting the callExpr production.
+	ExitCallExpr(c *CallExprContext)
+
 	// ExitArrayAccessExpr is called when exiting the arrayAccessExpr production.
 	ExitArrayAccessExpr(c *ArrayAccessExprContext)
+
+	// ExitNotgateExpr is called when exiting the notgateExpr production.
+	ExitNotgateExpr(c *NotgateExprContext)
 
 	// ExitMultDivExpr is called when exiting the multDivExpr production.
 	ExitMultDivExpr(c *MultDivExprContext)

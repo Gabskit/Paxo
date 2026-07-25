@@ -39,6 +39,35 @@ func (g *BytecodeGenerator) EnterShiftExpression(ctx *ShiftExprContext) {
 		// Opcode 0x15 = RShift
 		g.Bytecode = append(g.Bytecode, 0x15)}}
 
+func (g *BytecodeGenerator) EnterBitwiseExpression(ctx *BitwiseExprContext) {
+	if strings.Contains(ctx.GetText(), ".&") {
+		// Opcode 0x16 = And
+		g.Bytecode = append(g.Bytecode, 0x16)
+	} else if strings.Contains(ctx.GetText(), ".|") {
+		// Opcode 0x17 = Or
+		g.Bytecode = append(g.Bytecode, 0x17)
+	} else if strings.Contains(ctx.GetText(), "§") {
+		// Opcode 0x19 = XOR
+		g.Bytecode = append(g.Bytecode, 0x19)}}
+
+func (g *BytecodeGenerator) EnterNotgateExpression(ctx *NotgateExprContext) {
+	// Opcode 0x18 = Not
+	g.Bytecode = append(g.Bytecode, 0x18)}
+
+func (g *BytecodeGenerator) EnterRelationalExpression(ctx *RelationalExprContext) {
+	if strings.Contains(ctx.GetText(), "<") {
+		// Opcode 0x1A = Less
+		g.Bytecode = append(g.Bytecode, 0x1A)
+	} else if strings.Contains(ctx.GetText(), ">") {
+		// Opcode 0x1B = Greater
+		g.Bytecode = append(g.Bytecode, 0x1B)
+	} else if strings.Contains(ctx.GetText(), "==") {
+		// Opcode 0x1C = Equal
+		g.Bytecode = append(g.Bytecode, 0x1C)
+	} else if strings.Contains(ctx.GetText(), "!=") {
+		// Opcode 0x1D = NotEqual
+		g.Bytecode = append(g.Bytecode, 0x1D)}}
+
 func GenerateBytecode(inputPath string, outputPath string) error {
 	input, err := antlr.NewFileStream(inputPath)
 	if err != nil {

@@ -87,13 +87,14 @@ argumentList
     ;
 
 expression
-    : IDENTIFIER '(' argumentList? ')'
+    : IDENTIFIER '(' argumentList? ')' # callExpr
     | IDENTIFIER '[' expression ']'                         # arrayAccessExpr
     | expression ( '÷' | '×' ) expression       # multDivExpr
     | expression ( '+' | '-' ) expression                   # addSubExpr
     | expression ( '•«' | '»•' ) expression                 # shiftExpr
     | expression ( '<'|'>'|'≤'|'≥'|'=='|'≠' ) expression   # relationalExpr
     | expression ( '&' | '|' | '.&' | '.|' ) expression     # bitwiseExpr
+    | ( '!' | '.!' ) expression # notgateExpr
     | INT_LITERAL
     | DECIMAL_LITERAL
     | COMPLEX_LITERAL
@@ -101,12 +102,8 @@ expression
     | STRING_LITERAL
     | BOOLEAN_BIT
     | BOOLEAN_TRIT
-    | BOOLEAN_CRIT
     | VECTOR
-    | NANOTIME_LITERAL
-    | SLICE_LITERAL
-    | IPV4_LITERAL
-    | IPV6_LITERAL
+    | TIME_LITERAL
     | arrayLiteral
     | arrayAccess
     | IDENTIFIER
@@ -139,17 +136,13 @@ INT_LITERAL     : [+-]? [0-9]+ ;
 DECIMAL_LITERAL : [+-]? [0-9]+ '.' [0-9]+ ;
 BOOLEAN_BIT     : '×' | '✓' ;
 BOOLEAN_TRIT    : '×' | '•' | '✓' ;
-BOOLEAN_CRIT    : '×' | '°' | '•' | '✓' ;
 COMPLEX_LITERAL : [+-]? [0-9]+ ('.' [0-9]+)? [+-] [0-9]+ ('.' [0-9]+)? 'i'
 | [+-]? [0-9]+ ('.' [0-9]+) 'i' ;
 IDENTIFIER      : [a-zA-Z_\p{L}\p{Emoji}][a-zA-Z0-9_\p{L}\p{Emoji}]* ;
 STRING_LITERAL  : '"' (~["\r\n])* '"' ;
 CHAR_LITERAL    : '\'' . '\'' ;
 VECTOR          : '[' [+-]? [0-9]+ ('.' [0-9]+) (',' [+-]? [0-9]+ ('.' [0-9]+)?)* ']' ;
-NANOTIME_LITERAL: [0-9]+ ':' [0-9]+ ;
-SLICE_LITERAL   : '&' [a-zA-Z_\p{L}\p{Emoji}][a-zA-Z0-9_\p{L}\p{Emoji}]* '~' [0-9]+ ;
-IPV4_LITERAL    : [0-9]{1,3} '.' [0-9]{1,3} '.' [0-9]{1,3} '.' [0-9]{1,3} ('\\' [0-9]+)? ;
-IPV6_LITERAL    : [0-9a_fA-F]+ (':' [0-9a-fA-F]+)* ;
+TIME_LITERAL    : [0-9]{1-3} (':' [0-9]{1-2}){1-3} ('.' [0-9]{1-3}){1-2} ;
 LINE_COMMENT    : '//' ~[\r\n]* -> skip ;
 BLOCK_COMMENT   : '/*' .*? '*/' -> skip ;
 WS              : [ \t\r\n]+ -> skip ;

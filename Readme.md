@@ -14,7 +14,6 @@ Paxo es un nuevo lenguaje de tipado dinamico, multiparadigma, de vm, este lengua
 📥 foo = [4, 6] //vector bidimensional
 📥 foo = [6, 8, 4, 8]//vector 4d
 📥 foo = 97:10:06:20.878.345 //tiempo
-📥 goo = &foo //puntero
 📥 foo = «4, 5.08, "Arreglos", «6, 7»»
 
 📦 foo = {

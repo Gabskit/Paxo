@@ -150,6 +150,46 @@ impl LEPVM {
         }
     }
 
+    fn and_logic(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
+        match (a, b) {
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1 & v2)),
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1 & v2)),
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1 & v2)),
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1 & v2)),
+            _ => None,
+        }
+    }
+
+    fn or_logic(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
+        match (a, b) {
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1 | v2)),
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1 | v2)),
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1 | v2)),
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1 | v2)),
+            _ => None,
+        }
+    }
+
+    fn not_logic(a: PaxoValue) -> Option<PaxoValue> {
+        match a {
+            PaxoValue::Xs(v1) => Some(PaxoValue::Xs(!v1)),
+            PaxoValue::S(v1) => Some(PaxoValue::S(!v1)),
+            PaxoValue::M(v1) => Some(PaxoValue::M(!v1)),
+            PaxoValue::L(v1) => Some(PaxoValue::L(!v1)),
+            _ => None,
+        }
+    }
+
+    fn xor_logic(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
+        match (a, b) {
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1 ^ v2)),
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1 ^ v2)),
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1 ^ v2)),
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1 ^ v2)),
+            _ => None,
+        }
+    }
+
     /// Ejecuta una instrucción en la Cola FIFO
     pub fn step(&mut self, opcode: u8, arg: Option<PaxoValue>) {
         match opcode {
@@ -170,6 +210,8 @@ impl LEPVM {
 
             0x04 => { // POP: Desencola del frente y descarta el valor
                 self.fifo_queue.pop_front();}
+
+            
 
             // Operaciones Aritméticas y Lógicas 0x10 a 0x1F
             0x10 => { // ADD: Desencola 2 operandos del frente y encola la suma al final
@@ -213,5 +255,61 @@ impl LEPVM {
                         self.fifo_queue.push_back(res);
                     } else {
                         panic!("Tipos incompatibles para desplazamiento a la derecha en VM");}}}
+
+            0x16 => { // AND: Desencola 2 operandos del frente y encola la operación AND al final
+                if let (Some(a), Some(b)) = (self.fifo_queue.pop_front(), self.fifo_queue.pop_front()) {
+                    if let Some(res) = Self::and_logic(a, b) {
+                        self.fifo_queue.push_back(res);
+                    } else {
+                        panic!("Tipos incompatibles para operación AND en VM");}}}
+
+            0x17 => { // OR: Desencola 2 operandos del frente y encola la operación OR al final
+                if let (Some(a), Some(b)) = (self.fifo_queue.pop_front(), self.fifo_queue.pop_front()) {
+                    if let Some(res) = Self::or_logic(a, b) {
+                        self.fifo_queue.push_back(res);
+                    } else {
+                        panic!("Tipos incompatibles para operación OR en VM");}}}
+
+            0x18 => { // NOT: Desencola un operando del frente y encola la operación NOT al final
+                if let Some(a) = self.fifo_queue.pop_front() {
+                    if let Some(res) = Self::not_logic(a) {
+                        self.fifo_queue.push_back(res);
+                    } else {
+                        panic!("Tipos incompatibles para operación NOT en VM");}}}
+
+            0x19 => { // XOR: Desencola 2 operandos del frente y encola la operación XOR al final
+                if let (Some(a), Some(b)) = (self.fifo_queue.pop_front(), self.fifo_queue.pop_front()) {
+                    if let Some(res) = Self::xor_logic(a, b) {
+                        self.fifo_queue.push_back(res);
+                    } else {
+                        panic!("Tipos incompatibles para operación XOR en VM");}}}
+
+            0x1A => { // LESS: Desencola 2 operandos del frente y encola la comparación "menor" al final
+                if let (Some(a), Some(b)) = (self.fifo_queue.pop_front(), self.fifo_queue.pop_front()) {
+                    if let Some(res) = Self::less_logic(a, b) {
+                        self.fifo_queue.push_back(res);
+                    } else {
+                        panic!("Tipos incompatibles para comparación 'menor' en VM");}}}
+
+            0x1B => { // GREATER: Desencola 2 operandos del frente y encola la comparación "mayor" al final
+                if let (Some(a), Some(b)) = (self.fifo_queue.pop_front(), self.fifo_queue.pop_front()) {
+                    if let Some(res) = Self::greater_logic(a, b) {
+                        self.fifo_queue.push_back(res);
+                    } else {
+                        panic!("Tipos incompatibles para comparación 'mayor' en VM");}}}
+
+            0x1C => { // EQUAL: Desencola 2 operandos del frente y encola la comparación "igual" al final
+                if let (Some(a), Some(b)) = (self.fifo_queue.pop_front(), self.fifo_queue.pop_front()) {
+                    if let Some(res) = Self::equal_logic(a, b) {
+                        self.fifo_queue.push_back(res);
+                    } else {
+                        panic!("Tipos incompatibles para comparación 'igual' en VM");}}}
+
+            0x1D => { // NOT_EQUAL: Desencola 2 operandos del frente y encola la comparación "no igual" al final
+                if let (Some(a), Some(b)) = (self.fifo_queue.pop_front(), self.fifo_queue.pop_front()) {
+                    if let Some(res) = Self::not_equal_logic(a, b) {
+                        self.fifo_queue.push_back(res);
+                    } else {
+                        panic!("Tipos incompatibles para comparación 'no igual' en VM");}}}
 
             _ => todo!("Opcode 0x{:02X} aún no implementada", opcode),}}}

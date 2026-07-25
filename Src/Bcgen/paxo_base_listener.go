@@ -128,11 +128,23 @@ func (s *BasePaxoListener) EnterArgumentList(ctx *ArgumentListContext) {}
 // ExitArgumentList is called when production argumentList is exited.
 func (s *BasePaxoListener) ExitArgumentList(ctx *ArgumentListContext) {}
 
+// EnterCallExpr is called when production callExpr is entered.
+func (s *BasePaxoListener) EnterCallExpr(ctx *CallExprContext) {}
+
+// ExitCallExpr is called when production callExpr is exited.
+func (s *BasePaxoListener) ExitCallExpr(ctx *CallExprContext) {}
+
 // EnterArrayAccessExpr is called when production arrayAccessExpr is entered.
 func (s *BasePaxoListener) EnterArrayAccessExpr(ctx *ArrayAccessExprContext) {}
 
 // ExitArrayAccessExpr is called when production arrayAccessExpr is exited.
 func (s *BasePaxoListener) ExitArrayAccessExpr(ctx *ArrayAccessExprContext) {}
+
+// EnterNotgateExpr is called when production notgateExpr is entered.
+func (s *BasePaxoListener) EnterNotgateExpr(ctx *NotgateExprContext) {}
+
+// ExitNotgateExpr is called when production notgateExpr is exited.
+func (s *BasePaxoListener) ExitNotgateExpr(ctx *NotgateExprContext) {}
 
 // EnterMultDivExpr is called when production multDivExpr is entered.
 func (s *BasePaxoListener) EnterMultDivExpr(ctx *MultDivExprContext) {}
