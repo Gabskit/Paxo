@@ -193,5 +193,25 @@ impl LEPVM {
                     } else {
                         panic!("Tipos incompatibles para multiplicación en VM");}}}
 
+            0x13 => { // DIV: Desencola 2 operandos del frente y encola la división al final
+                if let (Some(a), Some(b)) = (self.fifo_queue.pop_front(), self.fifo_queue.pop_front()) {
+                    if let Some(res) = Self::div_numeric(a, b) {
+                        self.fifo_queue.push_back(res);
+                    } else {
+                        panic!("Tipos incompatibles para división en VM");}}}
+
+            0x14 => { // LShift: Desencola 2 operandos del frente y encola el desplazamiento a la izquierda al final
+                if let (Some(a), Some(b)) = (self.fifo_queue.pop_front(), self.fifo_queue.pop_front()) {
+                    if let Some(res) = Self::bitshift_L(a, b) {
+                        self.fifo_queue.push_back(res);
+                    } else {
+                        panic!("Tipos incompatibles para desplazamiento a la izquierda en VM");}}}
+
+            0x15 => { // RShift: Desencola 2 operandos del frente y encola el desplazamiento a la derecha al final
+                if let (Some(a), Some(b)) = (self.fifo_queue.pop_front(), self.fifo_queue.pop_front()) {
+                    if let Some(res) = Self::bitshift_R(a, b) {
+                        self.fifo_queue.push_back(res);
+                    } else {
+                        panic!("Tipos incompatibles para desplazamiento a la derecha en VM");}}}
 
             _ => todo!("Opcode 0x{:02X} aún no implementada", opcode),}}}
