@@ -4,7 +4,9 @@
     "main": "transpilador.js",
     "type": "module",
     "scripts": {
-        "antlr": "antlr-ng -Dlanguage=Go -o ./Src/Bcgen ./Src/Bcgen/Paxo.g4"
+        "antlr": "antlr-ng -Dlanguage=Go -o ./Src/Bcgen ./Src/Bcgen/Paxo.g4",
+        "build_bcg": "go build -o ./Src/Bcgen/Build ./Src/Bcgen/",
+        "build_vm": "cargo build --manifest-path ./Src/Vm/Cargo.toml"
     },
     "keywords": [],
     "author": "",

@@ -190,6 +190,8 @@ impl LEPVM {
         }
     }
 
+    
+
     /// Ejecuta una instrucción en la Cola FIFO
     pub fn step(&mut self, opcode: u8, arg: Option<PaxoValue>) {
         match opcode {
