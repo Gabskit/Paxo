@@ -190,6 +190,66 @@ impl LEPVM {
         }
     }
 
+    fn less_logic(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
+        match (a, b) {
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1 < v2)),
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1 < v2)),
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1 < v2)),
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1 < v2)),
+            _ => None,
+        }
+    }
+
+    fn greater_logic(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
+        match (a, b) {
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1 > v2)),
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1 > v2)),
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1 > v2)),
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1 > v2)),
+            _ => None,
+        }
+    }
+
+    fn equal_logic(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
+        match (a, b) {
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1 == v2)),
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1 == v2)),
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1 == v2)),
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1 == v2)),
+            _ => None,
+        }
+    }
+
+    fn not_equal_logic(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
+        match (a, b) {
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1 != v2)),
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1 != v2)),
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1 != v2)),
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1 != v2)),
+            _ => None,
+        }
+    }
+
+    fn less_equal_logic(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
+        match (a, b) {
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1 <= v2)),
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1 <= v2)),
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1 <= v2)),
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1 <= v2)),
+            _ => None,
+        }
+    }
+
+    fn greater_equal_logic(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
+        match (a, b) {
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1 >= v2)),
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1 >= v2)),
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1 >= v2)),
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1 >= v2)),
+            _ => None,
+        }
+    }
+
     
 
     /// Ejecuta una instrucción en la Cola FIFO
@@ -313,5 +373,21 @@ impl LEPVM {
                         self.fifo_queue.push_back(res);
                     } else {
                         panic!("Tipos incompatibles para comparación 'no igual' en VM");}}}
+
+            0x1E => { // LESS_EQUAL: Desencola 2 operandos del frente y encola la comparación
+                if let (Some(a), Some(b)) = (self.fifo_queue.pop_front(), self.fifo_queue.pop_front()) {
+                    if let Some(res) = Self::less_equal_logic(a, b) {
+                        self.fifo_queue.push_back(res);
+                    } else {
+                        panic!("Tipos incompatibles para comparación 'menor o igual' en VM");}}}
+
+            0x1F => { // GREATER_EQUAL: Desencola 2 operandos del frente y encola la comparación "mayor o igual" al final
+                if let (Some(a), Some(b)) = (self.fifo_queue.pop_front(), self.fifo_queue.pop_front()) {
+                    if let Some(res) = Self::greater_equal_logic(a, b) {
+                        self.fifo_queue.push_back(res);
+                    } else {
+                        panic!("Tipos incompatibles para comparación 'mayor o igual' en VM");}}}
+
+            /// 
 
             _ => todo!("Opcode 0x{:02X} aún no implementada", opcode),}}}

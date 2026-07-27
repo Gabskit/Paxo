@@ -67,7 +67,7 @@ tryCatchStatement
     ;
 
 functionDeclaration
-    : VAR_DECL IDENTIFIER '=' '(' parameterList? ')' block
+    : 'fx' IDENTIFIER '(' parameterList? ')' block
     ;
 
 pkgDeclaration

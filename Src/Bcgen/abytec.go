@@ -66,7 +66,15 @@ func (g *BytecodeGenerator) EnterRelationalExpression(ctx *RelationalExprContext
 		g.Bytecode = append(g.Bytecode, 0x1C)
 	} else if strings.Contains(ctx.GetText(), "!=") {
 		// Opcode 0x1D = NotEqual
-		g.Bytecode = append(g.Bytecode, 0x1D)}}
+		g.Bytecode = append(g.Bytecode, 0x1D)
+	} else if strings.Contains(ctx.GetText(), "<=") {
+		// Opcode 0x1E = LessEqual
+		g.Bytecode = append(g.Bytecode, 0x1E)
+	} else if strings.Contains(ctx.GetText(), ">=") {
+		// Opcode 0x1F = GreaterEqual
+		g.Bytecode = append(g.Bytecode, 0x1F)}}
+
+
 
 func GenerateBytecode(inputPath string, outputPath string) error {
 	input, err := antlr.NewFileStream(inputPath)

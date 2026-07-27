@@ -14,7 +14,7 @@ Paxo es un nuevo lenguaje de tipado dinamico, multiparadigma, de vm, este lengua
 📥 foo = [4, 6] //vector bidimensional
 📥 foo = [6, 8, 4, 8]//vector 4d
 📥 foo = 97:10:06:20.878.345 //tiempo
-📥 foo = «4, 5.08, "Arreglos", «6, 7»»
+📥 foo[] = «4, 5.08, "Arreglos", «6, 7»»
 
 📦 foo = {
   📥 goo = "Paquetes" //contiene variables y funciones
@@ -23,9 +23,11 @@ Paxo es un nuevo lenguaje de tipado dinamico, multiparadigma, de vm, este lengua
   📥 inte
   s📥 ou
 } //como union
-📥 foo = (){
+fx foo(){
 📥 goo = "Esto es una función"
 }
+
+var foo // aloclave
 ```
 
 ## Tamaños de variable
@@ -39,7 +41,7 @@ l📥 //16 bytes 128 bits
 ## Funciones
 
 ```
-📥 name = (){
+fx name(){
 //codigo
 }
 ```
@@ -49,7 +51,7 @@ Las funciones tambien pueden estar en paquetes para generar clases
 ```
 📦 hi = {
   📥 i1 = 8
-  📥 metodo = (){
+  fx metodo(){
     //codigo
   }
 }
@@ -121,7 +123,7 @@ Declaración match
 +📚 <Basic.paxo>
 📥 entero = false
 📥 i = 0
-📥 main = (){
+fx main(){
   entero = 9
   (i > 50): ⏸️ |:
     entero++
