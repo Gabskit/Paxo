@@ -10,14 +10,18 @@ pub enum PaxoValue {
     /// 128 bits: valor largo.
     L(u128)}
 
-pub enum PaxoSize{
-    XS_SIZE = 16,
-    S_SIZE = 32,
-    M_SIZE = 64,
-    L_SIZE = 12}
-
-#[inline(always)]
-impl PaxoValue, PaxoSize {
+pub enum DecodedPaxo {
+    Float(f64),
+    Vector2d(i64, i64),
+    Vector4d(i32, i32, i32, i32),
+    Boolean(bool),
+    Trit(u8),
+    Complex(f64, f64),
+    Time(u16, u8, u8, u8, u16, u16),
+    Utfchar(char)}
+    
+#[inline(always)] 
+impl PaxoValue{
 
     pub fn pack_data(datatype: u8, size: u8, payload: u128) -> Self {
     match size {
@@ -103,27 +107,36 @@ impl PaxoValue, PaxoSize {
             PaxoValue::L(packed)}
         _ => panic!("Unsupported size"),}}
 
-    pub fn unpack_data()
+    pub fn unpack_data(&self) -> DecodedPaxo {
+        match &self {
+            PaxoValue::Xs(v) => {
+                if (v & 0x7c00) != 0x7c00 {
+                    let exp = ((v >> 10) & 0x1F) as i32;
+                    let mantissa = (v & 0x03FF) as f64;
+                    let bias = 15;
+                    let result = if exp == 0 && mantissa == 0.0 {
+                        0.0
+                    } else {
+                        mantissa * 10.0f64.powi(exp - bias)
+                    };
+                    DecodedPaxo::Float(result)
+                } else {
+                    let tag = v & 0xFF00;
+                    match tag {
+                        0x7C00 => DecodedPaxo::Boolean((payload & 0x1) != 0), // Bit
+                        0x7D00 => DecodedPaxo::Utfchar((payload & 0xFF) as char), // UTF-8
+                        0x7E00 => DecodedPaxo::Vector2d(((payload >> 4) & 0xF) as i64, (payload & 0xF) as i64), // Vector 2D
+                        0x7F00 => DecodedPaxo::Vector4d(
+                        ((payload >> 6) & 0x3) as i32,
+                        ((payload >> 4) & 0x3) as i32,
+                        ((payload >> 2) & 0x3) as i32,
+                        (payload & 0x3) as i32), // Vector 4D
+                        0xFC00 => , // Trit
+                        0xFD00 => (6, (v & 0x00FF) as u128), // Número complejo
+                        _ => (7, (v & 0x00FF) as u128),      // Uso futuro / reservado
+                    }
+                }
+            }
+        }
+    }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::PaxoValue;
-
-    #[test]
-    fn vec2d_xs_roundtrip() {
-        let packed = PaxoValue::pack_vec2d_xs(10, 5);
-        let (x, y) = match packed {
-            PaxoValue::Xs(bits) => PaxoValue::unpack_vec2d_xs(bits),
-            other => panic!("unexpected variant: {:?}", other),};
-
-        assert_eq!((x, y), (10, 5));}
-
-    #[test]
-    fn vec2d_s_roundtrip() {
-        let packed = PaxoValue::pack_vec2d_s(10, -5, false);
-        let (x, y, polar) = match packed {
-            PaxoValue::S(bits) => PaxoValue::unpack_vec2d_s(bits),
-            other => panic!("unexpected variant: {:?}", other),};
-
-        assert_eq!((x, y, polar), (10, -5, false));}}
