@@ -1,29 +1,27 @@
 {
-    "tasks": [
-        {
-            "type": "cppbuild",
-            "label": "C/C++: gcc compilar archivo activo",
-            "command": "/usr/bin/gcc",
-            "args": [
-                "-fdiagnostics-color=always",
-                "-std=c2x",
-                "-g",
-                "${file}",
-                "-o",
-                "${fileDirname}/${fileBasenameNoExtension}"
-            ],
-            "options": {
-                "cwd": "${fileDirname}"
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "detail": "Tarea generada por el depurador."
-        }
-    ],
-    "version": "2.0.0"
+  "tasks": [
+    {
+      "type": "cppbuild",
+      "label": "C/C++: clang compilar archivo activo",
+      "command": "/usr/bin/clang",
+      "args": [
+        "-fdiagnostics-color=always",
+        "-std=c23",
+        "-g",
+        "${file}",
+        "-o",
+        "${fileDirname}/${fileBasenameNoExtension}"
+      ],
+      "options": {
+        "cwd": "${fileDirname}"
+      },
+      "problemMatcher": ["$gcc"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "detail": "Tarea generada por el depurador."
+    }
+  ],
+  "version": "2.0.0"
 }

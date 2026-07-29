@@ -192,60 +192,60 @@ impl LEPVM {
 
     fn less_logic(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
         match (a, b) {
-            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1 < v2)),
-            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1 < v2)),
-            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1 < v2)),
-            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1 < v2)),
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(if v1 < v2 { 1 } else { 0 })),
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(if v1 < v2 { 1 } else { 0 })),
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(if v1 < v2 { 1 } else { 0 })),
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(if v1 < v2 { 1 } else { 0 })),
             _ => None,
         }
     }
 
     fn greater_logic(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
         match (a, b) {
-            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1 > v2)),
-            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1 > v2)),
-            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1 > v2)),
-            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1 > v2)),
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(if v1 > v2 { 1 } else { 0 })),
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(if v1 > v2 { 1 } else { 0 })),
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(if v1 > v2 { 1 } else { 0 })),
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(if v1 > v2 { 1 } else { 0 })),
             _ => None,
         }
     }
 
     fn equal_logic(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
         match (a, b) {
-            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1 == v2)),
-            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1 == v2)),
-            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1 == v2)),
-            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1 == v2)),
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(if v1 == v2 { 1 } else { 0 })),
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(if v1 == v2 { 1 } else { 0 })),
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(if v1 == v2 { 1 } else { 0 })),
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(if v1 == v2 { 1 } else { 0 })),
             _ => None,
         }
     }
 
     fn not_equal_logic(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
         match (a, b) {
-            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1 != v2)),
-            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1 != v2)),
-            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1 != v2)),
-            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1 != v2)),
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(if v1 != v2 { 1 } else { 0 })),
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(if v1 != v2 { 1 } else { 0 })),
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(if v1 != v2 { 1 } else { 0 })),
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(if v1 != v2 { 1 } else { 0 })),
             _ => None,
         }
     }
 
     fn less_equal_logic(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
         match (a, b) {
-            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1 <= v2)),
-            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1 <= v2)),
-            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1 <= v2)),
-            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1 <= v2)),
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(if v1 <= v2 { 1 } else { 0 })),
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(if v1 <= v2 { 1 } else { 0 })),
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(if v1 <= v2 { 1 } else { 0 })),
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(if v1 <= v2 { 1 } else { 0 })),
             _ => None,
         }
     }
 
     fn greater_equal_logic(a: PaxoValue, b: PaxoValue) -> Option<PaxoValue> {
         match (a, b) {
-            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(v1 >= v2)),
-            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(v1 >= v2)),
-            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(v1 >= v2)),
-            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(v1 >= v2)),
+            (PaxoValue::Xs(v1), PaxoValue::Xs(v2)) => Some(PaxoValue::Xs(if v1 >= v2 { 1 } else { 0 })),
+            (PaxoValue::S(v1), PaxoValue::S(v2)) => Some(PaxoValue::S(if v1 >= v2 { 1 } else { 0 })),
+            (PaxoValue::M(v1), PaxoValue::M(v2)) => Some(PaxoValue::M(if v1 >= v2 { 1 } else { 0 })),
+            (PaxoValue::L(v1), PaxoValue::L(v2)) => Some(PaxoValue::L(if v1 >= v2 { 1 } else { 0 })),
             _ => None,
         }
     }
