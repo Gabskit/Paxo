@@ -111,32 +111,147 @@ impl PaxoValue{
         match &self {
             PaxoValue::Xs(v) => {
                 if (v & 0x7c00) != 0x7c00 {
-                    let exp = ((v >> 10) & 0x1F) as i32;
-                    let mantissa = (v & 0x03FF) as f64;
-                    let bias = 15;
-                    let result = if exp == 0 && mantissa == 0.0 {
+                    let exp: i8 = ((v >> 10) & 0x1f) as i8;
+                    let mantissa: f64 = (v & 0x03FF) as f64;
+                    let bias: u8 = 15;
+                    let result: f64 = if exp == 0 && mantissa == 0.0 {
                         0.0
                     } else {
-                        mantissa * 10.0f64.powi(exp - bias)
-                    };
+                        mantissa * 10.0f64.powi(exp - bias)}
+
                     DecodedPaxo::Float(result)
                 } else {
-                    let tag = v & 0xFF00;
+                    let tag: u16 = v & 0xff00;
                     match tag {
-                        0x7C00 => DecodedPaxo::Boolean((payload & 0x1) != 0), // Bit
-                        0x7D00 => DecodedPaxo::Utfchar((payload & 0xFF) as char), // UTF-8
-                        0x7E00 => DecodedPaxo::Vector2d(((payload >> 4) & 0xF) as i64, (payload & 0xF) as i64), // Vector 2D
+                        0x7c00 => DecodedPaxo::Boolean((v & 0x1) as bool), // Bit
+                        0x7d00 => DecodedPaxo::Utfchar((v & 0xFF) as char), // UTF-8
+                        0x7E00 => DecodedPaxo::Vector2d(((v >> 4) & 0xF) as i64, (payload & 0xF) as i64), // Vector 2D
                         0x7F00 => DecodedPaxo::Vector4d(
-                        ((payload >> 6) & 0x3) as i32,
-                        ((payload >> 4) & 0x3) as i32,
-                        ((payload >> 2) & 0x3) as i32,
-                        (payload & 0x3) as i32), // Vector 4D
-                        0xFC00 => , // Trit
-                        0xFD00 => (6, (v & 0x00FF) as u128), // Número complejo
-                        _ => (7, (v & 0x00FF) as u128),      // Uso futuro / reservado
+                        ((v >> 6) & 0x3) as i32,
+                        ((v >> 4) & 0x3) as i32,
+                        ((v >> 2) & 0x3) as i32,
+                        (v & 0x3) as i32), // Vector 4D
+                        0xFC00 => DecodedPaxo::Trit((v & 0x3) as u8), // Trit
+                        0xFD00 => {
+                            let expr: i8 = ((v >> 5) & 0x6) as i8
+                            let expi: i8 = ((v >> 1) & 0x6) as i8
+                            let mantissar: f64 = ((v >> 4) & 0x1) as f64
+                            let mantissai: f64 = (v & 0x1) as f64
+                            let bias: u8 = 1
+                            let resultr: f64 = if expr == 0 && mantissar == 0.0 {
+                                0.0
+                            } else {
+                                mantissar * 10.0f64.powi(expr - bias)}
+
+                            let resulti: f64 = if expi == 0 && mantissai == 0.0 {
+                                0.0
+                            } else {
+                                mantissai * 10.0f64.powi(expi - bias)}
+
+                            DecodedPaxo::Complex(resultr, resulti)}, // Número complejo
+
+                        _ => DecodedPaxo::Float(v as f64)}}}
+
+            PaxoValue::S(v) => {
+                if (v & 0x7fe0_0000) != 0x7fe0_0000 {
+                    let exp: i16 = ((v >> 20) & 0x7ff) as i16
+                    let mantissa: f64 = (v & 0xf_ffff) as f64
+                    let bias: u16 = 1023
+                    let result: f64 = if exp == 0 && mantissa == 0.0 {
+                        0.0
+                    } else {
+                        mantissa * 10.0f64.powi(exp - bias)}
+                    
+                    DecodedPaxo::Float(result)
+                } else {
+                    let tag: u32 = v & 0xfffc_0000
+                    match tag {
+                        0x7ff0_0000 => DecodedPaxo::Boolean((v & 0x1) as bool)
+                        0x7ff4_0000 => DecodedPaxo::Utfchar((v & 0xffff) as char)
+                        0x7ff8_0000 => DecodedPaxo::Vector2d(((v >> 9) & 0x1ff) as i64, (v & 0x1ff) as i64)
+                        0x7ffc_0000 => DecodedPaxo::Vector4d(
+                            ((v >> 12) & 0xf) as i32,
+                            ((v >> 8) & 0xf) as i32,
+                            ((v >> 4) & 0xf) as i32,
+                            (v & 0xf) as i32)
+                        0xfff0_0000 => DecodedPaxo::Trit((v & 0x3) as u8)
+                        0xfff4_0000 => {
+                            let expr: i8 = ((v >> 13) & 0xf) as i8
+                            let expi: i8 = ((v >> 4) & 0xf) as i8
+                            let mantissar: f64 = ((v >> 9) & 0xf) as f64
+                            let mantissai: f64 = (v & 0xf) as f64
+                            let bias: u8 = 7
+                            let resultr: f64 = if expr == 0 & mantissar == 0.0 {
+                                0.0
+                            } else {
+                                mantissar * 10.0f64.powi(expr - bias)}
+
+                            let resulti: f64 = if expi == 0 & mantissai == 0.0 {
+                                0.0
+                            } else {
+                                mantissai * 10.0f64.powi(expi - bias)}
+
+                            DecodedPaxo::Complex(resultr, resulti)}
+
+                        0xfff8_0000 => DecodedPaxo::Time(
+                            0, ((v >> 12) & 0x1f) as u8,
+                            ((v >> 6) & 0x3f) as u8,
+                            (v & 0x3f) as u8, 0, 0)
+                        _ => DecodedPaxo::Float(v as f64)}}}
+
+            PaxoValue::M(v) => {
+                if (v & 0x7ffc_0000_0000_0000) != 0x7ffc_0000_0000_0000 {
+                    let exp: i8 = ((v >> 50) & 0x1fff) as i16
+                    let mantissa: f64 = (v & 0x3_ffff_ffff_ffff) as f64
+                    let bias: u16 = 4095
+                    let result: f64 = if exp == 0 && mantissa == 0.0 {
+                        0.0
+                    } else {
+                        mantissa * 10.0f64.powi(exp - bias)}
+
+                    DecodedPaxo::Float(result)
+                } else {
+                    let tag: u64 = v & 0xffff_0000_0000_0000
+                    match tag {
+                        0x7ffc_0000_0000_0000 => DecodedPaxo::Boolean((v & 0x1) as bool)
+                        0x7ffd_0000_0000_0000 => DecodedPaxo::Utfchar((v & 0xffff_ffff) as char)
+                        0x7ffe_0000_0000_0000 => DecodedPaxo::Vector2d(((v >> 24) & 0xff_ffff) as i64, (v & 0xff_ffff) as i64)
+                        0x7fff_0000_0000_0000 => DecodedPaxo::Vector4d(
+                            ((v >> 36) & 0xfff) as i32,
+                            ((v >> 24) & 0xfff) as i32,
+                            ((v >> 12) & 0xfff) as i32,
+                            (v & 0xfff) as i32)
+                        0xfffc_0000_0000_0000 => DecodedPaxo::Trit((v & 0x3) as u8)
+                        0xfffd_0000_0000_0000 => {
+                            let expr: i8 = ((v >> 40) & 0x7f) as i8
+                            let expi: i8 = ((v >> 16) & 0x7f) as i8
+                            let mantissar: f64 = ((v >> 24) & 0xff_ffff) as f64
+                            let mantissai: f64 = (v & 0xff_ffff) as f64
+                            let bias: u16 = 63
+                            let resultr: f64 = if expr == 0 && mantissar == 0.0 {
+                                0.0
+                            } else {
+                                mantissar * 10.0f64.powi(expr - bias)}
+
+                            let resulti: f64 = if expi == 0 && mantissai == 0.0 {
+                                0.0
+                            } else {
+                                mantissai * 10.0f64.powi(expi - bias)}
+                            
+                            DecodedPaxo::Complex(resultr, resulti)}
+
+                        0xfffe_0000_0000_0000 => DecodedPaxo::Time(
+                            ((v >> 37) & 0x1ff) as u16,
+                            ((v >> 32) & 0x1f) as u8,
+                            ((v >> 26) & 0x3f) as u8,
+                            ((v >> 20) & 0x3f) as u8,
+                            ((v >> 10) & 0x3ff) as u16,
+                            (v & 0x3ff) as u16)
+                        _ => DecodedPaxo::Float(v as f64)
                     }
                 }
             }
+        
         }
     }
 }
