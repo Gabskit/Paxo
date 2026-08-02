@@ -22,13 +22,15 @@ statement
     ;
 
 varDeclaration
-    : sizePrefix? VAR_DECL IDENTIFIER '=' expression
-    | sizePrefix? VAR_DECL IDENTIFIER '[' INT_LITERAL? ']' '=' arrayLiteral
-    | sizePrefix? VAR_DECL IDENTIFIER
+    : sizePrefix? type IDENTIFIER '=' expression
+    | sizePrefix? type IDENTIFIER '[' INT_LITERAL? ']' '=' arrayLiteral
+    | sizePrefix? type IDENTIFIER
     ;
 
+type: BOOL_TYPE | NUMBER_TYPE | COMPLEX_TYPE | CHAR_TYPE | ARRAY_TYPE ;
+
 sizePrefix
-    : 'xxs' | 'xs' | 's' | 'l' | 'xl'
+    : 'xxs' | 'xs' | 's' 
     ;
 
 assignment
@@ -38,7 +40,7 @@ assignment
     ;
 
 ifElseStatement
-    : '(' expression ')' block (ARROW block)?
+    : '(' expression ')' block (ARROW '(' expression ')' block)*? (ARROW block)?
     ;
 
 matchStatement
@@ -79,7 +81,7 @@ block
     ;
 
 parameterList
-    : sizePrefix? VAR_DECL IDENTIFIER (',' sizePrefix? VAR_DECL IDENTIFIER)*
+    : sizePrefix? type IDENTIFIER (',' sizePrefix? type IDENTIFIER)*
     ;
 
 argumentList
@@ -102,8 +104,6 @@ expression
     | STRING_LITERAL
     | BOOLEAN_BIT
     | BOOLEAN_TRIT
-    | VECTOR
-    | TIME_LITERAL
     | arrayLiteral
     | arrayAccess
     | IDENTIFIER
@@ -121,7 +121,12 @@ arrayAccess
 // 2. REGLAS DEL LEXER (Tokens con Aliases Móvil/ASCII)
 // ==========================================
 
-VAR_DECL   : '📥' | 'var' ;
+NUMBER_TYPE: 'xn' ;
+COMPLEX_TYPE: 'xi';
+CHAR_TYPE  : 'abc';
+BOOL_TYPE  : 'bit';
+ARRAY_TYPE : '📥' | 'vars';
+
 PKG        : '📦' | 'pkg' ;
 TRY        : '↻' | 'try' ;
 CATCH      : '🪤' | 'catch' ;
@@ -141,8 +146,6 @@ COMPLEX_LITERAL : [+-]? [0-9]+ ('.' [0-9]+)? [+-] [0-9]+ ('.' [0-9]+)? 'i'
 IDENTIFIER      : [a-zA-Z_\p{L}\p{Emoji}][a-zA-Z0-9_\p{L}\p{Emoji}]* ;
 STRING_LITERAL  : '"' (~["\r\n])* '"' ;
 CHAR_LITERAL    : '\'' . '\'' ;
-VECTOR          : '[' [+-]? [0-9]+ ('.' [0-9]+) (',' [+-]? [0-9]+ ('.' [0-9]+)?)* ']' ;
-TIME_LITERAL    : [0-9]{1-3} (':' [0-9]{1-2}){1-3} ('.' [0-9]{1-3}){1-2} ;
 LINE_COMMENT    : '//' ~[\r\n]* -> skip ;
 BLOCK_COMMENT   : '/*' .*? '*/' -> skip ;
 WS              : [ \t\r\n]+ -> skip ;
