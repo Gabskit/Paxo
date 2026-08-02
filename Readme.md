@@ -5,38 +5,37 @@ Paxo es un nuevo lenguaje de tipado dinamico, multiparadigma, de vm, este lengua
 ## Tipos
 
 ```
-📥 foo = 6 //entero
-📥 foo = 6.7 //Decimal
-📥 foo = 9-4.4 i //complejo decimal 
-📥 foo = ✓ //booleano
-📥 foo = 'C' //caracter
-📥 foo = "Texto"
-📥 foo = [4, 6] //vector bidimensional
-📥 foo = [6, 8, 4, 8]//vector 4d
-📥 foo = 97:10:06:20.878.345 //tiempo
-📥 foo[] = «4, 5.08, "Arreglos", «6, 7»»
+xn foo = 6.7 //numero
+xi foo = 9-4.4 i //complejo
+bit foo = ✓ //booleano
+abc foo = 'C' //caracter
+abc foo = "Texto"
+📥 foo[] = «4, 5.08, «6, 7»»
 
 📦 foo = {
-  📥 goo = "Paquetes" //contiene variables y funciones
+  abc goo = "Paquetes" //contiene variables y funciones
 }
 🗳️ foo = {
-  📥 inte
-  s📥 ou
+  xn inte
+  bit ou
 } //como union
 fx foo(){
-📥 goo = "Esto es una función"
+abc goo = "Esto es una función"
 }
 
-var foo // aloclave
 ```
 
 ## Tamaños de variable
 
 ```
-xs📥 //2 bytes 16 bits
-s📥 //4 bytes 32 bits
-📥 //8 bytes 64 bits
-l📥 //16 bytes 128 bits
+8xn 8bits
+16xn 16 bits
+
+xsabc utf 8
+sabc uft 16
+abc utf 32
+
+
 ```
 ## Funciones
 
@@ -50,7 +49,7 @@ Las funciones tambien pueden estar en paquetes para generar clases
 
 ```
 📦 hi = {
-  📥 i1 = 8
+  xn i1 = 8
   fx metodo(){
     //codigo
   }
@@ -121,20 +120,21 @@ Declaración match
 
 ```
 +📚 <Basic.paxo>
-📥 entero = false
-📥 i = 0
+bit entero = •
+xn i = 0
 fx main(){
-  entero = 9
+  entero = ✓
   (i > 50): ⏸️ |:
-    entero++
+  i++
   :|
   ↻{
-    (entero ≠ 1000){
-      i = "completado"
+  abc texto
+    (i ≠ 1000){
+      texto = "completado"
     } →{
-      i = "en progreso"
+      texto = "en progreso"
     }
-  } 🪤 (axo.vartype) {
+  } 🪤 (paxo.vartype) {
     print(i)
   }
 }
