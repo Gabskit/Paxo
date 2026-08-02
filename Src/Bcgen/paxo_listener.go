@@ -17,6 +17,9 @@ type PaxoListener interface {
 	// EnterVarDeclaration is called when entering the varDeclaration production.
 	EnterVarDeclaration(c *VarDeclarationContext)
 
+	// EnterType is called when entering the type production.
+	EnterType(c *TypeContext)
+
 	// EnterSizePrefix is called when entering the sizePrefix production.
 	EnterSizePrefix(c *SizePrefixContext)
 
@@ -100,6 +103,9 @@ type PaxoListener interface {
 
 	// ExitVarDeclaration is called when exiting the varDeclaration production.
 	ExitVarDeclaration(c *VarDeclarationContext)
+
+	// ExitType is called when exiting the type production.
+	ExitType(c *TypeContext)
 
 	// ExitSizePrefix is called when exiting the sizePrefix production.
 	ExitSizePrefix(c *SizePrefixContext)

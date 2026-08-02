@@ -38,6 +38,12 @@ func (s *BasePaxoListener) EnterVarDeclaration(ctx *VarDeclarationContext) {}
 // ExitVarDeclaration is called when production varDeclaration is exited.
 func (s *BasePaxoListener) ExitVarDeclaration(ctx *VarDeclarationContext) {}
 
+// EnterType is called when production type is entered.
+func (s *BasePaxoListener) EnterType(ctx *TypeContext) {}
+
+// ExitType is called when production type is exited.
+func (s *BasePaxoListener) ExitType(ctx *TypeContext) {}
+
 // EnterSizePrefix is called when production sizePrefix is entered.
 func (s *BasePaxoListener) EnterSizePrefix(ctx *SizePrefixContext) {}
 
