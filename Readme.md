@@ -28,8 +28,15 @@ abc goo = "Esto es una función"
 ## Tamaños de variable
 
 ```
-8xn 8bits
-16xn 16 bits
+xxsxn 8 bits
+xsxn 16 bits
+sxn 32 bits
+xn 64 bits
+
+xxsxi
+xsxi
+sxi
+xi
 
 xsabc utf 8
 sabc uft 16
@@ -49,7 +56,7 @@ Las funciones tambien pueden estar en paquetes para generar clases
 
 ```
 📦 hi = {
-  xn i1 = 8
+  xxsxn i1 = 8
   fx metodo(){
     //codigo
   }
