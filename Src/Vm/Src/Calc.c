@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 typedef struct {
 	unsigned _BitInt(1) signo;
 	unsigned _BitInt(1) exponente;
@@ -45,3 +47,19 @@ typedef struct {
 	PaxoNum64 real;
 	PaxoNum64 imaginario;
 } __attribute__((packed)) PaxoCom64;
+
+typedef struct {
+	unsigned _BitInt(2) valor;
+} __attribute__((packed)) PaxoBool;
+
+typedef struct {
+	uint8_t valor;
+} __attribute__((packed)) PaxoChar8;
+
+typedef struct {
+	uint16_t valor;
+} __attribute__((packed)) PaxoChar16;
+
+typedef struct {
+	uint32_t valor;
+} __attribute__((packed)) PaxoChar32;
