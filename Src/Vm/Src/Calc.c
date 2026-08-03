@@ -63,3 +63,32 @@ typedef struct {
 typedef struct {
 	uint32_t valor;
 } __attribute__((packed)) PaxoChar32;
+
+//Tabla LUT
+const uint32_t LUT_exp[] = {
+	1,//0
+	10,//1
+	100,//2
+	1000,//3
+	10000,//4
+	100000,//5
+	1000000,//6
+	10000000,//7
+	100000000,//8
+	1000000000,//9
+	10000000000,//10
+	100000000000,//11
+};
+
+//Funciones de zig
+
+//Funciones numericas
+PaxoNum8 add_num8(PaxoNum8 a, PaxoNum8 b) {
+	uint8_t sesgo = 1;
+	
+	int8_t int_zone_a = (a.signo ? -1 : 1) * (int8_t)a.entero;
+	int8_t int_zone_b = (b.signo ? -1 : 1) * (int8_t)b.entero;
+	int8_t int_r = (int_zone_a & 0xf) + (int_zone_b & 0xf);
+	bool r_sign = (bool)(int_r & 0x80) >> 7;
+	
+}

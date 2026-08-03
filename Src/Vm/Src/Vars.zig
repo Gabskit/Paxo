@@ -1,5 +1,7 @@
 const std = @import("std");
 
+//Deficion de variables
+//Numeros
 pub const PaxoNum8 = extern struct {
 	signo: u1,
 	exponente: u1,
@@ -24,6 +26,7 @@ pub const PaxoNum64 = extern struct {
 	entero: u25,
 	fraccion: u27}
 
+//Números complejos
 pub const PaxoCom8 = extern struct {
 	real: PaxoNum8,
 	imaginario: PaxoNum8}
@@ -40,9 +43,11 @@ pub const PaxoCom64 = extern struct {
 	real: PaxoNum64,
 	imaginario: PaxoCom64}
 
+//Bit
 pub const PaxoBool = extern struct {
 	valor: u2}
 
+//Carácter
 pub const PaxoChar8 = extern struct {
 	caracter: u8}
 
@@ -51,3 +56,7 @@ pub const PaxoChar16 = extern struct {
 
 pub const PaxoChar32 = extern struct {
 	caracter: u32}
+
+//Conversion de tipos de datos
+
+
