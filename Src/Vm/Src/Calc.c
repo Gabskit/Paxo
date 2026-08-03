@@ -2,9 +2,9 @@
 
 typedef struct {
 	unsigned _BitInt(1) signo;
-	unsigned _BitInt(1) exponente;
+	unsigned _BitInt(2) exponente;
 	unsigned _BitInt(4) entero;
-	unsigned _BitInt(2) fraccion;
+	unsigned _BitInt(1) fraccion;
 } __attribute__((packed)) PaxoNum8;
 
 typedef struct {

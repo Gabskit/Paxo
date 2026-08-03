@@ -4,9 +4,9 @@ const std = @import("std");
 //Numeros
 pub const PaxoNum8 = extern struct {
 	signo: u1,
-	exponente: u1,
+	exponente: u2,
 	entero: u4,
-	fraccion: u2}
+	fraccion: u1}
 
 pub const PaxoNum16 = extern struct {
 	signo: u1,

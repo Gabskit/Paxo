@@ -22,16 +22,12 @@ statement
     ;
 
 varDeclaration
-    : sizePrefix? type IDENTIFIER '=' expression
-    | sizePrefix? type IDENTIFIER '[' INT_LITERAL? ']' '=' arrayLiteral
-    | sizePrefix? type IDENTIFIER
+    : type IDENTIFIER '=' expression
+    | type IDENTIFIER '[' INT_LITERAL? ']' '=' arrayLiteral
+    | type IDENTIFIER
     ;
 
-type: BOOL_TYPE | NUMBER_TYPE | COMPLEX_TYPE | CHAR_TYPE | ARRAY_TYPE ;
-
-sizePrefix
-    : 'xxs' | 'xs' | 's' 
-    ;
+type: BOOL_TYPE | NUMBER_TYPE | COMPLEX_TYPE | CHAR_TYPE ;
 
 assignment
     : IDENTIFIER '=' expression
@@ -81,7 +77,7 @@ block
     ;
 
 parameterList
-    : sizePrefix? type IDENTIFIER (',' sizePrefix? type IDENTIFIER)*
+    : type IDENTIFIER (',' type IDENTIFIER)*
     ;
 
 argumentList
@@ -121,11 +117,10 @@ arrayAccess
 // 2. REGLAS DEL LEXER (Tokens con Aliases Móvil/ASCII)
 // ==========================================
 
-NUMBER_TYPE: 'xn' ;
-COMPLEX_TYPE: 'xi';
-CHAR_TYPE  : 'abc';
+NUMBER_TYPE: 'n8' | 'n16' | 'n32' | 'n64' ;
+COMPLEX_TYPE: 'ni8' | 'ni16' | 'ni32' | 'ni64' ;
+CHAR_TYPE  : 'abc8' | 'abc16' | 'abc32' ;
 BOOL_TYPE  : 'bit';
-ARRAY_TYPE : '📥' | 'vars';
 
 PKG        : '📦' | 'pkg' ;
 TRY        : '↻' | 'try' ;

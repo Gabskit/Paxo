@@ -44,12 +44,6 @@ func (s *BasePaxoListener) EnterType(ctx *TypeContext) {}
 // ExitType is called when production type is exited.
 func (s *BasePaxoListener) ExitType(ctx *TypeContext) {}
 
-// EnterSizePrefix is called when production sizePrefix is entered.
-func (s *BasePaxoListener) EnterSizePrefix(ctx *SizePrefixContext) {}
-
-// ExitSizePrefix is called when production sizePrefix is exited.
-func (s *BasePaxoListener) ExitSizePrefix(ctx *SizePrefixContext) {}
-
 // EnterAssignment is called when production assignment is entered.
 func (s *BasePaxoListener) EnterAssignment(ctx *AssignmentContext) {}
 

@@ -20,9 +20,6 @@ type PaxoListener interface {
 	// EnterType is called when entering the type production.
 	EnterType(c *TypeContext)
 
-	// EnterSizePrefix is called when entering the sizePrefix production.
-	EnterSizePrefix(c *SizePrefixContext)
-
 	// EnterAssignment is called when entering the assignment production.
 	EnterAssignment(c *AssignmentContext)
 
@@ -106,9 +103,6 @@ type PaxoListener interface {
 
 	// ExitType is called when exiting the type production.
 	ExitType(c *TypeContext)
-
-	// ExitSizePrefix is called when exiting the sizePrefix production.
-	ExitSizePrefix(c *SizePrefixContext)
 
 	// ExitAssignment is called when exiting the assignment production.
 	ExitAssignment(c *AssignmentContext)
