@@ -5,22 +5,22 @@ Paxo es un nuevo lenguaje de tipado dinamico, multiparadigma, de vm, este lengua
 ## Tipos
 
 ```
-xn foo = 6.7 //numero
-xi foo = 9-4.4 i //complejo
+n8 foo = 6.7 //numero
+ni8 foo = 9-4.4 i //complejo
 bit foo = ✓ //booleano
-abc foo = 'C' //caracter
-abc foo = "Texto"
-📥 foo[] = «4, 5.08, «6, 7»»
+abc8 foo = 'C' //caracter
+abc8 foo = "Texto"
+n8 foo[] = «4, 5.08, «6, 7»»
 
 📦 foo = {
   abc goo = "Paquetes" //contiene variables y funciones
 }
 🗳️ foo = {
-  xn inte
+  n8 inte
   bit ou
 } //como union
-fx foo(){
-abc goo = "Esto es una función"
+fx foo = (){
+abc8 goo = "Esto es una función"
 }
 
 ```
@@ -28,26 +28,24 @@ abc goo = "Esto es una función"
 ## Tamaños de variable
 
 ```
-xxsxn 8 bits
-xsxn 16 bits
-sxn 32 bits
-xn 64 bits
+n8 8 bits
+n16 16 bits
+n32 32 bits
+n64 64 bits //en consideración 
 
-xxsxi
-xsxi
-sxi
-xi
+ni8
+ni16
+ni32
+ni64
 
-xsabc utf 8
-sabc uft 16
-abc utf 32
-
-
+abc8 utf 8
+abc16 uft 16
+abc32 utf 32
 ```
 ## Funciones
 
 ```
-fx name(){
+fx name = (){
 //codigo
 }
 ```
@@ -56,8 +54,8 @@ Las funciones tambien pueden estar en paquetes para generar clases
 
 ```
 📦 hi = {
-  xxsxn i1 = 8
-  fx metodo(){
+  n8 i1 = 8
+  fx metodo = (){
     //codigo
   }
 }
@@ -99,8 +97,8 @@ Declaración match
 :|
 ```
 
-- ⏸️: ejecutara el código declarado hasta que la condición sea verdadera
-- ▶️: ejecutara el código declarado mientras la condición sea verdadera
+- ⏸️ | ||: ejecutara el código declarado hasta que la condición sea verdadera
+- ▶️ | >: ejecutara el código declarado mientras la condición sea verdadera
 
 ## Manejo de errores
 
@@ -112,30 +110,31 @@ Declaración match
 }
 ```
 ## Operadores
-==, =, <, >, ≤, ≥, ≠, ×, ÷, √, •«, »•, &, |, !, .&, .|, .!, §, +, -
+
+==, =, <, >, ≤, ≥, ≠, ×, ÷, √, •«, »•, &, |, !, .&, .|, .!, ^, +, -
 •« desplazamiento de bits L
 »• desplazamiento de bits R
 & and
 | or
 ! not
-.& and bit trit
-.| or bit trit
-.! not bit trit
-§ xor
+.& and bit
+.| or bit
+.! not bit
+^ xor
 
 ## Ejemplo
 
 ```
 +📚 <Basic.paxo>
 bit entero = •
-xn i = 0
-fx main(){
+n8 i = 0
+fx main = (){
   entero = ✓
-  (i > 50): ⏸️ |:
+  (i > 50): || |:
   i++
   :|
   ↻{
-  abc texto
+  abc8 texto
     (i ≠ 1000){
       texto = "completado"
     } →{

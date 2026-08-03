@@ -1,7 +1,0 @@
-// ejemplo
-📥 entero = false
-📥 i = 0
-📥 main = () {
-  entero = 9
-  (i > 50): ⏸️ |:
-    entero++:|}
