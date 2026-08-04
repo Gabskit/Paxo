@@ -117,8 +117,8 @@ arrayAccess
 // 2. REGLAS DEL LEXER (Tokens con Aliases Móvil/ASCII)
 // ==========================================
 
-NUMBER_TYPE: 'n8' | 'n16' | 'n32' | 'n64' ;
-COMPLEX_TYPE: 'ni8' | 'ni16' | 'ni32' | 'ni64' ;
+NUMBER_TYPE: 'n8' | 'n16' | 'n32' ;
+COMPLEX_TYPE: 'ni8' | 'ni16' | 'ni32' ;
 CHAR_TYPE  : 'abc8' | 'abc16' | 'abc32' ;
 BOOL_TYPE  : 'bit';
 

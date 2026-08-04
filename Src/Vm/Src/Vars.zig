@@ -16,15 +16,9 @@ pub const PaxoNum16 = extern struct {
 
 pub const PaxoNum32 = extern struct {
 	signo: u1,
-	exponente: u7,
-	entero: u11,
+	exponente: u6,
+	entero: u12,
 	fraccion: u13}
-
-pub const PaxoNum64 = extern struct {
-	signo: u1,
-	exponente: u11,
-	entero: u25,
-	fraccion: u27}
 
 //Números complejos
 pub const PaxoCom8 = extern struct {
@@ -38,10 +32,6 @@ pub const PaxoCom16 = extern struct {
 pub const PaxoCom32 = extern struct {
 	real: PaxoNum32,
 	imaginario: PaxoNum32}
-
-pub const PaxoCom64 = extern struct {
-	real: PaxoNum64,
-	imaginario: PaxoCom64}
 
 //Bit
 pub const PaxoBool = extern struct {
@@ -58,5 +48,50 @@ pub const PaxoChar32 = extern struct {
 	caracter: u32}
 
 //Conversion de tipos de datos
+export fn num8tonum16(num: PaxoNum8) callconv(.C) PaxoNum16 {
+	var result: PaxoNum16;
+	result.signo = num.signo;
+	result.exponente = num.exponente;
+	result.entero = num.entero;
+	result.fraccion = num.fraccion;
+	return result;}
 
+export fn num8tonum32(num: PaxoNum8) callconv(.C) PaxoNum32 {
+	var result: PaxoNum32;
+	result.signo = num.signo;
+	result.exponente = num.exponente;
+	result.entero = num.entero;
+	result.fraccion = num.fraccion;
+	return result;}
 
+export fn num16tonum8(num: PaxoNum16) callconv(.C) PaxoNum8 {
+	var result: PaxoNum8;
+	result.signo = num.signo;
+	result.exponente = num.exponente;
+	result.entero = num.entero;
+	result.fraccion = num.fraccion;
+	return result;}
+
+export fn num16tonum32(num: PaxoNum16) callconv(.C) PaxoNum32 {
+	var result: PaxoNum32;
+	result.signo = num.signo;
+	result.exponente = num.exponente;
+	result.entero = num.entero;
+	result.fraccion = num.fraccion;
+	return result;}
+
+export fn num32tonum8(num: PaxoNum32) callconv(.C) PaxoNum8 {
+	var result: PaxoNum8;
+	result.signo = num.signo;
+	result.exponente = num.exponente;
+	result.entero = num.entero;
+	result.fraccion = num.fraccion;
+	return result;}
+
+export fn num32tonum16(num: PaxoNum32) callconv(.C) PaxoNum16 {
+	var result: PaxoNum16;
+	result.signo = num.signo;
+	result.exponente = num.exponente;
+	result.entero = num.entero;
+	result.fraccion = num.fraccion;
+	return result;}

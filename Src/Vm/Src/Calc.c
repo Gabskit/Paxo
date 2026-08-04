@@ -16,17 +16,10 @@ typedef struct {
 
 typedef struct {
 	unsigned _BitInt(1) signo;
-	unsigned _BitInt(7) exponente;
-	unsigned _BitInt(11) entero;
+	unsigned _BitInt(6) exponente;
+	unsigned _BitInt(12) entero;
 	unsigned _BitInt(13) fraccion;
 } __attribute__((packed)) PaxoNum32;
-
-typedef struct {
-	unsigned _BitInt(1) signo;
-	unsigned _BitInt(11) exponente;
-	unsigned _BitInt(25) entero;
-	unsigned _BitInt(27) fraccion;
-} __attribute__((packed)) PaxoNum64;
 
 typedef struct {
 	PaxoNum8 real;
@@ -44,11 +37,6 @@ typedef struct {
 } __attribute__((packed)) PaxoCom32;
 
 typedef struct {
-	PaxoNum64 real;
-	PaxoNum64 imaginario;
-} __attribute__((packed)) PaxoCom64;
-
-typedef struct {
 	unsigned _BitInt(2) valor;
 } __attribute__((packed)) PaxoBool;
 
@@ -64,31 +52,112 @@ typedef struct {
 	uint32_t valor;
 } __attribute__((packed)) PaxoChar32;
 
-//Tabla LUT
-const uint32_t LUT_exp[] = {
-	1,//0
-	10,//1
-	100,//2
-	1000,//3
-	10000,//4
-	100000,//5
-	1000000,//6
-	10000000,//7
-	100000000,//8
-	1000000000,//9
-	10000000000,//10
-	100000000000,//11
-};
+
 
 //Funciones de zig
 
 //Funciones numericas
 PaxoNum8 add_num8(PaxoNum8 a, PaxoNum8 b) {
-	uint8_t sesgo = 1;
+	const uint8_t sesgo = 1;
+	int8_t val_a = ((int8_t)a.entero << 1) | a.fraccion;
+	if (a.signo) { val_a = -val_a; }
+	int8_t val_b = ((int8_t)b.entero << 1) | a.fraccion;
+	if (b.signo) { val_b = -val_b; }
+
+	int8_t exp_a = (int8_t)a.exponente - sesgo;
+	int8_t exp_b = (int8_t)b.exponente - sesgo;
+	int8_t exp;
 	
-	int8_t int_zone_a = (a.signo ? -1 : 1) * (int8_t)a.entero;
-	int8_t int_zone_b = (b.signo ? -1 : 1) * (int8_t)b.entero;
-	int8_t int_r = (int_zone_a & 0xf) + (int_zone_b & 0xf);
-	bool r_sign = (bool)(int_r & 0x80) >> 7;
+	if (exp_a > exp_b) {
+		uint8_t diff = exp_a - exp_b;
+		for (int8_t i = 0; i < diff; i++) {
+			val_b *= 10;}
+		exp = exp_a;
+	} else if (exp_b > exp_a) {
+		uint8_t diff = exp_b - exp_b;
+		for (int8_t i = 0; i < diff; i++) {
+			val_a *= 10;}
+		exp = exp_b;}
+
+	int8_t suma = val_a + val_b;
+	PaxoNum8 result;
+	result.signo = (suma < 0)? 1 : 0;
+
+	while (suma >= (1 << 5)) {
+    suma /= 10;
+    exp++;}
+
+	result.exponente = (unsigned _BitInt(2))exp + sesgo;
+	result.entero = (unsigned _BitInt(4))(suma >> 1) & 0xf;
+	result.fraccion = (unsigned _BitInt(1))suma & 0x1;
+	return result;}
+
+PaxoNum16 add_num16(PaxoNum16 a, PaxoNum16 b) {
+	const uint8_t sesgo = 7;
+	int16_t val_a = ((int16_t)a.entero << 6) | a.fraccion;
+	if (a.signo) { val_a = -val_a; }
+	int16_t val_b = ((int16_t)b.entero << 6) | a.fraccion;
+	if (b.signo) { val_b = -val_b; }
+
+	int16_t exp_a = (int16_t)a.exponente - sesgo;
+	int16_t exp_b = (int16_t)b.exponente - sesgo;
+	int16_t exp;
 	
-}
+	if (exp_a > exp_b) {
+		uint8_t diff = exp_a - exp_b;
+		for (int8_t i = 0; i < diff; i++) {
+			val_b *= 10;}
+		exp = exp_a;
+	} else if (exp_b > exp_a) {
+		uint8_t diff = exp_b - exp_b;
+		for (int8_t i = 0; i < diff; i++) {
+			val_a *= 10;}
+		exp = exp_b;}
+
+	int16_t suma = val_a + val_b;
+	PaxoNum16 result;
+	result.signo = (suma < 0)? 1 : 0;
+
+	while (suma >= (1 << 11)) {
+    suma /= 10;
+    exp++;}
+
+	result.exponente = (unsigned _BitInt(4))exp + sesgo;
+	result.entero = (unsigned _BitInt(5))(suma >> 6) & 0x1f;
+	result.fraccion = (unsigned _BitInt(6))suma & 0x3f;
+	return result;}
+
+PaxoNum32 add_num32(PaxoNum32 a, PaxoNum32 b) {
+	const uint8_t sesgo = 31;
+	int32_t val_a = ((int32_t)a.entero << 13) | a.fraccion;
+	if (a.signo) { val_a = -val_a; }
+	int32_t val_b = ((int32_t)b.entero << 13) | a.fraccion;
+	if (b.signo) { val_b = -val_b; }
+
+	int8_t exp_a = (int8_t)a.exponente - sesgo;
+	int8_t exp_b = (int8_t)b.exponente - sesgo;
+	int8_t exp;
+	
+	if (exp_a > exp_b) {
+		uint8_t diff = exp_a - exp_b;
+		for (int8_t i = 0; i < diff; i++) {
+			val_b *= 10;}
+		exp = exp_a;
+	} else if (exp_b > exp_a) {
+		uint8_t diff = exp_b - exp_b;
+		for (int8_t i = 0; i < diff; i++) {
+			val_a *= 10;}
+		exp = exp_b;}
+
+	int32_t suma = val_a + val_b;
+	PaxoNum32 result;
+	result.signo = (suma < 0)? 1 : 0;
+
+	while (suma >= (1 << 25)) {
+    suma /= 10;
+    exp++;}
+
+	result.exponente = (unsigned _BitInt(6))exp + sesgo;
+	result.entero = (unsigned _BitInt(12))(suma >> 13) & 0xfff;
+	result.fraccion = (unsigned _BitInt(13))suma & 0x1fff;
+	return result;}
