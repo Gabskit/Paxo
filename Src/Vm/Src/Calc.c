@@ -168,7 +168,7 @@ PaxoNum8 mul_num8(PaxoNum8 a, PaxoNum8 b) {
 	if (exp_final < 0) exp_final = 0;
   if (exp_final > 1) exp_final = 1;
 
-	PaxoNum16 result;
+	PaxoNum8 result;
   result.signo = signo_final;
   result.exponente = (unsigned _BitInt(1))exp_final;
   result.entero = (unsigned _BitInt(4))(mult >> 2) & 0xf;
@@ -197,7 +197,7 @@ PaxoNum8 div_num8(PaxoNum8 a, PaxoNum8 b) {
 	if (exp_final < 0) exp_final = 0;
   if (exp_final > 1) exp_final = 1;
 
-  PaxoNum16 result;
+  PaxoNum8 result;
   result.signo = signo_final;
   result.exponente = (unsigned _BitInt(1))exp_final;
   result.entero = (unsigned _BitInt(4))(mult >> 6) & 0xf;
@@ -463,7 +463,7 @@ PaxoNum32 mul_num32(PaxoNum32 a, PaxoNum32 b) {
 	if (exp_final < 0) exp_final = 0;
   if (exp_final > 63) exp_final = 63;
 
-	PaxoNum16 result;
+	PaxoNum32 result;
   result.signo = signo_final;
   result.exponente = (unsigned _BitInt(6))exp_final;
   result.entero = (unsigned _BitInt(12))(mult >> 13) & 0xfff;
@@ -476,7 +476,7 @@ PaxoNum32 div_num32(PaxoNum32 a, PaxoNum32 b) {
   int32_t val_b = b.fraccion + (b.entero * 8192);
 
 	if (val_b == 0) {
-    PaxoNum16 error = {0, 0, 0, 0};
+    PaxoNum32 error = {0, 0, 0, 0};
     return error;
 	}
 
@@ -492,7 +492,7 @@ PaxoNum32 div_num32(PaxoNum32 a, PaxoNum32 b) {
 	if (exp_final < 0) exp_final = 0;
   if (exp_final > 63) exp_final = 63;
 
-  PaxoNum16 result;
+  PaxoNum32 result;
   result.signo = signo_final;
   result.exponente = (unsigned _BitInt(6))exp_final;
   result.entero = (unsigned _BitInt(12))(mult >> 6) & 0xfff;
