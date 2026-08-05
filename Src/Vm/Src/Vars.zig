@@ -4,9 +4,9 @@ const std = @import("std");
 //Numeros
 pub const PaxoNum8 = extern struct {
 	signo: u1,
-	exponente: u2,
+	exponente: u1,
 	entero: u4,
-	fraccion: u1}
+	fraccion: u2}
 
 pub const PaxoNum16 = extern struct {
 	signo: u1,
@@ -67,9 +67,9 @@ export fn num8tonum32(num: PaxoNum8) callconv(.C) PaxoNum32 {
 export fn num16tonum8(num: PaxoNum16) callconv(.C) PaxoNum8 {
 	var result: PaxoNum8;
 	result.signo = num.signo;
-	result.exponente = @as(u2, num.exponente);
+	result.exponente = @as(u1, num.exponente);
 	result.entero = @as(u4, num.entero);
-	result.fraccion = @as(u1, num.fraccion);
+	result.fraccion = @as(u2, num.fraccion);
 	return result;}
 
 export fn num16tonum32(num: PaxoNum16) callconv(.C) PaxoNum32 {
@@ -83,9 +83,9 @@ export fn num16tonum32(num: PaxoNum16) callconv(.C) PaxoNum32 {
 export fn num32tonum8(num: PaxoNum32) callconv(.C) PaxoNum8 {
 	var result: PaxoNum8;
 	result.signo = num.signo;
-	result.exponente = @as(u2, num.exponente);
+	result.exponente = @as(u1, num.exponente);
 	result.entero = @as(u4, num.entero);
-	result.fraccion = @as(u1, num.fraccion);
+	result.fraccion = @as(u2, num.fraccion);
 	return result;}
 
 export fn num32tonum16(num: PaxoNum32) callconv(.C) PaxoNum16 {
