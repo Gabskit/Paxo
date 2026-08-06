@@ -5,47 +5,36 @@ Paxo es un nuevo lenguaje de tipado dinamico, multiparadigma, de vm, este lengua
 ## Tipos
 
 ```
-n8 foo = 6.7 //numero
-ni8 foo = 9-4.4 i //complejo
-bit foo = ✓ //booleano
-abc8 foo = 'C' //caracter
-abc8 foo = "Texto"
-n8 foo[] = «4, 5.08, «6, 7»»
+var foo = 6.7 //numero
+var foo = 9-4.4 i //complejo
+var foo = ✓ //booleano
+var foo = 'C' //caracter
+var foo = "Texto"
+var foo[] = «4, 5.08,•, "arreglos", «6, 7»»
 
-📦 foo = {
-  abc goo = "Paquetes" //contiene variables y funciones
-}
-🗳️ foo = {
-  n8 inte
-  bit ou
-} //como union
-fx foo = (){
-abc8 goo = "Esto es una función"
+var foo = {
+  var goo = "Paquetes" //contiene variables y funciones
 }
 
+var foo = (){
+var goo = "Esto es una función"
+}
 ```
 
 ## Tamaños de variable
 
 ```
-n8 8 bits
-n16 16 bits
-n32 32 bits
-n64 64 bits //en consideración 
+.8 8 bits
+.16 16 bits
+.32 32 bits
+.64 64 bits //en consideración 
 
-ni8
-ni16
-ni32
-ni64
-
-abc8 utf 8
-abc16 uft 16
-abc32 utf 32
+var.8
 ```
 ## Funciones
 
 ```
-fx name = (){
+var name = (){
 //codigo
 }
 ```
@@ -53,9 +42,9 @@ fx name = (){
 Las funciones tambien pueden estar en paquetes para generar clases
 
 ```
-📦 hi = {
-  n8 i1 = 8
-  fx metodo = (){
+var hi = {
+  var i1 = 8
+  var metodo = (){
     //codigo
   }
 }
@@ -105,7 +94,7 @@ Declaración match
 ```
 ↻ {
   //codigo
-} 🪤 (error){
+} 🪤 | /] (error){
   //error
 }
 ```
@@ -126,19 +115,18 @@ Declaración match
 
 ```
 +📚 <Basic.paxo>
-bit entero = •
-n8 i = 0
-fx main = (){
-  entero = ✓
+var entero = •
+var i = 0
+var main = (){
+  entero = 9
   (i > 50): || |:
   i++
   :|
   ↻{
-  abc8 texto
     (i ≠ 1000){
-      texto = "completado"
+      i = "completado"
     } →{
-      texto = "en progreso"
+      i = "en progreso"
     }
   } 🪤 (paxo.vartype) {
     print(i)

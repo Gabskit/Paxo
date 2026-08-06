@@ -52,7 +52,15 @@ typedef struct {
 	uint32_t valor;
 } __attribute__((packed)) PaxoChar32;
 
+typedef union {
+	uint64_t puntero;
+} __attribute__((packed)) PaxoSpecial;
 
+typedef union {
+	PaxoNum8 number;
+	char chara;
+	PaxoBool bit;
+} __attribute__((packed)) Paxo8;
 
 //Funciones de zig
 
