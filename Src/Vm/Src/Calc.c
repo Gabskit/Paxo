@@ -41,26 +41,29 @@ typedef struct {
 } __attribute__((packed)) PaxoBool;
 
 typedef struct {
-	uint8_t valor;
-} __attribute__((packed)) PaxoChar8;
-
-typedef struct {
-	uint16_t valor;
-} __attribute__((packed)) PaxoChar16;
-
-typedef struct {
-	uint32_t valor;
-} __attribute__((packed)) PaxoChar32;
-
-typedef union {
-	uint64_t puntero;
-} __attribute__((packed)) PaxoSpecial;
-
-typedef union {
-	PaxoNum8 number;
-	char chara;
-	PaxoBool bit;
-} __attribute__((packed)) Paxo8;
+	int8_t type;
+	union {
+		PaxoNum8 number8;
+		char8_t chara8;
+		};
+	union {
+		PaxoNum16 number16;
+		char16_t chara16;
+		PaxoCom8 com16};
+	union {
+		PaxoNum32;
+		char32_t chara32;
+		PaxoCom16 com32
+		_Decimal32 mon32};
+	union {
+		PaxoCom32 com64;
+		_Decimal64 mon64};
+	union {
+		PaxoBool bit;
+		void* puntero;
+		bool truebool;};
+	
+} __attribute__((packed)) PaxoVar;
 
 //Funciones de zig
 
