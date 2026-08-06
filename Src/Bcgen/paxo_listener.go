@@ -17,9 +17,6 @@ type PaxoListener interface {
 	// EnterVarDeclaration is called when entering the varDeclaration production.
 	EnterVarDeclaration(c *VarDeclarationContext)
 
-	// EnterType is called when entering the type production.
-	EnterType(c *TypeContext)
-
 	// EnterAssignment is called when entering the assignment production.
 	EnterAssignment(c *AssignmentContext)
 
@@ -100,9 +97,6 @@ type PaxoListener interface {
 
 	// ExitVarDeclaration is called when exiting the varDeclaration production.
 	ExitVarDeclaration(c *VarDeclarationContext)
-
-	// ExitType is called when exiting the type production.
-	ExitType(c *TypeContext)
 
 	// ExitAssignment is called when exiting the assignment production.
 	ExitAssignment(c *AssignmentContext)

@@ -20,7 +20,8 @@ var foo = {
 }
 
 var foo = (){
-var goo = "Esto es una función"
+	var goo = "Esto es una función"
+	return goo;
 }
 ```
 

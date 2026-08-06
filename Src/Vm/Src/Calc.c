@@ -36,33 +36,37 @@ typedef struct {
 	PaxoNum32 imaginario;
 } __attribute__((packed)) PaxoCom32;
 
-typedef struct {
-	unsigned _BitInt(2) valor;
-} __attribute__((packed)) PaxoBool;
+typedef unsigned _BitInt(2) PaxoBool;
 
 typedef struct {
 	int8_t type;
 	union {
+	union {
 		PaxoNum8 number8;
-		char8_t chara8;
-		};
+		char8_t chara8;} v8;
 	union {
 		PaxoNum16 number16;
 		char16_t chara16;
-		PaxoCom8 com16};
+		PaxoCom8 com16} v16;
 	union {
 		PaxoNum32;
 		char32_t chara32;
 		PaxoCom16 com32
-		_Decimal32 mon32};
+		_Decimal32 mon32} v32;
 	union {
 		PaxoCom32 com64;
-		_Decimal64 mon64};
+		_Decimal64 mon64} v64;
 	union {
 		PaxoBool bit;
 		void* puntero;
-		bool truebool;};
-	
+		bool truebool;
+	} sys;
+		struct {
+			uint32_t func_id;
+			void* closure_env;
+		} __attribute__((packed)) func;
+
+} __attribute__((packed)) as;
 } __attribute__((packed)) PaxoVar;
 
 //Funciones de zig

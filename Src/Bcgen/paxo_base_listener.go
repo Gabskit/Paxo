@@ -38,12 +38,6 @@ func (s *BasePaxoListener) EnterVarDeclaration(ctx *VarDeclarationContext) {}
 // ExitVarDeclaration is called when production varDeclaration is exited.
 func (s *BasePaxoListener) ExitVarDeclaration(ctx *VarDeclarationContext) {}
 
-// EnterType is called when production type is entered.
-func (s *BasePaxoListener) EnterType(ctx *TypeContext) {}
-
-// ExitType is called when production type is exited.
-func (s *BasePaxoListener) ExitType(ctx *TypeContext) {}
-
 // EnterAssignment is called when production assignment is entered.
 func (s *BasePaxoListener) EnterAssignment(ctx *AssignmentContext) {}
 
