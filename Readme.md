@@ -13,7 +13,7 @@ var foo = 'C' //caracter
 var foo = "Texto"
 var goo = @foo //puntero
 var foo = .× //booleano bit
-var foo[] = «4, 5.08,•, "arreglos", «6, 7»»
+var foo[] = «4, 5.08, •, "arreglos", «6 + 8.0i, §7»»
 
 var foo = {
   var goo = "Paquetes" //contiene variables y funciones

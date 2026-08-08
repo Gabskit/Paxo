@@ -129,7 +129,7 @@ export fn decodenum8(num: PaxoNum8) callconv(.C) [*:0]const u8 {
 	const exp: i8 = @as(i8, @intCast(num.exponente)) - sesgo;
 	const signo_str = if (num.signo == 1) "-" else " ";
 
-	var man: u32 = @as(u32, num.fraccion) + (@as(u32, num.entero) << 2);
+	var man: u32 = @as(u32, num.fraccion) + (@as(u32, ((num.exponente > 0) ? num.entero + 1 : num.entero)) << 2);
 	if (exp > 0) {
     const factor_exp = std.math.pow(u32, 10, @as(u32, @intCast(exp)));
     man = man * factor_exp;
