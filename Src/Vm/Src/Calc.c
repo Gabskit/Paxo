@@ -619,7 +619,7 @@ PaxoNum64 sub_num64(PaxoNum64 a, PaxoNum64 b) {
 	if (exp > 512) exp = 512;
 
 	result.exponente = (unsigned _BitInt(10))(exp + sesgo);
-	result.entero = (unsigned _BitInt(26))((abs_suma >> 27) & 0xffffff);
+	result.entero = (unsigned _BitInt(26))((abs_suma >> 27) & 0x3ffffff);
 	result.fraccion = (unsigned _BitInt(27))(abs_suma & 0x7ffffff);
 	return result;}
 
