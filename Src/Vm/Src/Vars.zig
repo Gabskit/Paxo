@@ -22,6 +22,12 @@ pub const PaxoNum32 = extern struct {
 	entero: u12,
 	fraccion: u13};
 
+pub const PaxoNum64 = extern struct {
+	signo: u1,
+	exponente: u10,
+	entero: u26,
+	fraccion: u27};
+
 //Números complejos
 pub const PaxoCom8 = extern struct {
 	real: PaxoNum8,
@@ -34,6 +40,10 @@ pub const PaxoCom16 = extern struct {
 pub const PaxoCom32 = extern struct {
 	real: PaxoNum32,
 	imaginario: PaxoNum32};
+
+pub const PaxoCom64 = extern struct {
+	real: PaxoNum64,
+	imaginario: PaxoNum64};
 
 //Bit
 pub const PaxoBool = extern struct {
