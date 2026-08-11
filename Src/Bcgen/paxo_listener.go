@@ -17,14 +17,17 @@ type PaxoListener interface {
 	// EnterVarDeclaration is called when entering the varDeclaration production.
 	EnterVarDeclaration(c *VarDeclarationContext)
 
+	// EnterType is called when entering the type production.
+	EnterType(c *TypeContext)
+
+	// EnterScope is called when entering the scope production.
+	EnterScope(c *ScopeContext)
+
 	// EnterAssignment is called when entering the assignment production.
 	EnterAssignment(c *AssignmentContext)
 
-	// EnterIfElseStatement is called when entering the ifElseStatement production.
-	EnterIfElseStatement(c *IfElseStatementContext)
-
-	// EnterMatchStatement is called when entering the matchStatement production.
-	EnterMatchStatement(c *MatchStatementContext)
+	// EnterCondStatement is called when entering the condStatement production.
+	EnterCondStatement(c *CondStatementContext)
 
 	// EnterMatchCase is called when entering the matchCase production.
 	EnterMatchCase(c *MatchCaseContext)
@@ -98,14 +101,17 @@ type PaxoListener interface {
 	// ExitVarDeclaration is called when exiting the varDeclaration production.
 	ExitVarDeclaration(c *VarDeclarationContext)
 
+	// ExitType is called when exiting the type production.
+	ExitType(c *TypeContext)
+
+	// ExitScope is called when exiting the scope production.
+	ExitScope(c *ScopeContext)
+
 	// ExitAssignment is called when exiting the assignment production.
 	ExitAssignment(c *AssignmentContext)
 
-	// ExitIfElseStatement is called when exiting the ifElseStatement production.
-	ExitIfElseStatement(c *IfElseStatementContext)
-
-	// ExitMatchStatement is called when exiting the matchStatement production.
-	ExitMatchStatement(c *MatchStatementContext)
+	// ExitCondStatement is called when exiting the condStatement production.
+	ExitCondStatement(c *CondStatementContext)
 
 	// ExitMatchCase is called when exiting the matchCase production.
 	ExitMatchCase(c *MatchCaseContext)

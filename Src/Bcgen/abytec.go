@@ -4,93 +4,67 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"github.com/antlr4-go/antlr/v4")
 
-type BytecodeGenerator struct {
+	"github.com/antlr4-go/antlr/v4"
+)
+
+type CraneliftIRGenerator struct {
 	*BasePaxoListener
-	Bytecode []byte}
+	CLIFBuilder strings.Builder
+	VarIndex    int
+}
 
-// Ejemplo de captura de declaración de variables.
-func (g *BytecodeGenerator) EnterVarDeclaration(ctx *VarDeclarationContext) {
-	// Opcode 0x01 = PUSH / STORE
-	g.Bytecode = append(g.Bytecode, 0x01)}
+func NewCraneliftIRGenerator() *CraneliftIRGenerator {
+	g := &CraneliftIRGenerator{}
+	// Firma de función principal en Cranelift IR
+	g.CLIFBuilder.WriteString("function %main() -> i32 {\n")
+	g.CLIFBuilder.WriteString("block0:\n")
+	return g
+}
 
-func (g *BytecodeGenerator) EnterAddSubExpression(ctx *AddSubExprContext) {
+func (g *CraneliftIRGenerator) EnterVarDeclaration(ctx *VarDeclarationContext) {
+	varName := ctx.IDENTIFIER().GetText()
+	g.CLIFBuilder.WriteString(fmt.Sprintf("    ; Declaracion de variable %s\n", varName))
+}
+
+func (g *CraneliftIRGenerator) EnterAddSubExpression(ctx *AddSubExprContext) {
 	if strings.Contains(ctx.GetText(), "+") {
-		// Opcode 0x10 = Add
-		g.Bytecode = append(g.Bytecode, 0x10)
+		// En lugar del opcode 0x10, emitimos una llamada al runtime C (add_num8)
+		g.CLIFBuilder.WriteString("    %res = call %add_num8(%valA, %valB)\n")
 	} else if strings.Contains(ctx.GetText(), "-") {
-		// Opcode 0x11 = Sub
-		g.Bytecode = append(g.Bytecode, 0x11)}}
+		g.CLIFBuilder.WriteString("    %res = call %sub_num8(%valA, %valB)\n")
+	}
+}
 
-func (g *BytecodeGenerator) EnterMulDivExpression(ctx *MultDivExprContext) {
+func (g *CraneliftIRGenerator) EnterMulDivExpression(ctx *MultDivExprContext) {
 	if strings.Contains(ctx.GetText(), "×") {
-		// Opcode 0x12 = Mul
-		g.Bytecode = append(g.Bytecode, 0x12)
+		g.CLIFBuilder.WriteString("    %res = call %mul_num8(%valA, %valB)\n")
 	} else if strings.Contains(ctx.GetText(), "÷") {
-		// Opcode 0x13 = Div
-		g.Bytecode = append(g.Bytecode, 0x13)}}
+		g.CLIFBuilder.WriteString("    %res = call %div_num8(%valA, %valB)\n")
+	}
+}
 
-func (g *BytecodeGenerator) EnterShiftExpression(ctx *ShiftExprContext) {
-	if strings.Contains(ctx.GetText(), "<<") {
-		// Opcode 0x14 = LShift
-		g.Bytecode = append(g.Bytecode, 0x14)
-	} else if strings.Contains(ctx.GetText(), ">>") {
-		// Opcode 0x15 = RShift
-		g.Bytecode = append(g.Bytecode, 0x15)}}
+func (g *CraneliftIRGenerator) GenerateCLIF() string {
+	g.CLIFBuilder.WriteString("    v0 = iconst.i32 0\n")
+	g.CLIFBuilder.WriteString("    return v0\n")
+	g.CLIFBuilder.WriteString("}\n")
+	return g.CLIFBuilder.String()
+}
 
-func (g *BytecodeGenerator) EnterBitwiseExpression(ctx *BitwiseExprContext) {
-	if strings.Contains(ctx.GetText(), ".&") {
-		// Opcode 0x16 = And
-		g.Bytecode = append(g.Bytecode, 0x16)
-	} else if strings.Contains(ctx.GetText(), ".|") {
-		// Opcode 0x17 = Or
-		g.Bytecode = append(g.Bytecode, 0x17)
-	} else if strings.Contains(ctx.GetText(), "§") {
-		// Opcode 0x19 = XOR
-		g.Bytecode = append(g.Bytecode, 0x19)}}
-
-func (g *BytecodeGenerator) EnterNotgateExpression(ctx *NotgateExprContext) {
-	// Opcode 0x18 = Not
-	g.Bytecode = append(g.Bytecode, 0x18)}
-
-func (g *BytecodeGenerator) EnterRelationalExpression(ctx *RelationalExprContext) {
-	if strings.Contains(ctx.GetText(), "<") {
-		// Opcode 0x1A = Less
-		g.Bytecode = append(g.Bytecode, 0x1A)
-	} else if strings.Contains(ctx.GetText(), ">") {
-		// Opcode 0x1B = Greater
-		g.Bytecode = append(g.Bytecode, 0x1B)
-	} else if strings.Contains(ctx.GetText(), "==") {
-		// Opcode 0x1C = Equal
-		g.Bytecode = append(g.Bytecode, 0x1C)
-	} else if strings.Contains(ctx.GetText(), "!=") {
-		// Opcode 0x1D = NotEqual
-		g.Bytecode = append(g.Bytecode, 0x1D)
-	} else if strings.Contains(ctx.GetText(), "<=") {
-		// Opcode 0x1E = LessEqual
-		g.Bytecode = append(g.Bytecode, 0x1E)
-	} else if strings.Contains(ctx.GetText(), ">=") {
-		// Opcode 0x1F = GreaterEqual
-		g.Bytecode = append(g.Bytecode, 0x1F)}}
-
-
-
-func GenerateBytecode(inputPath string, outputPath string) error {
+func GenerateCraneliftIR(inputPath string, outputPath string) error {
 	input, err := antlr.NewFileStream(inputPath)
 	if err != nil {
-		return err}
+		return err
+	}
 
 	lexer := NewPaxoLexer(input)
 	stream := antlr.NewCommonTokenStream(lexer, 0)
 	p := NewPaxoParser(stream)
 
 	tree := p.Program()
-	generator := &BytecodeGenerator{BasePaxoListener: &BasePaxoListener{}}
+	generator := NewCraneliftIRGenerator()
 	antlr.ParseTreeWalkerDefault.Walk(generator, tree)
 
-	if err := os.WriteFile(outputPath, generator.Bytecode, 0644); err != nil {
-		return err}
-
-	fmt.Printf("¡Bytecode %q generado con éxito!\n", outputPath)
-	return nil}
+	clifCode := generator.GenerateCLIF()
+	return os.WriteFile(outputPath, []byte(clifCode), 0644)
+}

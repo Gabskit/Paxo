@@ -11,8 +11,7 @@ program
 statement
     : varDeclaration
     | assignment
-    | matchStatement
-    | ifElseStatement
+    | condStatement
     | loopStatement
     | tryCatchStatement
     | expression ';'
@@ -20,10 +19,16 @@ statement
     ;
 
 varDeclaration
-    : VAR_TYPE SIZE_POSFIX? IDENTIFIER '=' expression
-    | VAR_TYPE SIZE_POSFIX? IDENTIFIER '[' INT_LITERAL? ']' '=' arrayLiteral
-    | VAR_TYPE SIZE_POSFIX? IDENTIFIER
+    : scope type SIZE_POSFIX? IDENTIFIER '=' expression
+    | scope type SIZE_POSFIX? IDENTIFIER '[' INT_LITERAL? ']' '=' arrayLiteral
+    | scope type SIZE_POSFIX? IDENTIFIER
     ;
+
+type
+		: VAR_TYPE | NUM_TYPE | CHARA_TYPE | COMPLEX_TYPE | POINTER_TYPE | MONEY_TYPE | TRIT_TYPE | BOOLEAN_TYPE ;
+
+scope
+	: GLOBAL | LOCAL ;
 
 assignment
     : IDENTIFIER '=' expression
@@ -31,12 +36,8 @@ assignment
     | IDENTIFIER '--'
     ;
 
-ifElseStatement
-    : '(' expression ')' block (ARROW '(' expression ')' block)*? (ARROW block)?
-    ;
-
-matchStatement
-    : '(' IDENTIFIER ')' '{' matchCase+ '}'
+condStatement
+    : '(' IDENTIFIER | expression ')' '?' matchCase ( ':' matchCase )*? ';'
     ;
 
 matchCase
@@ -61,7 +62,7 @@ tryCatchStatement
     ;
 
 functionDeclaration
-    : '(' parameterList? ')' block
+    : '(' parameterList? ')' ':' type block
     ;
 
 pkgDeclaration
@@ -73,7 +74,7 @@ block
     ;
 
 parameterList
-    : VAR_TYPE SIZE_POSFIX? IDENTIFIER (',' VAR_TYPE SIZE_POSFIX? IDENTIFIER)*
+    : type SIZE_POSFIX? IDENTIFIER (',' type SIZE_POSFIX? IDENTIFIER)*
     ;
 
 argumentList
@@ -118,6 +119,16 @@ arrayAccess
 // ==========================================
 
 VAR_TYPE: 'var' | '📥' ;
+NUM_TYPE: 'n' ;
+MONEY_TYPE: 'mn' ;
+CHARA_TYPE: 'abc' ;
+TRIT_TYPE: 'trit' ;
+BOOLEAN_TYPE: 'bool' ;
+POINTER_TYPE: 'pin' ;
+COMPLEX_TYPE: 'ni' ;
+
+GLOBAL: 'pub' | '🌎' ;
+LOCAL: 'local';
 
 TRY        : '↻' | 'try' ;
 CATCH      : '🪤' | 'catch' | '/]' ;

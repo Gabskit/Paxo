@@ -38,23 +38,29 @@ func (s *BasePaxoListener) EnterVarDeclaration(ctx *VarDeclarationContext) {}
 // ExitVarDeclaration is called when production varDeclaration is exited.
 func (s *BasePaxoListener) ExitVarDeclaration(ctx *VarDeclarationContext) {}
 
+// EnterType is called when production type is entered.
+func (s *BasePaxoListener) EnterType(ctx *TypeContext) {}
+
+// ExitType is called when production type is exited.
+func (s *BasePaxoListener) ExitType(ctx *TypeContext) {}
+
+// EnterScope is called when production scope is entered.
+func (s *BasePaxoListener) EnterScope(ctx *ScopeContext) {}
+
+// ExitScope is called when production scope is exited.
+func (s *BasePaxoListener) ExitScope(ctx *ScopeContext) {}
+
 // EnterAssignment is called when production assignment is entered.
 func (s *BasePaxoListener) EnterAssignment(ctx *AssignmentContext) {}
 
 // ExitAssignment is called when production assignment is exited.
 func (s *BasePaxoListener) ExitAssignment(ctx *AssignmentContext) {}
 
-// EnterIfElseStatement is called when production ifElseStatement is entered.
-func (s *BasePaxoListener) EnterIfElseStatement(ctx *IfElseStatementContext) {}
+// EnterCondStatement is called when production condStatement is entered.
+func (s *BasePaxoListener) EnterCondStatement(ctx *CondStatementContext) {}
 
-// ExitIfElseStatement is called when production ifElseStatement is exited.
-func (s *BasePaxoListener) ExitIfElseStatement(ctx *IfElseStatementContext) {}
-
-// EnterMatchStatement is called when production matchStatement is entered.
-func (s *BasePaxoListener) EnterMatchStatement(ctx *MatchStatementContext) {}
-
-// ExitMatchStatement is called when production matchStatement is exited.
-func (s *BasePaxoListener) ExitMatchStatement(ctx *MatchStatementContext) {}
+// ExitCondStatement is called when production condStatement is exited.
+func (s *BasePaxoListener) ExitCondStatement(ctx *CondStatementContext) {}
 
 // EnterMatchCase is called when production matchCase is entered.
 func (s *BasePaxoListener) EnterMatchCase(ctx *MatchCaseContext) {}

@@ -12,7 +12,7 @@ mn foo = §7.87
 var foo = 9-4.4 i //complejo
 ni foo = 9-4.4 i
 var foo = • //booleano trit
-bit foo = •
+trit foo = •
 var foo = 'C' //caracter
 abc foo = 'C'
 var foo = "Texto"
@@ -49,7 +49,6 @@ n.8
 
 ```
 local var //local
-📥 var 
 
 pub var //global
 🌎 var
