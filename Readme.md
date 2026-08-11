@@ -6,13 +6,21 @@ Paxo es un nuevo lenguaje de tipado dinamico, multiparadigma, de vm, este lengua
 
 ```
 var foo = 6.7 //numero
+n foo = 6.7
 var foo = §7.87 //decimal monetario
+mn foo = §7.87
 var foo = 9-4.4 i //complejo
+ni foo = 9-4.4 i
 var foo = • //booleano trit
+bit foo = •
 var foo = 'C' //caracter
+abc foo = 'C'
 var foo = "Texto"
+abc foo = "Texto"
 var goo = @foo //puntero
+pin goo = @foo
 var foo = .× //booleano bit
+bool foo = .×
 var foo[] = «4, 5.08, •, "arreglos", «6 + 8.0i, §7»»
 
 var foo = {
@@ -34,11 +42,22 @@ var foo = (){
 .64 64 bits //en consideración 
 
 var.8
+n.8
+```
+
+## Acceso de variables
+
+```
+local var //local
+📥 var 
+
+pub var //global
+🌎 var
 ```
 ## Funciones
 
 ```
-var name = (){
+📥 var name = (){
 //codigo
 }
 ```
@@ -46,9 +65,9 @@ var name = (){
 Las funciones tambien pueden estar en paquetes para generar clases
 
 ```
-var hi = {
-  var i1 = 8
-  var metodo = (){
+pub var hi = {
+  local var i1 = 8
+  local var metodo = (){
     //codigo
   }
 }
@@ -56,30 +75,18 @@ var hi = {
 
 ## Condicionales
 
-Declaración if else
+Declaracion Condicionales
 
 ```
-(variable){
-  //caso
-}→{
-  //caso
-}
-```
-
-Declaración match
-
-```
-(variable){
-  1 -> {
+(expresión | variable)?
     //caso 1
-  }
-  'a' -> {
+  : 'a' -> 
     //caso a
-  }
-  _ -> {
+  : (expresión) ->
+		//caso
+	: _ -> 
     //caso por defecto
-  }
-}
+  ;
 ```
 
 ## Bucles
@@ -119,19 +126,19 @@ Declaración match
 
 ```
 +📚 <Basic.paxo>
-var entero = •
-var i = 0
-var main = (){
+local var entero = •
+local var i = 0
+pub var main = (){
   entero = 9
   (i > 50): || |:
   i++
   :|
   ↻{
-    (i ≠ 1000){
+    (i ≠ 1000) ?
       i = "completado"
-    } →{
+    : _ →
       i = "en progreso"
-    }
+    ;
   } 🪤 (paxo.vartype) {
     print(i)
   }

@@ -39,15 +39,7 @@ pub const PaxoCom32 = extern struct {
 pub const PaxoBool = extern struct {
 	valor: u2};
 
-//Carácter
-pub const PaxoChar8 = extern struct {
-	caracter: u8};
 
-pub const PaxoChar16 = extern struct {
-	caracter: u16};
-
-pub const PaxoChar32 = extern struct {
-	caracter: u32};
 
 //Conversion de tipos de datos
 export fn num8tonum16(num: PaxoNum8) callconv(.C) PaxoNum16 {
