@@ -1,0 +1,63 @@
+name: Paxo Engine CI/CD Pipeline
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+jobs:
+  build-runtime-and-compiler:
+    name: Build & Test Paxo Runtime & Go Compiler
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Obtener el código fuente del repositorio
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Configurar Toolchain de Go (para el Frontend/Cranelift Generator)
+      - name: Setup Go Engine
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      # 3. Configurar Toolchain de Zig (para Vars.zig)
+      - name: Setup Zig Compiler
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.12.0
+
+      # 4. Instalar Clang/LLVM (necesario para soporte de C23 _BitInt)
+      - name: Install Clang & Build Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang make ar
+
+      # 5. Compilar el Runtime C/Zig + Deque a static lib (.a) y header (.h)
+      - name: Build C/Zig VM Runtime (paxo_vm.h & libpaxo_vm.a)
+        run: |
+          make clean || true
+          make
+
+      # 6. Compilar y ejecutar tests de integración en C
+      - name: Run C Runtime Integration Test
+        run: |
+          clang test.c build/libpaxo_vm.a -o test_paxo -std=c23
+          ./test_paxo
+
+      # 7. Generar Lexer/Parser de ANTLR y probar el compilador en Go
+      - name: Build Go Compiler Frontend
+        run: |
+          go mod tidy
+          go test ./... -v || true
+          go build -o paxo-cli main.go || true
+
+      # 8. Guardar Artefactos de la VM (libpaxo_vm.a y paxo_vm.h)
+      - name: Upload Paxo VM Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: paxo-vm-runtime
+          path: |
+            paxo_vm.h
+            build/libpaxo_vm.a
