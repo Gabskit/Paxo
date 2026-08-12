@@ -108,10 +108,8 @@ typedef struct {
       uint32_t func_id;
       void *closure_env;
     } __attribute__((packed)) func;
-  } __attribute__((packed)) as;
-} __attribute__((packed)) PaxoVar;reading
-
-// Funciones de zig
+	} as;
+} PaxoVar;
 
 // Funciones numericas
 // 8 bits
