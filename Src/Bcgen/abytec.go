@@ -14,6 +14,22 @@ type CraneliftIRGenerator struct {
 	VarIndex    int
 }
 
+type Verifier struct {
+	Bytecode      []byte
+	ValidOffsets  map[int]bool
+	ConstantCount int
+}
+
+func (v *Verifier) Verify() error {
+	if err := v.pass1InstructionBoundaries(); err != nil {
+		return fmt.Errorf("error de estructura: %w", err)
+	}
+	if err := v.pass2ControlFlowAndStack(); err != nil {
+		return fmt.Errorf("error de flujo/pila: %w", err)
+	}
+	return nil
+}
+
 func NewCraneliftIRGenerator() *CraneliftIRGenerator {
 	g := &CraneliftIRGenerator{}
 	// Firma de función principal en Cranelift IR

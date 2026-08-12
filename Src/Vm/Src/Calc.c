@@ -108,7 +108,7 @@ typedef struct {
       uint32_t func_id;
       void *closure_env;
     } __attribute__((packed)) func;
-	} as;
+  } as;
 } PaxoVar;
 
 // Funciones numericas
