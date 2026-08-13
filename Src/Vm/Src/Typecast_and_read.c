@@ -628,8 +628,8 @@ PaxoNum32 decimal128tonum32(_Decimal128 dec) {
   return result;
 }
 
-//64 bits
-PaxoNum64 decimal32tonum32(_Decimal32 dec) {
+// 64 bits
+PaxoNum64 decimal32tonum64(_Decimal32 dec) {
   PaxoNum64 result;
   double val = (double)dec;
 
@@ -660,7 +660,7 @@ PaxoNum64 decimal32tonum32(_Decimal32 dec) {
   return result;
 }
 
-PaxoNum64 decimal64tonum32(_Decimal64 dec) {
+PaxoNum64 decimal64tonum64(_Decimal64 dec) {
   PaxoNum64 result;
   double val = (double)dec;
 
@@ -691,7 +691,7 @@ PaxoNum64 decimal64tonum32(_Decimal64 dec) {
   return result;
 }
 
-PaxoNum64 decimal128tonum32(_Decimal128 dec) {
+PaxoNum64 decimal128tonum64(_Decimal128 dec) {
   PaxoNum64 result;
   double val = (double)dec;
 
@@ -736,16 +736,34 @@ _Decimal64 booltodecimal(bool bit) { return bit ? 1.0dd : 0.0dd; }
 PaxoBool decimaltotrit(_Decimal64 dec) {
   if (dec == 0.0dd)
     return 0; // false
-	if (dec >= 2.0dd)
-		return 2; 
-  return 1;   // true
+  if (dec >= 2.0dd)
+    return 2;
+  return 1; // true
 }
 
 // PaxoBool (trit) a Decimal
 _Decimal64 trittodecimal(PaxoBool trit) {
   if (trit == 1)
     return 1.0dd;
-	else if (trit == 2)
-		return 2.0dd
-  return 0.0dd;
+  else if (trit == 2)
+    return 2.0dd return 0.0dd;
 }
+
+//entre decimal
+_Decimal32 decimal64todecimal32(_Decimal64 num) {
+	return (_Decimal32)num;}
+
+_Decimal32 decimal128todecimal32(_Decimal128 num) {
+	return (_Decimal32)num;}
+
+_Decimal64 decimal32todecimal64(_Decimal32 num) {
+	return (_Decimal64)num;}
+
+_Decimal64 decimal128todecimal64(_Decimal128 num) {
+	return (_Decimal64)num;}
+
+_Decimal128 decimal32todecimal128(_Decimal32 num) {
+	return (_Decimal128)num;}
+
+_Decimal128 decimal64todecimal128(_Decimal64 num) {
+	return (_Decimal128)num;}
