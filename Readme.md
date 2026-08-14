@@ -7,10 +7,6 @@ Paxo es un nuevo lenguaje de tipado dinamico, multiparadigma, de vm, este lengua
 ```
 var foo = 6.7 //numero
 n foo = 6.7
-var foo = §7.87 //decimal monetario
-mn foo = §7.87
-var foo = 9-4.4 i //complejo
-ni foo = 9-4.4 i
 var foo = • //booleano trit
 trit foo = •
 var foo = 'C' //caracter
@@ -21,7 +17,7 @@ var goo = @foo //puntero
 pin goo = @foo
 var foo = .× //booleano bit
 bool foo = .×
-var foo[] = «4, 5.08, •, "arreglos", «6 + 8.0i, §7»»
+var foo[] = «4, 5.08, •, "arreglos", «6 + 8.0, 7»»
 
 var foo = {
   var goo = "Paquetes" //contiene variables y funciones
