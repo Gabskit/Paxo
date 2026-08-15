@@ -1,3 +1,4 @@
+#pragma once
 #include <stdint.h>
 #include <uchar.h>
 
@@ -6,27 +7,27 @@
 // ==========================================
 
 typedef struct {
-  unsigned _BitInt(1) signo : 1;
-  unsigned _BitInt(3) exponente : 3; // Max: 7, Sesgo: 3
-  unsigned _BitInt(4) entero : 4;    // Max: 15
+  uint8_t signo : 1;
+  uint8_t exponente : 3; // Max: 7, Sesgo: 3
+  uint8_t entero : 4;    // Max: 15
 } __attribute__((packed)) Num8;
 
 typedef struct {
-  unsigned _BitInt(1) signo : 1;
-  unsigned _BitInt(5) exponente : 5; // Max: 31, Sesgo: 15
-  unsigned _BitInt(10) entero : 10;  // Max: 1,023
+  uint16_t signo : 1;
+  uint16_t exponente : 5; // Max: 31, Sesgo: 15
+  uint16_t entero : 10;   // Max: 1,023
 } __attribute__((packed)) Num16;
 
 typedef struct {
-  unsigned _BitInt(1) signo : 1;
-  unsigned _BitInt(8) exponente : 8; // Max: 255, Sesgo: 127
-  unsigned _BitInt(23) entero : 23;  // Max: 8,388,607
+  uint32_t signo : 1;
+  uint32_t exponente : 8; // Max: 255, Sesgo: 127
+  uint32_t entero : 23;   // Max: 8,388,607
 } __attribute__((packed)) Num32;
 
 typedef struct {
-  unsigned _BitInt(1) signo : 1;
-  unsigned _BitInt(11) exponente : 11; // Max: 2047, Sesgo: 1023
-  unsigned _BitInt(52) entero : 52;    // Max: 4,503,599,627,370,495
+  uint64_t signo : 1;
+  uint64_t exponente : 11; // Max: 2047, Sesgo: 1023
+  uint64_t entero : 52;    // Max: 4,503,599,627,370,495
 } __attribute__((packed)) Num64;
 
 typedef unsigned _BitInt(2) PaxoBool;
@@ -80,32 +81,42 @@ typedef struct {
 // ==========================================
 
 Num8 add_num8(Num8 a, Num8 b) {
+  if (a.entero == 0) return b;
+  if (b.entero == 0) return a;
+
   const int8_t sesgo = 3, exp_max = 7;
   const uint8_t i_max = 15;
 
   int8_t exp_a = (int8_t)a.exponente - sesgo;
   int8_t exp_b = (int8_t)b.exponente - sesgo;
-  int8_t exp_target = (exp_a < exp_b) ? exp_a : exp_b;
+
+  // Garantizar que 'a' sea el de exponente mayor o igual
+  if (exp_a < exp_b) {
+    Num8 temp = a; a = b; b = temp;
+    int8_t exp_temp = exp_a; exp_a = exp_b; exp_b = exp_temp;
+  }
+
+  int8_t diff_exp = exp_a - exp_b;
+
+  // Barrera: Descartar 'b' si la diferencia supera 2 dígitos decimales
+  if (diff_exp > 2) return a; 
 
   int64_t val_a = (int64_t)a.entero;
-  for (int8_t i = 0; i < (exp_a - exp_target); i++)
-    val_a *= 10;
-  if (a.signo)
-    val_a = -val_a;
-
   int64_t val_b = (int64_t)b.entero;
-  for (int8_t i = 0; i < (exp_b - exp_target); i++)
-    val_b *= 10;
-  if (b.signo)
-    val_b = -val_b;
+
+  for (int8_t i = 0; i < diff_exp; i++) {
+    val_a *= 10;
+  }
+
+  if (a.signo) val_a = -val_a;
+  if (b.signo) val_b = -val_b;
 
   int64_t suma = val_a + val_b;
-  if (suma == 0)
-    return (Num8){0, 0, 0};
+  if (suma == 0) return (Num8){0, 0, 0};
 
   uint8_t signo_res = (suma < 0) ? 1 : 0;
   uint64_t abs_suma = (suma < 0) ? -suma : suma;
-  int16_t exp_res = exp_target;
+  int16_t exp_res = exp_b;
 
   while (abs_suma > i_max) {
     abs_suma /= 10;
@@ -116,11 +127,11 @@ Num8 add_num8(Num8 a, Num8 b) {
     exp_res++;
   }
 
-  if (abs_suma == 0)
-    return (Num8){0, 0, 0};
+  if (abs_suma == 0) return (Num8){0, 0, 0};
+  
   int16_t exp_almacenado = exp_res + sesgo;
-  if (exp_almacenado > exp_max)
-    exp_almacenado = exp_max;
+  if (exp_almacenado > exp_max) exp_almacenado = exp_max;
+  if (exp_almacenado < 0) return (Num8){0, 0, 0};
 
   return (Num8){.signo = signo_res,
                 .exponente = (unsigned _BitInt(3))exp_almacenado,
@@ -200,32 +211,41 @@ Num8 div_num8(Num8 a, Num8 b) {
 // ==========================================
 
 Num16 add_num16(Num16 a, Num16 b) {
+  if (a.entero == 0) return b;
+  if (b.entero == 0) return a;
+
   const int16_t sesgo = 15, exp_max = 31;
   const uint16_t i_max = 1023;
 
   int16_t exp_a = (int16_t)a.exponente - sesgo;
   int16_t exp_b = (int16_t)b.exponente - sesgo;
-  int16_t exp_target = (exp_a < exp_b) ? exp_a : exp_b;
+
+  if (exp_a < exp_b) {
+    Num16 temp = a; a = b; b = temp;
+    int16_t exp_temp = exp_a; exp_a = exp_b; exp_b = exp_temp;
+  }
+
+  int16_t diff_exp = exp_a - exp_b;
+
+  // Barrera: Descartar 'b' si la diferencia supera 4 dígitos decimales
+  if (diff_exp > 4) return a; 
 
   int64_t val_a = (int64_t)a.entero;
-  for (int16_t i = 0; i < (exp_a - exp_target); i++)
-    val_a *= 10;
-  if (a.signo)
-    val_a = -val_a;
-
   int64_t val_b = (int64_t)b.entero;
-  for (int16_t i = 0; i < (exp_b - exp_target); i++)
-    val_b *= 10;
-  if (b.signo)
-    val_b = -val_b;
+
+  for (int16_t i = 0; i < diff_exp; i++) {
+    val_a *= 10;
+  }
+
+  if (a.signo) val_a = -val_a;
+  if (b.signo) val_b = -val_b;
 
   int64_t suma = val_a + val_b;
-  if (suma == 0)
-    return (Num16){0, 0, 0};
+  if (suma == 0) return (Num16){0, 0, 0};
 
   uint8_t signo_res = (suma < 0) ? 1 : 0;
   uint64_t abs_suma = (suma < 0) ? -suma : suma;
-  int16_t exp_res = exp_target;
+  int16_t exp_res = exp_b;
 
   while (abs_suma > i_max) {
     abs_suma /= 10;
@@ -236,11 +256,11 @@ Num16 add_num16(Num16 a, Num16 b) {
     exp_res++;
   }
 
-  if (abs_suma == 0)
-    return (Num16){0, 0, 0};
+  if (abs_suma == 0) return (Num16){0, 0, 0};
+  
   int16_t exp_almacenado = exp_res + sesgo;
-  if (exp_almacenado > exp_max)
-    exp_almacenado = exp_max;
+  if (exp_almacenado > exp_max) exp_almacenado = exp_max;
+  if (exp_almacenado < 0) return (Num16){0, 0, 0};
 
   return (Num16){.signo = signo_res,
                  .exponente = (unsigned _BitInt(5))exp_almacenado,
@@ -320,33 +340,46 @@ Num16 div_num16(Num16 a, Num16 b) {
 // ==========================================
 
 Num32 add_num32(Num32 a, Num32 b) {
+  if (a.entero == 0) return b;
+  if (b.entero == 0) return a;
+
   const int16_t sesgo = 127, exp_max = 255;
-  const uint32_t i_max = 8388607;
+  const uint32_t i_max = 8388607; // 2^23 - 1
 
   int16_t exp_a = (int16_t)a.exponente - sesgo;
   int16_t exp_b = (int16_t)b.exponente - sesgo;
-  int16_t exp_target = (exp_a < exp_b) ? exp_a : exp_b;
 
+  // Asegurar que 'a' tenga el exponente más alto
+  if (exp_a < exp_b) {
+    Num32 temp = a; a = b; b = temp;
+    int16_t exp_temp = exp_a; exp_a = exp_b; exp_b = exp_temp;
+  }
+
+  int16_t diff_exp = exp_a - exp_b;
+
+  // Límite de seguridad: Si la diferencia supera los 7 dígitos
+  // decimales que caben en 23 bits binarios, descartamos 'b'.
+  if (diff_exp > 7) return a;
+
+  // Recuperamos el uso seguro de tu tipo _BitInt(128)
   _BitInt(128) val_a = (_BitInt(128))a.entero;
-  for (int16_t i = 0; i < (exp_a - exp_target); i++)
-    val_a *= 10;
-  if (a.signo)
-    val_a = -val_a;
-
   _BitInt(128) val_b = (_BitInt(128))b.entero;
-  for (int16_t i = 0; i < (exp_b - exp_target); i++)
-    val_b *= 10;
-  if (b.signo)
-    val_b = -val_b;
+
+  for (int16_t i = 0; i < diff_exp; i++) {
+    val_a *= 10;
+  }
+
+  if (a.signo) val_a = -val_a;
+  if (b.signo) val_b = -val_b;
 
   _BitInt(128) suma = val_a + val_b;
-  if (suma == 0)
-    return (Num32){0, 0, 0};
+  if (suma == 0) return (Num32){0, 0, 0};
 
   uint8_t signo_res = (suma < 0) ? 1 : 0;
   unsigned _BitInt(128) abs_suma = (suma < 0) ? -suma : suma;
-  int16_t exp_res = exp_target;
+  int16_t exp_res = exp_b;
 
+  // Normalización decimal original[span_3](start_span)[span_3](end_span)
   while (abs_suma > i_max) {
     abs_suma /= 10;
     exp_res++;
@@ -356,12 +389,13 @@ Num32 add_num32(Num32 a, Num32 b) {
     exp_res++;
   }
 
-  if (abs_suma == 0)
-    return (Num32){0, 0, 0};
+  if (abs_suma == 0) return (Num32){0, 0, 0};
+  
   int16_t exp_almacenado = exp_res + sesgo;
-  if (exp_almacenado > exp_max)
-    exp_almacenado = exp_max;
+  if (exp_almacenado > exp_max) exp_almacenado = exp_max;
+  if (exp_almacenado < 0) return (Num32){0, 0, 0};
 
+  // Casteos estrictos a _BitInt tal y como en tu código[span_4](start_span)[span_4](end_span)
   return (Num32){.signo = signo_res,
                  .exponente = (unsigned _BitInt(8))exp_almacenado,
                  .entero = (unsigned _BitInt(23))abs_suma};
@@ -441,32 +475,41 @@ Num32 div_num32(Num32 a, Num32 b) {
 // ==========================================
 
 Num64 add_num64(Num64 a, Num64 b) {
+  if (a.entero == 0) return b;
+  if (b.entero == 0) return a;
+
   const int16_t sesgo = 1023, exp_max = 2047;
   const uint64_t i_max = 4503599627370495ULL;
 
   int16_t exp_a = (int16_t)a.exponente - sesgo;
   int16_t exp_b = (int16_t)b.exponente - sesgo;
-  int16_t exp_target = (exp_a < exp_b) ? exp_a : exp_b;
+
+  if (exp_a < exp_b) {
+    Num64 temp = a; a = b; b = temp;
+    int16_t exp_temp = exp_a; exp_a = exp_b; exp_b = exp_temp;
+  }
+
+  int16_t diff_exp = exp_a - exp_b;
+
+  // Barrera: Descartar 'b' si la diferencia supera 16 dígitos decimales
+  if (diff_exp > 16) return a; 
 
   _BitInt(128) val_a = (_BitInt(128))a.entero;
-  for (int16_t i = 0; i < (exp_a - exp_target); i++)
-    val_a *= 10;
-  if (a.signo)
-    val_a = -val_a;
-
   _BitInt(128) val_b = (_BitInt(128))b.entero;
-  for (int16_t i = 0; i < (exp_b - exp_target); i++)
-    val_b *= 10;
-  if (b.signo)
-    val_b = -val_b;
+
+  for (int16_t i = 0; i < diff_exp; i++) {
+    val_a *= 10;
+  }
+
+  if (a.signo) val_a = -val_a;
+  if (b.signo) val_b = -val_b;
 
   _BitInt(128) suma = val_a + val_b;
-  if (suma == 0)
-    return (Num64){0, 0, 0};
+  if (suma == 0) return (Num64){0, 0, 0};
 
   uint8_t signo_res = (suma < 0) ? 1 : 0;
   unsigned _BitInt(128) abs_suma = (suma < 0) ? -suma : suma;
-  int16_t exp_res = exp_target;
+  int16_t exp_res = exp_b;
 
   while (abs_suma > i_max) {
     abs_suma /= 10;
@@ -477,11 +520,11 @@ Num64 add_num64(Num64 a, Num64 b) {
     exp_res++;
   }
 
-  if (abs_suma == 0)
-    return (Num64){0, 0, 0};
+  if (abs_suma == 0) return (Num64){0, 0, 0};
+  
   int16_t exp_almacenado = exp_res + sesgo;
-  if (exp_almacenado > exp_max)
-    exp_almacenado = exp_max;
+  if (exp_almacenado > exp_max) exp_almacenado = exp_max;
+  if (exp_almacenado < 0) return (Num64){0, 0, 0};
 
   return (Num64){.signo = signo_res,
                  .exponente = (unsigned _BitInt(11))exp_almacenado,
