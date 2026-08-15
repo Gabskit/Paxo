@@ -3,90 +3,26 @@
 
 typedef enum {
   // Carga de Literales a la Pila
-  OP_PUSH_NUM8,
-  OP_PUSH_NUM16,
-  OP_PUSH_NUM32,
-  OP_PUSH_NUM64,
-  OP_PUSH_TRIT,
-  OP_PUSH_BOOL,
-  OP_PUSH_CHAR8,
-  OP_PUSH_CHAR16,
-  OP_PUSH_CHAR32,
-  OP_PUSH_DEC32,
-  OP_PUSH_DEC64,
-  OP_PUSH_DEC128,
-  OP_PUSH_POINTER,
+  OP_PUSH,
 
   // Operaciones Aritméticas
-  OP_ADD_NUM8 = 0x20,
-  OP_ADD_NUM16,
-  OP_ADD_NUM32,
-  OP_ADD_NUM64,
-  OP_ADD_DEC32,
-  OP_ADD_DEC64,
-  OP_ADD_DEC128,
-  OP_SUB_NUM8,
-  OP_SUB_NUM16,
-  OP_SUB_NUM32,
-  OP_SUB_NUM64,
-  OP_SUB_DEC32,
-  OP_SUB_DEC64,
-  OP_SUB_DEC128,
-  OP_MUL_NUM8,
-  OP_MUL_NUM16,
-  OP_MUL_NUM32,
-  OP_MUL_NUM64,
-  OP_MUL_DEC32,
-  OP_MUL_DEC64,
-  OP_MUL_DEC128,
-  OP_DIV_NUM8,
-  OP_DIV_NUM16,
-  OP_DIV_NUM32,
-  OP_DIV_NUM64,
-  OP_DIV_DEC32,
-  OP_DIV_DEC64,
-  OP_DIV_DEC128,
+  OP_ADD,
+  OP_SUB,
+  OP_MUL,
+  OP_DIV,
 
   // Conversión de Tipos (Typecast)
-  OP_CAST_NUM8_NUM16 = 0x40,
-  OP_CAST_NUM8_NUM32,
-  OP_CAST_NUM8_NUM64,
-  OP_CAST_NUM16_NUM8,
-  OP_CAST_NUM16_NUM32,
-  OP_CAST_NUM16_NUM64,
-  OP_CAST_NUM32_NUM8,
-  OP_CAST_NUM32_NUM16,
-  OP_CAST_NUM32_NUM64,
-  OP_CAST_NUM64_NUM8,
-  OP_CAST_NUM64_NUM16,
-  OP_CAST_NUM64_NUM32,
-	OP_CAST_DEC32_NUM8,
-	OP_CAST_DEC32_NUM16,
-  OP_CAST_DEC32_NUM32,
-	OP_CAST_DEC32_NUM64,
-	OP_CAST_DEC64_NUM8,
-	OP_CAST_DEC64_NUM16,
-  OP_CAST_DEC64_NUM32,
-	OP_CAST_DEC64_NUM64,
-	OP_CAST_DEC128_NUM8,
-	OP_CAST_DEC128_NUM16,
-  OP_CAST_DEC128_NUM32,
-	OP_CAST_DEC128_NUM64,
-  OP_CAST_TRIT_NUM8,
-  OP_CAST
+  OP_CAST,
 
-      // Variables (Entorno / Stack Frame)
-      OP_LOAD_VAR = 0x40, // [uint16_t index] -> Push var
-  OP_STORE_VAR = 0x41,    // [uint16_t index] -> Pop var
+  // Variables (Entorno / Stack Frame)
+  OP_LOAD_VAR,  // [uint16_t index] -> Push var
+  OP_STORE_VAR, // [uint16_t index] -> Pop var
 
   // Entrada / Salida (I/O)
-  OP_PRINT_NUM8 = 0x50,
-  OP_PRINT_NUM16,
-  OP_PRINT_NUM32,
-  OP_PRINT_NUM64,
+  OP_PRINT,
 
   // Control de Flujo y Fin
-  OP_JUMP = 0x60,          // [int16_t offset]
-  OP_JUMP_IF_FALSE = 0x61, // [int16_t offset]
-  OP_HALT = 0xFF           // Detener la VM
+  OP_JUMP,          // [int16_t offset]
+  OP_JUMP_IF_FALSE, // [int16_t offset]
+  OP_HALT           // Detener la VM
 } PaxoOpcode;

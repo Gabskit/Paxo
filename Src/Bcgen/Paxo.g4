@@ -92,8 +92,6 @@ expression
     | ( '!' | '.!' ) expression # notgateExpr
     | INT_LITERAL
     | DECIMAL_LITERAL
-		| MONEY_LITERAL
-    | COMPLEX_LITERAL
     | CHAR_LITERAL
     | STRING_LITERAL
     | BOOLEAN_BIT
@@ -141,11 +139,8 @@ PLAY_MODE  : '▶️' | 'go' | '>' ;
 // Literales
 INT_LITERAL     : [+-]? [0-9]+ ;
 DECIMAL_LITERAL : [+-]? [0-9]+ '.' [0-9]+ ;
-MONEY_LITERAL   : '§' [+-]? [0-9]+ '.' [0-9]+ ;
 BOOLEAN_BIT			: '.×' | '.✓' ;
 BOOLEAN_TRIT    : '×' | '•' | '✓' ;
-COMPLEX_LITERAL : [+-]? [0-9]+ ('.' [0-9]+)? [+-] [0-9]+ ('.' [0-9]+)? 'i'
-| [+-]? [0-9]+ ('.' [0-9]+) 'i' ;
 POINTER_LITERAL : '@' IDENTIFIER ;
 
 IDENTIFIER      : [a-zA-Z_\p{L}\p{Emoji}][a-zA-Z0-9_\p{L}\p{Emoji}]* ;
