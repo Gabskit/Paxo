@@ -8,10 +8,18 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#define MAX_FRAMES 128
+
+typedef struct {
+  size_t return_ip;
+  PaxoVar locals[16]; // Variables locales del marco activo
+} CallFrame;
 
 typedef struct {
   const uint8_t *bytecode;
   size_t ip;
+  CallFrame frames[MAX_FRAMES];
+  size_t frame_count;
 } VM;
 
 typedef enum {
@@ -276,6 +284,12 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       }
       break;
     }
+    case OP_CALL: {
+      uint16_t target_ip = read_u16(vm);
+      vm->frames[vm->frame_count++] = (CallFrame){.return_ip = vm->ip};
+      vm->ip = target_ip;
+      break;
+    }
 
     case OP_HALT:
     default:
@@ -283,4 +297,11 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       break;
     }
   }
+}
+
+void vm_error(VM *vm, const char *msg) {
+  text_red(stderr);
+  fprintf(stderr, "[PAXO EXEC ERROR]");
+  reset_colors(stderr);
+  fprintf(stderr, " en IP 0x%04ZX: %s\n", vm->ip, msg);
 }
