@@ -139,3 +139,6 @@ pub var main = (){
   }
 }
 ```
+
+## Dependencias usadas
+termcolor https://github.com/ararslan/termcolor-c.git

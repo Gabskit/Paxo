@@ -3,6 +3,7 @@
 #include "Calc.c"
 #include "Deque.c"
 #include "Typecast_and_read.c"
+#include "termcolor-c.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
