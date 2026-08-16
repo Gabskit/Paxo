@@ -1,38 +1,49 @@
 #pragma once
 #include "Calc.c"
-#include <math.h> // Define pow
+#include <math.h>
 #include <stdint.h>
-#include <stdio.h> // Define snprintf
-#include <uchar.h> // Define char8_t en C23
+#include <stdio.h>
+#include <uchar.h>
 
 typedef unsigned char char8_t;
 
 // ==========================================
-// CONVERSIÓN DE TIPOS 
+// SESGOS DE EXPONENTE Y BASE
+// ==========================================
+// Num8:  exp:2 -> Bias = 1
+// Num16: exp:5 -> Bias = 15
+// Num32: exp:8 -> Bias = 127
+// Num64: exp:7 -> Bias = 63
+
+// ==========================================
+// CONVERSIÓN DE TIPOS MOBILE POINT
 // ==========================================
 
 // --- 8 BITS A OTROS ---
 Num16 num8tonum16(Num8 num) {
   Num16 result;
   result.signo = num.signo;
-  result.exponente = (unsigned _BitInt(5))(num.exponente + 12); // 15 - 3
-  result.entero = (unsigned _BitInt(10))num.entero;
+  result.exp = num.exp + 14; // 15 - 1
+  result.hp = (uint16_t)num.hp << 4; // Escala de 1 a 2 nibbles
+  result.p = num.p;
   return result;
 }
 
 Num32 num8tonum32(Num8 num) {
   Num32 result;
   result.signo = num.signo;
-  result.exponente = (unsigned _BitInt(8))(num.exponente + 124); // 127 - 3
-  result.entero = (unsigned _BitInt(23))num.entero;
+  result.exp = num.exp + 126; // 127 - 1
+  result.hp = (uint32_t)num.hp << 16; // Escala de 1 a 5 nibbles
+  result.p = num.p;
   return result;
 }
 
 Num64 num8tonum64(Num8 num) {
   Num64 result;
   result.signo = num.signo;
-  result.exponente = (unsigned _BitInt(11))(num.exponente + 1020); // 1023 - 3
-  result.entero = (unsigned _BitInt(52))num.entero;
+  result.exp = num.exp + 62; // 63 - 1
+  result.hp = (uint64_t)num.hp << 48; // Escala de 1 a 13 nibbles
+  result.p = num.p;
   return result;
 }
 
@@ -40,24 +51,28 @@ Num64 num8tonum64(Num8 num) {
 Num8 num16tonum8(Num16 num) {
   Num8 result;
   result.signo = num.signo;
-  result.exponente = (unsigned _BitInt(3))(num.exponente - 12); // 3 - 15
-  result.entero = (unsigned _BitInt(4))num.entero;
+  int new_exp = (int)num.exp - 14;
+  result.exp = new_exp < 0 ? 0 : (new_exp > 3 ? 3 : new_exp);
+  result.hp = (uint8_t)(num.hp >> 4);
+  result.p = num.p & 0x1;
   return result;
 }
 
 Num32 num16tonum32(Num16 num) {
   Num32 result;
   result.signo = num.signo;
-  result.exponente = (unsigned _BitInt(8))(num.exponente + 112); // 127 - 15
-  result.entero = (unsigned _BitInt(23))num.entero;
+  result.exp = num.exp + 112; // 127 - 15
+  result.hp = (uint32_t)num.hp << 12;
+  result.p = num.p;
   return result;
 }
 
 Num64 num16tonum64(Num16 num) {
   Num64 result;
   result.signo = num.signo;
-  result.exponente = (unsigned _BitInt(11))(num.exponente + 1008); // 1023 - 15
-  result.entero = (unsigned _BitInt(52))num.entero;
+  result.exp = num.exp + 48; // 63 - 15
+  result.hp = (uint64_t)num.hp << 44;
+  result.p = num.p;
   return result;
 }
 
@@ -65,24 +80,30 @@ Num64 num16tonum64(Num16 num) {
 Num8 num32tonum8(Num32 num) {
   Num8 result;
   result.signo = num.signo;
-  result.exponente = (unsigned _BitInt(3))(num.exponente - 124); // 3 - 127
-  result.entero = (unsigned _BitInt(4))num.entero;
+  int new_exp = (int)num.exp - 126;
+  result.exp = new_exp < 0 ? 0 : (new_exp > 3 ? 3 : new_exp);
+  result.hp = (uint8_t)(num.hp >> 16);
+  result.p = num.p & 0x1;
   return result;
 }
 
 Num16 num32tonum16(Num32 num) {
   Num16 result;
   result.signo = num.signo;
-  result.exponente = (unsigned _BitInt(5))(num.exponente - 112); // 15 - 127
-  result.entero = (unsigned _BitInt(10))num.entero;
+  int new_exp = (int)num.exp - 112;
+  result.exp = new_exp < 0 ? 0 : (new_exp > 31 ? 31 : new_exp);
+  result.hp = (uint16_t)(num.hp >> 12);
+  result.p = num.p & 0x3;
   return result;
 }
 
 Num64 num32tonum64(Num32 num) {
   Num64 result;
   result.signo = num.signo;
-  result.exponente = (unsigned _BitInt(11))(num.exponente + 896); // 1023 - 127
-  result.entero = (unsigned _BitInt(52))num.entero;
+  int new_exp = (int)num.exp - 64; // 63 - 127
+  result.exp = new_exp < 0 ? 0 : (new_exp > 127 ? 127 : new_exp);
+  result.hp = (uint64_t)num.hp << 32;
+  result.p = num.p;
   return result;
 }
 
@@ -90,217 +111,184 @@ Num64 num32tonum64(Num32 num) {
 Num8 num64tonum8(Num64 num) {
   Num8 result;
   result.signo = num.signo;
-  result.exponente = (unsigned _BitInt(3))(num.exponente - 1020); // 3 - 1023
-  result.entero = (unsigned _BitInt(4))num.entero;
+  int new_exp = (int)num.exp - 62;
+  result.exp = new_exp < 0 ? 0 : (new_exp > 3 ? 3 : new_exp);
+  result.hp = (uint8_t)(num.hp >> 48);
+  result.p = num.p & 0x1;
   return result;
 }
 
 Num16 num64tonum16(Num64 num) {
   Num16 result;
   result.signo = num.signo;
-  result.exponente = (unsigned _BitInt(5))(num.exponente - 1008); // 15 - 1023
-  result.entero = (unsigned _BitInt(10))num.entero;
+  int new_exp = (int)num.exp - 48;
+  result.exp = new_exp < 0 ? 0 : (new_exp > 31 ? 31 : new_exp);
+  result.hp = (uint16_t)(num.hp >> 44);
+  result.p = num.p & 0x3;
   return result;
 }
 
 Num32 num64tonum32(Num64 num) {
   Num32 result;
   result.signo = num.signo;
-  result.exponente = (unsigned _BitInt(8))(num.exponente - 896); // 127 - 1023
-  result.entero = (unsigned _BitInt(23))num.entero;
+  result.exp = num.exp + 64; // 127 - 63
+  result.hp = (uint32_t)(num.hp >> 32);
+  result.p = num.p & 0x7;
   return result;
 }
 
-// trit a num
+// --- CONVERSIÓN CON TRIT / BOOL ---
 Num8 trittonum8(PaxoBool trit) {
-  Num8 result;
-  result.signo = 0;
-  result.exponente = 3;
-  result.entero = (unsigned _BitInt(4))trit;
+  Num8 result = {0};
+  result.exp = 1; // Bias 1 = 20^0
+  result.hp = (uint8_t)trit;
   return result;
 }
 
 Num16 trittonum16(PaxoBool trit) {
-  Num16 result;
-  result.signo = 0;
-  result.exponente = 15;
-  result.entero = (unsigned _BitInt(10))trit;
+  Num16 result = {0};
+  result.exp = 15; // Bias 15 = 20^0
+  result.hp = (uint16_t)trit;
   return result;
 }
 
 Num32 trittonum32(PaxoBool trit) {
-  Num32 result;
-  result.signo = 0;
-  result.exponente = 127;
-  result.entero = (unsigned _BitInt(23))trit;
+  Num32 result = {0};
+  result.exp = 127; // Bias 127 = 20^0
+  result.hp = (uint32_t)trit;
   return result;
 }
 
 Num64 trittonum64(PaxoBool trit) {
-  Num64 result;
-  result.signo = 0;
-  result.exponente = 1023;
-  result.entero = (unsigned _BitInt(52))trit;
+  Num64 result = {0};
+  result.exp = 63; // Bias 63 = 20^0
+  result.hp = (uint64_t)trit;
   return result;
 }
 
-// num to trit
-PaxoBool num8totrit(Num8 num) {
-  PaxoBool result = (num.entero < 3) ? (PaxoBool)num.entero : 0;
-  return result;
-}
+PaxoBool num8totrit(Num8 num) { return (num.hp < 3) ? (PaxoBool)num.hp : 0; }
+PaxoBool num16totrit(Num16 num) { return (num.hp < 3) ? (PaxoBool)num.hp : 0; }
+PaxoBool num32totrit(Num32 num) { return (num.hp < 3) ? (PaxoBool)num.hp : 0; }
+PaxoBool num64totrit(Num64 num) { return (num.hp < 3) ? (PaxoBool)num.hp : 0; }
 
-PaxoBool num16totrit(Num16 num) {
-  PaxoBool result = (num.entero < 3) ? (PaxoBool)num.entero : 0;
-  return result;
-}
-
-PaxoBool num32totrit(Num32 num) {
-  PaxoBool result = (num.entero < 3) ? (PaxoBool)num.entero : 0;
-  return result;
-}
-
-PaxoBool num64totrit(Num64 num) {
-  PaxoBool result = (num.entero < 3) ? (PaxoBool)num.entero : 0;
-  return result;
-}
-
-// bool a num
 Num8 booltonum8(bool bit) {
-  Num8 result;
-  result.signo = 0;
-  result.exponente = 3;
-  result.entero = (unsigned _BitInt(4))bit;
+  Num8 result = {0};
+  result.exp = 1;
+  result.hp = bit ? 1 : 0;
   return result;
 }
 
 Num16 booltonum16(bool bit) {
-  Num16 result;
-  result.signo = 0;
-  result.exponente = 15;
-  result.entero = (unsigned _BitInt(10))bit;
+  Num16 result = {0};
+  result.exp = 15;
+  result.hp = bit ? 1 : 0;
   return result;
 }
 
 Num32 booltonum32(bool bit) {
-  Num32 result;
-  result.signo = 0;
-  result.exponente = 127;
-  result.entero = (unsigned _BitInt(23))bit;
+  Num32 result = {0};
+  result.exp = 127;
+  result.hp = bit ? 1 : 0;
   return result;
 }
 
 Num64 booltonum64(bool bit) {
-  Num64 result;
-  result.signo = 0;
-  result.exponente = 1023;
-  result.entero = (unsigned _BitInt(52))bit;
+  Num64 result = {0};
+  result.exp = 63;
+  result.hp = bit ? 1 : 0;
   return result;
 }
 
-// num a bool
-bool num8tobool(Num8 num) { return (num.entero != 0); }
-
-bool num16tobool(Num16 num) { return (num.entero != 0); }
-
-bool num32tobool(Num32 num) { return (num.entero != 0); }
-
-bool num64tobool(Num64 num) { return (num.entero != 0); }
+bool num8tobool(Num8 num) { return (num.hp != 0); }
+bool num16tobool(Num16 num) { return (num.hp != 0); }
+bool num32tobool(Num32 num) { return (num.hp != 0); }
+bool num64tobool(Num64 num) { return (num.hp != 0); }
 
 PaxoBool booltotrit(bool bit) { return bit ? 1 : 0; }
-
 bool trittobool(PaxoBool trit) { return (trit == 1); }
 
-// interpretación
+// ==========================================
+// LECTURA / FORMATEO DE CADENAS
+// ==========================================
+
 const char8_t *readtrit(PaxoBool trit) {
-  if (trit == 0) {
-    return u8"×";
-  } else if (trit == 1) {
-    return u8"•";
-  } else {
-    return u8"✓";
-  }
+  if (trit == 0) return u8"×";
+  if (trit == 1) return u8"•";
+  return u8"✓";
 }
 
 const char8_t *readbool(bool bit) {
-  if (bit) {
-    return u8"true";
-  } else {
-    return u8"false";
-  }
+  return bit ? u8"true" : u8"false";
 }
 
 const char8_t *readnum8(Num8 num, PaxoBool rep) {
   static char8_t buffer[64];
-  int exp_real = (int)num.exponente - 3; // Sesgo = 3
+  int exp_real = (int)num.exp - 1; // Bias = 1
+
   if (rep == 0) {
-    // Formato en notación científica: "-15 × 10^(-3)"
-    snprintf((char *)buffer, sizeof(buffer), "%s%u × 10^(%d)",
-             num.signo ? "-" : "", (unsigned)num.entero, exp_real);
+    snprintf((char *)buffer, sizeof(buffer), "%s0x%X × 20^(%d)",
+             num.signo ? "-" : "", (unsigned)num.hp, exp_real);
   } else if (rep == 1) {
-    double val = (num.signo ? -1.0 : 1.0) * num.entero * pow(10, exp_real);
-    snprintf((char *)buffer, sizeof(buffer), "%.10g", val);
+    double mantissa = (double)num.hp / (num.p ? 16.0 : 1.0);
+    double val = (num.signo ? -1.0 : 1.0) * mantissa * pow(20.0, exp_real);
+    snprintf((char *)buffer, sizeof(buffer), "%.6g", val);
   } else {
-    snprintf((char *)buffer, sizeof(buffer), "[S:%u | E:%u | I:%u]",
-             (unsigned)num.signo, (unsigned)num.exponente,
-             (unsigned)num.entero);
+    snprintf((char *)buffer, sizeof(buffer), "[S:%u | E:%u | HP:0x%X | P:%u]",
+             (unsigned)num.signo, (unsigned)num.exp, (unsigned)num.hp, (unsigned)num.p);
   }
   return buffer;
 }
 
 const char8_t *readnum16(Num16 num, PaxoBool rep) {
   static char8_t buffer[128];
-  int exp_real = (int)num.exponente - 15;
+  int exp_real = (int)num.exp - 15; // Bias = 15
 
   if (rep == 0) {
-    snprintf((char *)buffer, sizeof(buffer), "%s%u × 10^(%d)",
-             num.signo ? "-" : "", (unsigned)num.entero, exp_real);
+    snprintf((char *)buffer, sizeof(buffer), "%s0x%X × 20^(%d)",
+             num.signo ? "-" : "", (unsigned)num.hp, exp_real);
   } else if (rep == 1) {
-    double val =
-        (num.signo ? -1.0 : 1.0) * (double)num.entero * pow(10, exp_real);
-    snprintf((char *)buffer, sizeof(buffer), "%.15g", val);
+    double mantissa = (double)num.hp / (num.p ? pow(16.0, num.p) : 1.0);
+    double val = (num.signo ? -1.0 : 1.0) * mantissa * pow(20.0, exp_real);
+    snprintf((char *)buffer, sizeof(buffer), "%.10g", val);
   } else {
-    snprintf((char *)buffer, sizeof(buffer), "[S:%u | E:%u | I:%u]",
-             (unsigned)num.signo, (unsigned)num.exponente,
-             (unsigned)num.entero);
+    snprintf((char *)buffer, sizeof(buffer), "[S:%u | E:%u | HP:0x%X | P:%u]",
+             (unsigned)num.signo, (unsigned)num.exp, (unsigned)num.hp, (unsigned)num.p);
   }
   return buffer;
 }
 
 const char8_t *readnum32(Num32 num, PaxoBool rep) {
   static char8_t buffer[128];
-  int exp_real = (int)num.exponente - 127;
+  int exp_real = (int)num.exp - 127; // Bias = 127
 
   if (rep == 0) {
-    snprintf((char *)buffer, sizeof(buffer), "%s%llu × 10^(%d)",
-             num.signo ? "-" : "", (unsigned long long)num.entero, exp_real);
+    snprintf((char *)buffer, sizeof(buffer), "%s0x%X × 20^(%d)",
+             num.signo ? "-" : "", (unsigned)num.hp, exp_real);
   } else if (rep == 1) {
-    double val = (num.signo ? -1.0 : 1.0) * (double)num.entero *
-                 pow(10.0, (double)exp_real);
-    snprintf((char *)buffer, sizeof(buffer), "%.20g", val);
+    double mantissa = (double)num.hp / (num.p ? pow(16.0, num.p) : 1.0);
+    double val = (num.signo ? -1.0 : 1.0) * mantissa * pow(20.0, exp_real);
+    snprintf((char *)buffer, sizeof(buffer), "%.15g", val);
   } else {
-    snprintf((char *)buffer, sizeof(buffer), "[S:%u | E:%u | I:%llu]",
-             (unsigned)num.signo, (unsigned)num.exponente,
-             (unsigned long long)num.entero);
+    snprintf((char *)buffer, sizeof(buffer), "[S:%u | E:%u | HP:0x%X | P:%u]",
+             (unsigned)num.signo, (unsigned)num.exp, (unsigned)num.hp, (unsigned)num.p);
   }
   return buffer;
 }
 
 const char8_t *readnum64(Num64 num, PaxoBool rep) {
   static char8_t buffer[128];
-  int exp_real = (int)num.exponente - 1023;
+  int exp_real = (int)num.exp - 63; // Bias = 63
 
   if (rep == 0) {
-    snprintf((char *)buffer, sizeof(buffer), "%s%llu × 10^(%d)",
-             num.signo ? "-" : "", (unsigned long long)num.entero, exp_real);
+    snprintf((char *)buffer, sizeof(buffer), "%s0x%llX × 20^(%d)",
+             num.signo ? "-" : "", (unsigned long long)num.hp, exp_real);
   } else if (rep == 1) {
-    double val =
-        (num.signo ? -1.0 : 1.0) * (double)num.entero * pow(10, exp_real);
-    snprintf((char *)buffer, sizeof(buffer), "%.25g", val);
+    double mantissa = (double)num.hp / (num.p ? pow(16.0, num.p) : 1.0);
+    double val = (num.signo ? -1.0 : 1.0) * mantissa * pow(20.0, exp_real);
+    snprintf((char *)buffer, sizeof(buffer), "%.20g", val);
   } else {
-    snprintf((char *)buffer, sizeof(buffer), "[S:%u | E:%u | I:%llu]",
-             (unsigned)num.signo, (unsigned)num.exponente,
-             (unsigned long long)num.entero);
+    snprintf((char *)buffer, sizeof(buffer), "[S:%u | E:%u | HP:0x%llX | P:%u]",
+             (unsigned)num.signo, (unsigned)num.exp, (unsigned long long)num.hp, (unsigned)num.p);
   }
   return buffer;
 }
