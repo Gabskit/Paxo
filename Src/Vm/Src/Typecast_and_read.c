@@ -1,3 +1,4 @@
+#pragma once
 #include "Calc.c"
 #include <math.h> // Define pow
 #include <stdint.h>

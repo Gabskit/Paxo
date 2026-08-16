@@ -32,6 +32,8 @@ var foo = (){
 ## Tamaños de variable
 
 ```
+.4
+.6
 .8 8 bits
 .16 16 bits
 .32 32 bits
