@@ -25,7 +25,7 @@ varDeclaration
     ;
 
 type
-		: VAR_TYPE | NUM_TYPE | CHARA_TYPE | COMPLEX_TYPE | POINTER_TYPE | MONEY_TYPE | TRIT_TYPE | BOOLEAN_TYPE ;
+		: VAR_TYPE | NUM_TYPE | CHARA_TYPE | POINTER_TYPE | TRIT_TYPE | BOOLEAN_TYPE ;
 
 scope
 	: GLOBAL | LOCAL ;
@@ -118,12 +118,10 @@ arrayAccess
 
 VAR_TYPE: 'var' | '📥' ;
 NUM_TYPE: 'n' ;
-MONEY_TYPE: 'mn' ;
 CHARA_TYPE: 'abc' ;
 TRIT_TYPE: 'trit' ;
 BOOLEAN_TYPE: 'bool' ;
 POINTER_TYPE: 'pin' ;
-COMPLEX_TYPE: 'ni' ;
 
 GLOBAL: 'pub' | '🌎' ;
 LOCAL: 'local';
