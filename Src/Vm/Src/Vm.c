@@ -26,7 +26,9 @@ typedef enum {
   OP_PRINT,
   OP_JUMP,          // [int16_t offset]
   OP_JUMP_IF_FALSE, // [int16_t offset]
-  OP_HALT
+  OP_HALT,
+  OP_CALL,
+  OP_CALL_NATIVE
 } PaxoOpcode;
 
 void vm_init(VM *vm, const uint8_t *bytecode) {
