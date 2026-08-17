@@ -5,35 +5,35 @@
 typedef unsigned char char8_t;
 
 // ==========================================
-// 1. DEFINICIÓN DE ESTRUCTURAS MOBILE POINT
+// 1. ESTRUCTURAS MOBILE POINT (REVISIÓN ALGO_2)
 // ==========================================
 
 typedef struct {
   uint8_t signo : 1;
-  uint8_t exp : 2;
-  uint8_t hp : 4;
-  uint8_t p : 1;
+  uint8_t exp : 1;
+  uint8_t bc : 4; // 2 bit-chunks
+  uint8_t p : 2;  // 3 posiciones
 } __attribute__((packed)) Num8;
 
 typedef struct {
   uint16_t signo : 1;
-  uint16_t exp : 5;
-  uint16_t hp : 8;
-  uint16_t p : 2;
+  uint16_t exp : 2;
+  uint16_t bc : 10; // 5 bit-chunks
+  uint16_t p : 3;   // 6 posiciones
 } __attribute__((packed)) Num16;
 
 typedef struct {
   uint32_t signo : 1;
-  uint32_t exp : 8;
-  uint32_t hp : 20;
-  uint32_t p : 3;
+  uint32_t exp : 5;
+  uint32_t bc : 22; // 11 bit-chunks
+  uint32_t p : 4;   // 12 posiciones
 } __attribute__((packed)) Num32;
 
 typedef struct {
   uint64_t signo : 1;
-  uint64_t exp : 7;
-  uint64_t hp : 52;
-  uint64_t p : 4;
+  uint64_t exp : 10;
+  uint64_t bc : 48; // 24 bit-chunks
+  uint64_t p : 5;   // 25 posiciones
 } __attribute__((packed)) Num64;
 
 typedef unsigned _BitInt(2) PaxoBool;
@@ -58,18 +58,21 @@ typedef struct {
   } as;
 } PaxoVar;
 
+// Macro auxiliar para propagar el punto fijo de mayor precision
+#define PROPAGAR_P(a, b) ((a.p > b.p) ? a.p : b.p)
+
 // ==========================================
 // 2. OPERACIONES ARITMÉTICAS: 8 BITS (MP8)
 // ==========================================
 
 Num8 add_num8(Num8 a, Num8 b) {
-  if (a.hp == 0)
+  if (a.bc == 0)
     return b;
-  if (b.hp == 0)
+  if (b.bc == 0)
     return a;
 
-  const int8_t sesgo = 1, exp_max = 3;
-  const uint8_t hp_max = 15; // 4 bits (0xF)
+  const int8_t sesgo = 0, exp_max = 1;
+  const uint8_t bc_max = 15; // 4 bits (0xF)
 
   int8_t exp_a = (int8_t)a.exp - sesgo;
   int8_t exp_b = (int8_t)b.exp - sesgo;
@@ -84,15 +87,14 @@ Num8 add_num8(Num8 a, Num8 b) {
   }
 
   int8_t diff_exp = exp_a - exp_b;
-  if (diff_exp > 2)
+  if (diff_exp > 1)
     return a;
 
-  int64_t val_a = (int64_t)a.hp;
-  int64_t val_b = (int64_t)b.hp;
+  int64_t val_a = (int64_t)a.bc;
+  int64_t val_b = (int64_t)b.bc;
 
-  for (int8_t i = 0; i < diff_exp; i++) {
-    val_a *= 20; // Escala base 20
-  }
+  for (int8_t i = 0; i < diff_exp; i++)
+    val_a *= 20;
 
   if (a.signo)
     val_a = -val_a;
@@ -101,30 +103,30 @@ Num8 add_num8(Num8 a, Num8 b) {
 
   int64_t suma = val_a + val_b;
   if (suma == 0)
-    return (Num8){0, 0, 0, 0};
+    return (Num8){0, 0, 0, PROPAGAR_P(a, b)};
 
   uint8_t signo_res = (suma < 0) ? 1 : 0;
   uint64_t abs_suma = (suma < 0) ? -suma : suma;
   int16_t exp_res = exp_b;
 
-  while (abs_suma > hp_max) {
+  while (abs_suma > bc_max) {
     abs_suma /= 20;
     exp_res++;
   }
 
   if (abs_suma == 0)
-    return (Num8){0, 0, 0, 0};
+    return (Num8){0, 0, 0, PROPAGAR_P(a, b)};
 
   int16_t exp_almacenado = exp_res + sesgo;
   if (exp_almacenado > exp_max)
     exp_almacenado = exp_max;
   if (exp_almacenado < 0)
-    return (Num8){0, 0, 0, 0};
+    return (Num8){0, 0, 0, PROPAGAR_P(a, b)};
 
   return (Num8){.signo = signo_res,
                 .exp = (uint8_t)exp_almacenado,
-                .hp = (uint8_t)abs_suma,
-                .p = a.p};
+                .bc = (uint8_t)abs_suma,
+                .p = PROPAGAR_P(a, b)};
 }
 
 Num8 sub_num8(Num8 a, Num8 b) {
@@ -133,59 +135,63 @@ Num8 sub_num8(Num8 a, Num8 b) {
 }
 
 Num8 mul_num8(Num8 a, Num8 b) {
-  if (a.hp == 0 || b.hp == 0)
-    return (Num8){0, 0, 0, 0};
-  const int8_t sesgo = 1, exp_max = 3;
-  const uint8_t hp_max = 15;
+  if (a.bc == 0 || b.bc == 0)
+    return (Num8){0, 0, 0, PROPAGAR_P(a, b)};
+  const int8_t sesgo = 0, exp_max = 1;
+  const uint8_t bc_max = 15;
 
   uint8_t signo_res = (a.signo != b.signo) ? 1 : 0;
-  uint64_t mult = (uint64_t)a.hp * b.hp;
+  uint64_t mult = (uint64_t)a.bc * b.bc;
   int16_t exp_res = ((int16_t)a.exp - sesgo) + ((int16_t)b.exp - sesgo);
 
-  while (mult > hp_max) {
+  while (mult > bc_max) {
     mult /= 20;
     exp_res++;
   }
 
   if (mult == 0)
-    return (Num8){0, 0, 0, 0};
+    return (Num8){0, 0, 0, PROPAGAR_P(a, b)};
   int16_t exp_almacenado = exp_res + sesgo;
   if (exp_almacenado > exp_max)
     exp_almacenado = exp_max;
+  if (exp_almacenado < 0)
+    return (Num8){0, 0, 0, PROPAGAR_P(a, b)};
 
   return (Num8){.signo = signo_res,
                 .exp = (uint8_t)exp_almacenado,
-                .hp = (uint8_t)mult,
-                .p = a.p};
+                .bc = (uint8_t)mult,
+                .p = PROPAGAR_P(a, b)};
 }
 
 Num8 div_num8(Num8 a, Num8 b) {
-  if (b.hp == 0 || a.hp == 0)
-    return (Num8){0, 0, 0, 0};
-  const int8_t sesgo = 1, exp_max = 3, escala = 2;
-  const uint8_t hp_max = 15;
+  if (b.bc == 0 || a.bc == 0)
+    return (Num8){0, 0, 0, PROPAGAR_P(a, b)};
+  const int8_t sesgo = 0, exp_max = 1, escala = 2;
+  const uint8_t bc_max = 15;
 
   uint8_t signo_res = (a.signo != b.signo) ? 1 : 0;
-  uint64_t num_a = (uint64_t)a.hp * 400ULL; // 20^2
-  uint64_t div = num_a / b.hp;
+  uint64_t num_a = (uint64_t)a.bc * 400ULL; // 20^2
+  uint64_t div = num_a / b.bc;
   int16_t exp_res =
       ((int16_t)a.exp - sesgo) - ((int16_t)b.exp - sesgo) - escala;
 
-  while (div > hp_max) {
+  while (div > bc_max) {
     div /= 20;
     exp_res++;
   }
 
   if (div == 0)
-    return (Num8){0, 0, 0, 0};
+    return (Num8){0, 0, 0, PROPAGAR_P(a, b)};
   int16_t exp_almacenado = exp_res + sesgo;
   if (exp_almacenado > exp_max)
     exp_almacenado = exp_max;
+  if (exp_almacenado < 0)
+    return (Num8){0, 0, 0, PROPAGAR_P(a, b)};
 
   return (Num8){.signo = signo_res,
                 .exp = (uint8_t)exp_almacenado,
-                .hp = (uint8_t)div,
-                .p = a.p};
+                .bc = (uint8_t)div,
+                .p = PROPAGAR_P(a, b)};
 }
 
 // ==========================================
@@ -193,13 +199,13 @@ Num8 div_num8(Num8 a, Num8 b) {
 // ==========================================
 
 Num16 add_num16(Num16 a, Num16 b) {
-  if (a.hp == 0)
+  if (a.bc == 0)
     return b;
-  if (b.hp == 0)
+  if (b.bc == 0)
     return a;
 
-  const int16_t sesgo = 15, exp_max = 31;
-  const uint16_t hp_max = 255; // 8 bits (0xFF)
+  const int16_t sesgo = 1, exp_max = 3;
+  const uint16_t bc_max = 1023; // 10 bits (0x3FF)
 
   int16_t exp_a = (int16_t)a.exp - sesgo;
   int16_t exp_b = (int16_t)b.exp - sesgo;
@@ -214,15 +220,14 @@ Num16 add_num16(Num16 a, Num16 b) {
   }
 
   int16_t diff_exp = exp_a - exp_b;
-  if (diff_exp > 3)
+  if (diff_exp > 2)
     return a;
 
-  int64_t val_a = (int64_t)a.hp;
-  int64_t val_b = (int64_t)b.hp;
+  int64_t val_a = (int64_t)a.bc;
+  int64_t val_b = (int64_t)b.bc;
 
-  for (int16_t i = 0; i < diff_exp; i++) {
+  for (int16_t i = 0; i < diff_exp; i++)
     val_a *= 20;
-  }
 
   if (a.signo)
     val_a = -val_a;
@@ -231,30 +236,30 @@ Num16 add_num16(Num16 a, Num16 b) {
 
   int64_t suma = val_a + val_b;
   if (suma == 0)
-    return (Num16){0, 0, 0, 0};
+    return (Num16){0, 0, 0, PROPAGAR_P(a, b)};
 
   uint8_t signo_res = (suma < 0) ? 1 : 0;
   uint64_t abs_suma = (suma < 0) ? -suma : suma;
   int16_t exp_res = exp_b;
 
-  while (abs_suma > hp_max) {
+  while (abs_suma > bc_max) {
     abs_suma /= 20;
     exp_res++;
   }
 
   if (abs_suma == 0)
-    return (Num16){0, 0, 0, 0};
+    return (Num16){0, 0, 0, PROPAGAR_P(a, b)};
 
   int16_t exp_almacenado = exp_res + sesgo;
   if (exp_almacenado > exp_max)
     exp_almacenado = exp_max;
   if (exp_almacenado < 0)
-    return (Num16){0, 0, 0, 0};
+    return (Num16){0, 0, 0, PROPAGAR_P(a, b)};
 
   return (Num16){.signo = signo_res,
                  .exp = (uint16_t)exp_almacenado,
-                 .hp = (uint16_t)abs_suma,
-                 .p = a.p};
+                 .bc = (uint16_t)abs_suma,
+                 .p = PROPAGAR_P(a, b)};
 }
 
 Num16 sub_num16(Num16 a, Num16 b) {
@@ -263,59 +268,63 @@ Num16 sub_num16(Num16 a, Num16 b) {
 }
 
 Num16 mul_num16(Num16 a, Num16 b) {
-  if (a.hp == 0 || b.hp == 0)
-    return (Num16){0, 0, 0, 0};
-  const int16_t sesgo = 15, exp_max = 31;
-  const uint16_t hp_max = 255;
+  if (a.bc == 0 || b.bc == 0)
+    return (Num16){0, 0, 0, PROPAGAR_P(a, b)};
+  const int16_t sesgo = 1, exp_max = 3;
+  const uint16_t bc_max = 1023;
 
   uint8_t signo_res = (a.signo != b.signo) ? 1 : 0;
-  uint64_t mult = (uint64_t)a.hp * b.hp;
+  uint64_t mult = (uint64_t)a.bc * b.bc;
   int16_t exp_res = ((int16_t)a.exp - sesgo) + ((int16_t)b.exp - sesgo);
 
-  while (mult > hp_max) {
+  while (mult > bc_max) {
     mult /= 20;
     exp_res++;
   }
 
   if (mult == 0)
-    return (Num16){0, 0, 0, 0};
+    return (Num16){0, 0, 0, PROPAGAR_P(a, b)};
   int16_t exp_almacenado = exp_res + sesgo;
   if (exp_almacenado > exp_max)
     exp_almacenado = exp_max;
+  if (exp_almacenado < 0)
+    return (Num16){0, 0, 0, PROPAGAR_P(a, b)};
 
   return (Num16){.signo = signo_res,
                  .exp = (uint16_t)exp_almacenado,
-                 .hp = (uint16_t)mult,
-                 .p = a.p};
+                 .bc = (uint16_t)mult,
+                 .p = PROPAGAR_P(a, b)};
 }
 
 Num16 div_num16(Num16 a, Num16 b) {
-  if (b.hp == 0 || a.hp == 0)
-    return (Num16){0, 0, 0, 0};
-  const int16_t sesgo = 15, exp_max = 31, escala = 3;
-  const uint16_t hp_max = 255;
+  if (b.bc == 0 || a.bc == 0)
+    return (Num16){0, 0, 0, PROPAGAR_P(a, b)};
+  const int16_t sesgo = 1, exp_max = 3, escala = 3;
+  const uint16_t bc_max = 1023;
 
   uint8_t signo_res = (a.signo != b.signo) ? 1 : 0;
-  uint64_t num_a = (uint64_t)a.hp * 8000ULL; // 20^3
-  uint64_t div = num_a / b.hp;
+  uint64_t num_a = (uint64_t)a.bc * 8000ULL; // 20^3
+  uint64_t div = num_a / b.bc;
   int16_t exp_res =
       ((int16_t)a.exp - sesgo) - ((int16_t)b.exp - sesgo) - escala;
 
-  while (div > hp_max) {
+  while (div > bc_max) {
     div /= 20;
     exp_res++;
   }
 
   if (div == 0)
-    return (Num16){0, 0, 0, 0};
+    return (Num16){0, 0, 0, PROPAGAR_P(a, b)};
   int16_t exp_almacenado = exp_res + sesgo;
   if (exp_almacenado > exp_max)
     exp_almacenado = exp_max;
+  if (exp_almacenado < 0)
+    return (Num16){0, 0, 0, PROPAGAR_P(a, b)};
 
   return (Num16){.signo = signo_res,
                  .exp = (uint16_t)exp_almacenado,
-                 .hp = (uint16_t)div,
-                 .p = a.p};
+                 .bc = (uint16_t)div,
+                 .p = PROPAGAR_P(a, b)};
 }
 
 // ==========================================
@@ -323,13 +332,13 @@ Num16 div_num16(Num16 a, Num16 b) {
 // ==========================================
 
 Num32 add_num32(Num32 a, Num32 b) {
-  if (a.hp == 0)
+  if (a.bc == 0)
     return b;
-  if (b.hp == 0)
+  if (b.bc == 0)
     return a;
 
-  const int16_t sesgo = 127, exp_max = 255;
-  const uint32_t hp_max = 1048575; // 20 bits (0xFFFFF)
+  const int16_t sesgo = 15, exp_max = 31;
+  const uint32_t bc_max = 4194303; // 22 bits (0x3FFFFF)
 
   int16_t exp_a = (int16_t)a.exp - sesgo;
   int16_t exp_b = (int16_t)b.exp - sesgo;
@@ -347,12 +356,11 @@ Num32 add_num32(Num32 a, Num32 b) {
   if (diff_exp > 5)
     return a;
 
-  _BitInt(128) val_a = (_BitInt(128))a.hp;
-  _BitInt(128) val_b = (_BitInt(128))b.hp;
+  _BitInt(128) val_a = (_BitInt(128))a.bc;
+  _BitInt(128) val_b = (_BitInt(128))b.bc;
 
-  for (int16_t i = 0; i < diff_exp; i++) {
+  for (int16_t i = 0; i < diff_exp; i++)
     val_a *= 20;
-  }
 
   if (a.signo)
     val_a = -val_a;
@@ -361,30 +369,30 @@ Num32 add_num32(Num32 a, Num32 b) {
 
   _BitInt(128) suma = val_a + val_b;
   if (suma == 0)
-    return (Num32){0, 0, 0, 0};
+    return (Num32){0, 0, 0, PROPAGAR_P(a, b)};
 
   uint8_t signo_res = (suma < 0) ? 1 : 0;
   unsigned _BitInt(128) abs_suma = (suma < 0) ? -suma : suma;
   int16_t exp_res = exp_b;
 
-  while (abs_suma > hp_max) {
+  while (abs_suma > bc_max) {
     abs_suma /= 20;
     exp_res++;
   }
 
   if (abs_suma == 0)
-    return (Num32){0, 0, 0, 0};
+    return (Num32){0, 0, 0, PROPAGAR_P(a, b)};
 
   int16_t exp_almacenado = exp_res + sesgo;
   if (exp_almacenado > exp_max)
     exp_almacenado = exp_max;
   if (exp_almacenado < 0)
-    return (Num32){0, 0, 0, 0};
+    return (Num32){0, 0, 0, PROPAGAR_P(a, b)};
 
   return (Num32){.signo = signo_res,
                  .exp = (uint32_t)exp_almacenado,
-                 .hp = (uint32_t)abs_suma,
-                 .p = a.p};
+                 .bc = (uint32_t)abs_suma,
+                 .p = PROPAGAR_P(a, b)};
 }
 
 Num32 sub_num32(Num32 a, Num32 b) {
@@ -393,60 +401,64 @@ Num32 sub_num32(Num32 a, Num32 b) {
 }
 
 Num32 mul_num32(Num32 a, Num32 b) {
-  if (a.hp == 0 || b.hp == 0)
-    return (Num32){0, 0, 0, 0};
-  const int16_t sesgo = 127, exp_max = 255;
-  const uint32_t hp_max = 1048575;
+  if (a.bc == 0 || b.bc == 0)
+    return (Num32){0, 0, 0, PROPAGAR_P(a, b)};
+  const int16_t sesgo = 15, exp_max = 31;
+  const uint32_t bc_max = 4194303;
 
   uint8_t signo_res = (a.signo != b.signo) ? 1 : 0;
-  unsigned _BitInt(128) mult = (unsigned _BitInt(128))a.hp * b.hp;
+  unsigned _BitInt(128) mult = (unsigned _BitInt(128))a.bc * b.bc;
   int16_t exp_res = ((int16_t)a.exp - sesgo) + ((int16_t)b.exp - sesgo);
 
-  while (mult > hp_max) {
+  while (mult > bc_max) {
     mult /= 20;
     exp_res++;
   }
 
   if (mult == 0)
-    return (Num32){0, 0, 0, 0};
+    return (Num32){0, 0, 0, PROPAGAR_P(a, b)};
   int16_t exp_almacenado = exp_res + sesgo;
   if (exp_almacenado > exp_max)
     exp_almacenado = exp_max;
+  if (exp_almacenado < 0)
+    return (Num32){0, 0, 0, PROPAGAR_P(a, b)};
 
   return (Num32){.signo = signo_res,
                  .exp = (uint32_t)exp_almacenado,
-                 .hp = (uint32_t)mult,
-                 .p = a.p};
+                 .bc = (uint32_t)mult,
+                 .p = PROPAGAR_P(a, b)};
 }
 
 Num32 div_num32(Num32 a, Num32 b) {
-  if (b.hp == 0 || a.hp == 0)
-    return (Num32){0, 0, 0, 0};
-  const int16_t sesgo = 127, exp_max = 255, escala = 5;
-  const uint32_t hp_max = 1048575;
+  if (b.bc == 0 || a.bc == 0)
+    return (Num32){0, 0, 0, PROPAGAR_P(a, b)};
+  const int16_t sesgo = 15, exp_max = 31, escala = 5;
+  const uint32_t bc_max = 4194303;
 
   uint8_t signo_res = (a.signo != b.signo) ? 1 : 0;
   unsigned _BitInt(128) num_a =
-      (unsigned _BitInt(128))a.hp * 3200000ULL; // 20^5
-  unsigned _BitInt(128) div = num_a / b.hp;
+      (unsigned _BitInt(128))a.bc * 3200000ULL; // 20^5
+  unsigned _BitInt(128) div = num_a / b.bc;
   int16_t exp_res =
       ((int16_t)a.exp - sesgo) - ((int16_t)b.exp - sesgo) - escala;
 
-  while (div > hp_max) {
+  while (div > bc_max) {
     div /= 20;
     exp_res++;
   }
 
   if (div == 0)
-    return (Num32){0, 0, 0, 0};
+    return (Num32){0, 0, 0, PROPAGAR_P(a, b)};
   int16_t exp_almacenado = exp_res + sesgo;
   if (exp_almacenado > exp_max)
     exp_almacenado = exp_max;
+  if (exp_almacenado < 0)
+    return (Num32){0, 0, 0, PROPAGAR_P(a, b)};
 
   return (Num32){.signo = signo_res,
                  .exp = (uint32_t)exp_almacenado,
-                 .hp = (uint32_t)div,
-                 .p = a.p};
+                 .bc = (uint32_t)div,
+                 .p = PROPAGAR_P(a, b)};
 }
 
 // ==========================================
@@ -454,13 +466,13 @@ Num32 div_num32(Num32 a, Num32 b) {
 // ==========================================
 
 Num64 add_num64(Num64 a, Num64 b) {
-  if (a.hp == 0)
+  if (a.bc == 0)
     return b;
-  if (b.hp == 0)
+  if (b.bc == 0)
     return a;
 
-  const int16_t sesgo = 63, exp_max = 127;
-  const uint64_t hp_max = 4503599627370495ULL; // 52 bits
+  const int16_t sesgo = 511, exp_max = 1023;
+  const uint64_t bc_max = 281474976710655ULL; // 48 bits (0xFFFFFFFFFFFF)
 
   int16_t exp_a = (int16_t)a.exp - sesgo;
   int16_t exp_b = (int16_t)b.exp - sesgo;
@@ -478,12 +490,11 @@ Num64 add_num64(Num64 a, Num64 b) {
   if (diff_exp > 12)
     return a;
 
-  _BitInt(128) val_a = (_BitInt(128))a.hp;
-  _BitInt(128) val_b = (_BitInt(128))b.hp;
+  _BitInt(128) val_a = (_BitInt(128))a.bc;
+  _BitInt(128) val_b = (_BitInt(128))b.bc;
 
-  for (int16_t i = 0; i < diff_exp; i++) {
+  for (int16_t i = 0; i < diff_exp; i++)
     val_a *= 20;
-  }
 
   if (a.signo)
     val_a = -val_a;
@@ -492,30 +503,30 @@ Num64 add_num64(Num64 a, Num64 b) {
 
   _BitInt(128) suma = val_a + val_b;
   if (suma == 0)
-    return (Num64){0, 0, 0, 0};
+    return (Num64){0, 0, 0, PROPAGAR_P(a, b)};
 
   uint8_t signo_res = (suma < 0) ? 1 : 0;
   unsigned _BitInt(128) abs_suma = (suma < 0) ? -suma : suma;
   int16_t exp_res = exp_b;
 
-  while (abs_suma > hp_max) {
+  while (abs_suma > bc_max) {
     abs_suma /= 20;
     exp_res++;
   }
 
   if (abs_suma == 0)
-    return (Num64){0, 0, 0, 0};
+    return (Num64){0, 0, 0, PROPAGAR_P(a, b)};
 
   int16_t exp_almacenado = exp_res + sesgo;
   if (exp_almacenado > exp_max)
     exp_almacenado = exp_max;
   if (exp_almacenado < 0)
-    return (Num64){0, 0, 0, 0};
+    return (Num64){0, 0, 0, PROPAGAR_P(a, b)};
 
   return (Num64){.signo = signo_res,
                  .exp = (uint64_t)exp_almacenado,
-                 .hp = (uint64_t)abs_suma,
-                 .p = a.p};
+                 .bc = (uint64_t)abs_suma,
+                 .p = PROPAGAR_P(a, b)};
 }
 
 Num64 sub_num64(Num64 a, Num64 b) {
@@ -524,58 +535,62 @@ Num64 sub_num64(Num64 a, Num64 b) {
 }
 
 Num64 mul_num64(Num64 a, Num64 b) {
-  if (a.hp == 0 || b.hp == 0)
-    return (Num64){0, 0, 0, 0};
-  const int16_t sesgo = 63, exp_max = 127;
-  const uint64_t hp_max = 4503599627370495ULL;
+  if (a.bc == 0 || b.bc == 0)
+    return (Num64){0, 0, 0, PROPAGAR_P(a, b)};
+  const int16_t sesgo = 511, exp_max = 1023;
+  const uint64_t bc_max = 281474976710655ULL;
 
   uint8_t signo_res = (a.signo != b.signo) ? 1 : 0;
-  unsigned _BitInt(128) mult = (unsigned _BitInt(128))a.hp * b.hp;
+  unsigned _BitInt(128) mult = (unsigned _BitInt(128))a.bc * b.bc;
   int16_t exp_res = ((int16_t)a.exp - sesgo) + ((int16_t)b.exp - sesgo);
 
-  while (mult > hp_max) {
+  while (mult > bc_max) {
     mult /= 20;
     exp_res++;
   }
 
   if (mult == 0)
-    return (Num64){0, 0, 0, 0};
+    return (Num64){0, 0, 0, PROPAGAR_P(a, b)};
   int16_t exp_almacenado = exp_res + sesgo;
   if (exp_almacenado > exp_max)
     exp_almacenado = exp_max;
+  if (exp_almacenado < 0)
+    return (Num64){0, 0, 0, PROPAGAR_P(a, b)};
 
   return (Num64){.signo = signo_res,
                  .exp = (uint64_t)exp_almacenado,
-                 .hp = (uint64_t)mult,
-                 .p = a.p};
+                 .bc = (uint64_t)mult,
+                 .p = PROPAGAR_P(a, b)};
 }
 
 Num64 div_num64(Num64 a, Num64 b) {
-  if (b.hp == 0 || a.hp == 0)
-    return (Num64){0, 0, 0, 0};
-  const int16_t sesgo = 63, exp_max = 127, escala = 8;
-  const uint64_t hp_max = 4503599627370495ULL;
+  if (b.bc == 0 || a.bc == 0)
+    return (Num64){0, 0, 0, PROPAGAR_P(a, b)};
+  const int16_t sesgo = 511, exp_max = 1023, escala = 12;
+  const uint64_t bc_max = 281474976710655ULL;
 
   uint8_t signo_res = (a.signo != b.signo) ? 1 : 0;
   unsigned _BitInt(128) num_a =
-      (unsigned _BitInt(128))a.hp * 25600000000ULL; // 20^8
-  unsigned _BitInt(128) div = num_a / b.hp;
+      (unsigned _BitInt(128))a.bc * 4096000000000000ULL; // 20^12
+  unsigned _BitInt(128) div = num_a / b.bc;
   int16_t exp_res =
       ((int16_t)a.exp - sesgo) - ((int16_t)b.exp - sesgo) - escala;
 
-  while (div > hp_max) {
+  while (div > bc_max) {
     div /= 20;
     exp_res++;
   }
 
   if (div == 0)
-    return (Num64){0, 0, 0, 0};
+    return (Num64){0, 0, 0, PROPAGAR_P(a, b)};
   int16_t exp_almacenado = exp_res + sesgo;
   if (exp_almacenado > exp_max)
     exp_almacenado = exp_max;
+  if (exp_almacenado < 0)
+    return (Num64){0, 0, 0, PROPAGAR_P(a, b)};
 
   return (Num64){.signo = signo_res,
                  .exp = (uint64_t)exp_almacenado,
-                 .hp = (uint64_t)div,
-                 .p = a.p};
+                 .bc = (uint64_t)div,
+                 .p = PROPAGAR_P(a, b)};
 }

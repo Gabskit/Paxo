@@ -1,5 +1,6 @@
 node_modules
 Test
+Src/Vm/Test
 Src/Vm/target
 Src/Bcgen/Build
 Build
