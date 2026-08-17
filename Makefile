@@ -1,6 +1,6 @@
 # Variables de compilación
 CC = clang
-CFLAGS = -Wall -Wextra -O3 -std=c23
+CFLAGS = -Wall -Wextra -O3 -std=gnu23
 
 BUILD_DIR = build
 TARGET_LIB = $(BUILD_DIR)/libpaxo_vm.a
