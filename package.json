@@ -5,7 +5,7 @@
 	"scripts": {
 		"antlr": "antlr-ng -Dlanguage=Go -o ./Src/Bcgen ./Src/Bcgen/Paxo.g4",
 		"build:bcg": "go build -o ./Build/Bcg ./Src/Bcgen/",
-		"build:vm": "gcc --std=c23 -O3 -Wall -Wextra ./Src/Vm/Src/Main.c -o ./Build/Vm/Lepvm",
+		"build:vm": "gcc --std=gnu23 -O3 -Wall -Wextra ./Src/Vm/Src/Main.c -o ./Build/Vm/Lepvm",
 		"build": "npm run antlr && npm run build:bcg && npm run build:vm"
 	},
 	"keywords": [],

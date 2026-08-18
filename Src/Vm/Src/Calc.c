@@ -594,3 +594,141 @@ Num64 div_num64(Num64 a, Num64 b) {
                  .bc = (uint64_t)div,
                  .p = PROPAGAR_P(a, b)};
 }
+
+// ==========================================
+// 6. COMPARACIONES MOBILE POINT
+//    Retorna: -1 si a < b, 0 si a == b, 1 si a > b
+// ==========================================
+
+static inline uint8_t bc_max8(void) { return 15; }
+static inline uint16_t bc_max16(void) { return 1023; }
+static inline uint32_t bc_max32(void) { return 4194303; }
+static inline uint64_t bc_max64(void) { return 281474976710655ULL; }
+
+static inline int cmp_num8(Num8 a, Num8 b) {
+  if (a.signo != b.signo)
+    return a.signo ? -1 : 1;
+
+  const int8_t sesgo = 0;
+  int8_t exp_a = (int8_t)a.exp - sesgo;
+  int8_t exp_b = (int8_t)b.exp - sesgo;
+
+  int64_t val_a = (int64_t)a.bc;
+  int64_t val_b = (int64_t)b.bc;
+
+  if (exp_a > exp_b) {
+    for (int8_t i = 0; i < exp_a - exp_b && val_a <= (int64_t)bc_max8(); i++)
+      val_a *= 20;
+  } else if (exp_b > exp_a) {
+    for (int8_t i = 0; i < exp_b - exp_a && val_b <= (int64_t)bc_max8(); i++)
+      val_b *= 20;
+  }
+
+  if (a.signo) {
+    val_a = -val_a;
+    val_b = -val_b;
+  }
+
+  if (val_a < val_b)
+    return -1;
+  if (val_a > val_b)
+    return 1;
+  return 0;
+}
+
+static inline int cmp_num16(Num16 a, Num16 b) {
+  if (a.signo != b.signo)
+    return a.signo ? -1 : 1;
+
+  const int16_t sesgo = 1;
+  int16_t exp_a = (int16_t)a.exp - sesgo;
+  int16_t exp_b = (int16_t)b.exp - sesgo;
+
+  int64_t val_a = (int64_t)a.bc;
+  int64_t val_b = (int64_t)b.bc;
+
+  if (exp_a > exp_b) {
+    int16_t diff = exp_a - exp_b;
+    for (int16_t i = 0; i < diff && val_a <= (int64_t)bc_max16(); i++)
+      val_a *= 20;
+  } else if (exp_b > exp_a) {
+    int16_t diff = exp_b - exp_a;
+    for (int16_t i = 0; i < diff && val_b <= (int64_t)bc_max16(); i++)
+      val_b *= 20;
+  }
+
+  if (a.signo) {
+    val_a = -val_a;
+    val_b = -val_b;
+  }
+
+  if (val_a < val_b)
+    return -1;
+  if (val_a > val_b)
+    return 1;
+  return 0;
+}
+
+static inline int cmp_num32(Num32 a, Num32 b) {
+  if (a.signo != b.signo)
+    return a.signo ? -1 : 1;
+
+  _BitInt(128) val_a = (_BitInt(128))a.bc;
+  _BitInt(128) val_b = (_BitInt(128))b.bc;
+
+  int16_t bias_a = (int16_t)a.exp - 15;
+  int16_t bias_b = (int16_t)b.exp - 15;
+
+  if (bias_a > bias_b) {
+    int16_t diff = bias_a - bias_b;
+    for (int16_t i = 0; i < diff && val_a <= (_BitInt(128))bc_max32(); i++)
+      val_a *= 20;
+  } else if (bias_b > bias_a) {
+    int16_t diff = bias_b - bias_a;
+    for (int16_t i = 0; i < diff && val_b <= (_BitInt(128))bc_max32(); i++)
+      val_b *= 20;
+  }
+
+  if (a.signo) {
+    val_a = -val_a;
+    val_b = -val_b;
+  }
+
+  if (val_a < val_b)
+    return -1;
+  if (val_a > val_b)
+    return 1;
+  return 0;
+}
+
+static inline int cmp_num64(Num64 a, Num64 b) {
+  if (a.signo != b.signo)
+    return a.signo ? -1 : 1;
+
+  _BitInt(192) val_a = (_BitInt(192))a.bc;
+  _BitInt(192) val_b = (_BitInt(192))b.bc;
+
+  int16_t bias_a = (int16_t)a.exp - 511;
+  int16_t bias_b = (int16_t)b.exp - 511;
+
+  if (bias_a > bias_b) {
+    int16_t diff = bias_a - bias_b;
+    for (int16_t i = 0; i < diff && val_a <= (_BitInt(192))bc_max64(); i++)
+      val_a *= 20;
+  } else if (bias_b > bias_a) {
+    int16_t diff = bias_b - bias_a;
+    for (int16_t i = 0; i < diff && val_b <= (_BitInt(192))bc_max64(); i++)
+      val_b *= 20;
+  }
+
+  if (a.signo) {
+    val_a = -val_a;
+    val_b = -val_b;
+  }
+
+  if (val_a < val_b)
+    return -1;
+  if (val_a > val_b)
+    return 1;
+  return 0;
+}
