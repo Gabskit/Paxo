@@ -673,19 +673,19 @@ static inline int cmp_num32(Num32 a, Num32 b) {
   if (a.signo != b.signo)
     return a.signo ? -1 : 1;
 
-  _BitInt(128) val_a = (_BitInt(128))a.bc;
-  _BitInt(128) val_b = (_BitInt(128))b.bc;
+  __int128 val_a = (__int128)a.bc;
+  __int128 val_b = (__int128)b.bc;
 
   int16_t bias_a = (int16_t)a.exp - 15;
   int16_t bias_b = (int16_t)b.exp - 15;
 
   if (bias_a > bias_b) {
     int16_t diff = bias_a - bias_b;
-    for (int16_t i = 0; i < diff && val_a <= (_BitInt(128))bc_max32(); i++)
+    for (int16_t i = 0; i < diff && val_a <= (__int128)bc_max32(); i++)
       val_a *= 20;
   } else if (bias_b > bias_a) {
     int16_t diff = bias_b - bias_a;
-    for (int16_t i = 0; i < diff && val_b <= (_BitInt(128))bc_max32(); i++)
+    for (int16_t i = 0; i < diff && val_b <= (__int128)bc_max32(); i++)
       val_b *= 20;
   }
 
@@ -705,19 +705,19 @@ static inline int cmp_num64(Num64 a, Num64 b) {
   if (a.signo != b.signo)
     return a.signo ? -1 : 1;
 
-  _BitInt(192) val_a = (_BitInt(192))a.bc;
-  _BitInt(192) val_b = (_BitInt(192))b.bc;
+  __int128 val_a = (__int128)a.bc;
+  __int128 val_b = (__int128)b.bc;
 
   int16_t bias_a = (int16_t)a.exp - 511;
   int16_t bias_b = (int16_t)b.exp - 511;
 
   if (bias_a > bias_b) {
     int16_t diff = bias_a - bias_b;
-    for (int16_t i = 0; i < diff && val_a <= (_BitInt(192))bc_max64(); i++)
+    for (int16_t i = 0; i < diff && val_a <= (__int128)bc_max64(); i++)
       val_a *= 20;
   } else if (bias_b > bias_a) {
     int16_t diff = bias_b - bias_a;
-    for (int16_t i = 0; i < diff && val_b <= (_BitInt(192))bc_max64(); i++)
+    for (int16_t i = 0; i < diff && val_b <= (__int128)bc_max64(); i++)
       val_b *= 20;
   }
 

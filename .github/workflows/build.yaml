@@ -1,4 +1,4 @@
-name: Paxo Engine CI/CD Pipeline
+name: Paxo CI
 
 on:
   push:
@@ -7,57 +7,45 @@ on:
     branches: ["main", "master"]
 
 jobs:
-  build-runtime-and-compiler:
-    name: Build & Test Paxo Runtime & Go Compiler
+  build:
+    name: Build & Test
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Obtener el código fuente del repositorio
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Configurar Toolchain de Go (para el Frontend/Cranelift Generator)
-      - name: Setup Go Engine
+      - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "1.23"
 
-      # 3. Configurar Toolchain de Zig (para Vars.zig)
-      - name: Setup Zig Compiler
-        uses: goto-bus-stop/setup-zig@v2
-        with:
-          version: 0.12.0
-
-      # 4. Instalar Clang/LLVM (necesario para soporte de C23 _BitInt)
-      - name: Install Clang & Build Tools
+      - name: Install Clang
         run: |
           sudo apt-get update
           sudo apt-get install -y clang make ar
 
-      # 5. Compilar el Runtime C/Zig + Deque a static lib (.a) y header (.h)
-      - name: Build C/Zig VM Runtime (paxo_vm.h & libpaxo_vm.a)
-        run: |
-          make clean || true
-          make
+      - name: Build VM
+        run: npm run build:vm
 
-      # 6. Compilar y ejecutar tests de integración en C
-      - name: Run C Runtime Integration Test
-        run: |
-          clang test.c build/libpaxo_vm.a -o test_paxo -std=c23
-          ./test_paxo
+      - name: Build Compiler
+        run: npm run build:bcg
 
-      # 7. Generar Lexer/Parser de ANTLR y probar el compilador en Go
-      - name: Build Go Compiler Frontend
-        run: |
-          go mod tidy
-          go test ./... -v || true
-          go build -o paxo-cli main.go || true
+      - name: Generate lep.h
+        run: npm run gen:lep
 
-      # 8. Guardar Artefactos de la VM (libpaxo_vm.a y paxo_vm.h)
-      - name: Upload Paxo VM Artifacts
+      - name: Run VM Tests
+        run: npm run test:vm
+
+      - name: Run Compiler Tests
+        run: npm run test:bcg
+
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: paxo-vm-runtime
+          name: paxo-build
           path: |
-            paxo_vm.h
-            build/libpaxo_vm.a
+            Build/Lepvm
+            Build/Bcg
+            Build/lep.h
+            Build/libpaxo_vm.a

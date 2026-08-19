@@ -4,19 +4,22 @@
 	"type": "module",
 	"scripts": {
 		"antlr": "antlr-ng -Dlanguage=Go -o ./Src/Bcgen ./Src/Bcgen/Paxo.g4",
-		"build:bcg": "go build -o ./Build/Bcg ./Src/Bcgen/",
-		"build:vm": "gcc --std=gnu23 -O3 -Wall -Wextra ./Src/Vm/Src/Main.c -o ./Build/Vm/Lepvm",
-		"build": "npm run antlr && npm run build:bcg && npm run build:vm"
+		"build:bcg": "mkdir -p ./Build && go build -o ./Build/Bcg ./Src/Bcgen/cmd/paxocc/",
+		"build:vm": "mkdir -p ./Build/Vm && clang -Wall -Wextra -O3 -std=gnu23 ./Src/Vm/Src/Main.c -o ./Build/Lepvm -lm",
+		"build": "npm run antlr && npm run build:bcg && npm run build:vm && npm run gen:lep",
+		"gen:lep": "bash sh/gen_lep.sh",
+		"test:vm": "npm run gen:lep && mkdir -p ./Build && clang -Wall -Wextra -std=gnu23 -I./Build -o ./Build/test_vm_full ./Src/Test/test_vm_full.c -lm && ./Build/test_vm_full",
+		"test:vm:old": "npm run gen:lep && mkdir -p ./Build && clang -Wall -Wextra -std=gnu23 -I./Build -o ./Build/test_lep ./Src/Test/test_lep.c -lm && ./Build/test_lep",
+		"test:bcg": "go test -v ./Src/Bcgen/",
+		"test": "npm run test:vm && npm run test:bcg"
 	},
 	"keywords": [],
 	"author": "",
 	"license": "ISC",
 	"description": "Ecosistema de lenguaje y VM con aritmética Mobile Point (MP)",
-	"dependencies": {
-		"antlr4": "^4.13.2"
-	},
+	"dependencies": {},
 	"devDependencies": {
 		"antlr-ng": "^1.0.10",
-		"antlr4ng-cli": "^2.0.0"
+		"antlr4": "^4.13.2"
 	}
 }

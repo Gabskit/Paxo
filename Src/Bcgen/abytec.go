@@ -68,12 +68,22 @@ const (
 // EMITTER
 // ==========================================
 type Emitter struct {
-	code []byte
+	code        []byte
+	deferred    bool
+	deferredBuf []byte
+	condStart   int
+	inControl   bool
 }
 
-func (e *Emitter) emit(b byte)                 { e.code = append(e.code, b) }
-func (e *Emitter) emit16(v uint16)             { e.code = append(e.code, byte(v), byte(v>>8)) }
-func (e *Emitter) emitI16(v int16)             { e.code = append(e.code, byte(v), byte(v>>8)) }
+func (e *Emitter) emit(b byte) {
+	if e.deferred {
+		e.deferredBuf = append(e.deferredBuf, b)
+	} else {
+		e.code = append(e.code, b)
+	}
+}
+func (e *Emitter) emit16(v uint16) { e.emit(byte(v)); e.emit(byte(v >> 8)) }
+func (e *Emitter) emitI16(v int16) { e.emit(byte(v)); e.emit(byte(v >> 8)) }
 func (e *Emitter) patchI16(off int, val int16)  { e.code[off] = byte(val); e.code[off+1] = byte(val>>8) }
 func (e *Emitter) pos() int                    { return len(e.code) }
 
@@ -221,59 +231,63 @@ func (cg *CodeGen) ExitAssignment(ctx *AssignmentContext) {
 // CondStatement
 // ==========================================
 func (cg *CodeGen) ExitCondStatement(ctx *CondStatementContext) {
+	blockCode := cg.deferredBuf
+	cg.deferredBuf = nil
+	condStart := cg.condStart
+	cg.inControl = false
+
 	cases := ctx.AllMatchCase()
-	jumpEnds := make([]int, 0)
-
-	for i := 0; i < len(cases)-1; i++ {
-		mc := cases[i]
-		cg.walkTree(mc.Expression())
-		cg.emit(OP_EQ)
-		cg.emit(OP_JUMP_IF_FALSE)
-		skipPatch := cg.pos()
-		cg.emitI16(0)
-		cg.emit(OP_POP)
-		cg.walkTree(mc.Block())
-		cg.emit(OP_JUMP)
-		jumpEnds = append(jumpEnds, cg.pos())
-		cg.emitI16(0)
-		cg.patchI16(skipPatch, int16(cg.pos()-skipPatch))
+	if len(cases) == 0 {
+		return
 	}
 
-	last := cases[len(cases)-1]
-	lastChild := childTokText(last, 0)
-	if lastChild == "_" {
+	first := cases[0]
+	if childTokText(first, 0) == "_" {
 		cg.emit(OP_POP)
-		cg.walkTree(last.Block())
-	} else {
-		cg.walkTree(last.Expression())
-		cg.emit(OP_EQ)
-		cg.emit(OP_JUMP_IF_FALSE)
-		skipPatch := cg.pos()
-		cg.emitI16(0)
-		cg.emit(OP_POP)
-		cg.walkTree(last.Block())
-		cg.patchI16(skipPatch, int16(cg.pos()-skipPatch))
+		cg.code = append(cg.code, blockCode...)
+		return
 	}
 
-	for _, jmpPos := range jumpEnds {
-		cg.patchI16(jmpPos, int16(cg.pos()-jmpPos))
-	}
+	cg.walkTree(first.Expression())
+	cg.emit(OP_EQ)
+	cg.emit(OP_JUMP_IF_FALSE)
+	skipPatch := cg.pos()
+	cg.emitI16(0)
+	cg.emit(OP_POP)
+	cg.code = append(cg.code, blockCode...)
+	cg.emit(OP_JUMP)
+	jumpEnd := cg.pos()
+	cg.emitI16(0)
+	cg.patchI16(skipPatch, int16(cg.pos()-skipPatch-2))
+
+	_ = condStart
+	_ = jumpEnd
+	_ = cases
 }
 
 // ==========================================
 // LoopStatement
 // ==========================================
+func (cg *CodeGen) EnterLoopStatement(ctx *LoopStatementContext) {
+	cg.condStart = cg.pos()
+	cg.inControl = true
+}
+
 func (cg *CodeGen) ExitLoopStatement(ctx *LoopStatementContext) {
-	loopStart := cg.pos()
+	blockCode := cg.deferredBuf
+	cg.deferredBuf = nil
+	condStart := cg.condStart
+	cg.inControl = false
+
 	cg.emit(OP_JUMP_IF_FALSE)
-	loopEndPatch := cg.pos()
+	jumpEndPatch := cg.pos()
 	cg.emitI16(0)
-
-	cg.walkTree(ctx.Block())
-
+	cg.code = append(cg.code, blockCode...)
 	cg.emit(OP_JUMP)
-	cg.patchI16(cg.pos()-2, int16(loopStart-(cg.pos()-2)))
-	cg.patchI16(loopEndPatch, int16(cg.pos()-loopEndPatch))
+	jumpBackPatch := cg.pos()
+	cg.emitI16(int16(condStart - cg.pos()))
+	cg.patchI16(jumpBackPatch, int16(condStart-cg.pos()))
+	cg.patchI16(jumpEndPatch, int16(cg.pos()-jumpEndPatch-2))
 }
 
 // ==========================================
@@ -282,43 +296,36 @@ func (cg *CodeGen) ExitLoopStatement(ctx *LoopStatementContext) {
 func (cg *CodeGen) EnterEveryRule(ctx antlr.ParserRuleContext) {}
 
 func (cg *CodeGen) ExitEveryRule(ctx antlr.ParserRuleContext) {
-	if expr, ok := ctx.(*ExpressionContext); ok {
-		cg.handleBaseExpression(expr)
+	if _, ok := ctx.(IExpressionContext); ok {
+		cg.handleBaseExpression(ctx)
 	}
 }
 
-func (cg *CodeGen) handleBaseExpression(ctx *ExpressionContext) {
-	if ctx.INT_LITERAL() != nil {
-		text := ctx.INT_LITERAL().GetText()
+func (cg *CodeGen) handleBaseExpression(ctx antlr.ParserRuleContext) {
+	switch expr := ctx.(type) {
+	case *IntLitExprContext:
+		text := expr.INT_LITERAL().GetText()
 		val, _ := strconv.Atoi(text)
 		if val >= 0 && val <= 255 {
 			cg.pushNum8(uint8(val))
 		} else {
 			cg.pushNum16(uint16(val))
 		}
-		return
-	}
-	if ctx.DECIMAL_LITERAL() != nil {
-		text := ctx.DECIMAL_LITERAL().GetText()
+	case *DecLitExprContext:
+		text := expr.DECIMAL_LITERAL().GetText()
 		val, _ := strconv.ParseFloat(text, 64)
 		cg.pushNum8(uint8(int(val)))
-		return
-	}
-	if ctx.CHAR_LITERAL() != nil {
-		text := ctx.CHAR_LITERAL().GetText()
+	case *CharLitExprContext:
+		text := expr.CHAR_LITERAL().GetText()
 		if len(text) >= 3 {
 			cg.pushChar(uint8(text[1]))
 		} else {
 			cg.pushChar(0)
 		}
-		return
-	}
-	if ctx.BOOLEAN_BIT() != nil {
-		cg.pushBool(ctx.BOOLEAN_BIT().GetText() == ".✓")
-		return
-	}
-	if ctx.BOOLEAN_TRIT() != nil {
-		text := ctx.BOOLEAN_TRIT().GetText()
+	case *BoolBitExprContext:
+		cg.pushBool(expr.BOOLEAN_BIT().GetText() == ".✓")
+	case *BoolTritExprContext:
+		text := expr.BOOLEAN_TRIT().GetText()
 		cg.emit(OP_PUSH)
 		cg.emit(TYPE_TRIT)
 		if text == "•" {
@@ -328,17 +335,13 @@ func (cg *CodeGen) handleBaseExpression(ctx *ExpressionContext) {
 		} else {
 			cg.emit(0)
 		}
-		return
-	}
-	if ctx.STRING_LITERAL() != nil {
-		text := ctx.STRING_LITERAL().GetText()
+	case *StringLitExprContext:
+		text := expr.STRING_LITERAL().GetText()
 		for i := 1; i < len(text)-1; i++ {
 			cg.pushChar(uint8(text[i]))
 		}
-		return
-	}
-	if ctx.IDENTIFIER() != nil {
-		name := ctx.IDENTIFIER().GetText()
+	case *IdentExprContext:
+		name := expr.IDENTIFIER().GetText()
 		idx, ok := cg.locals[name]
 		if !ok {
 			cg.reportError("variable no declarada: " + name)
@@ -346,7 +349,6 @@ func (cg *CodeGen) handleBaseExpression(ctx *ExpressionContext) {
 		}
 		cg.emit(OP_LOAD_VAR)
 		cg.emit16(idx)
-		return
 	}
 }
 
@@ -408,7 +410,14 @@ func (cg *CodeGen) ExitCallExpr(ctx *CallExprContext) {
 	name := ctx.IDENTIFIER().GetText()
 	argCount := 0
 	if ctx.ArgumentList() != nil {
-		argCount = len(ctx.ArgumentList().AllExpression())
+		for _, expr := range ctx.ArgumentList().AllExpression() {
+			if sl, ok := expr.(*StringLitExprContext); ok {
+				text := sl.STRING_LITERAL().GetText()
+				argCount += len(text) - 2
+			} else {
+				argCount++
+			}
+		}
 	}
 
 	switch name {
@@ -423,7 +432,18 @@ func (cg *CodeGen) ExitCallExpr(ctx *CallExprContext) {
 	}
 }
 
-func (cg *CodeGen) ExitBlock(ctx *BlockContext) {}
+func (cg *CodeGen) EnterBlock(ctx *BlockContext) {
+	if cg.inControl {
+		cg.deferred = true
+		cg.deferredBuf = make([]byte, 0)
+	}
+}
+
+func (cg *CodeGen) ExitBlock(ctx *BlockContext) {
+	if cg.deferred {
+		cg.deferred = false
+	}
+}
 func (cg *CodeGen) ExitMatchCase(ctx *MatchCaseContext) {}
 
 // ==========================================

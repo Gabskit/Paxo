@@ -37,7 +37,7 @@ assignment
     ;
 
 condStatement
-    : '(' IDENTIFIER | expression ')' '?' matchCase ( ':' matchCase )*? ';'
+    : '(' expression ')' '?' matchCase ( ':' matchCase )*? ';'
     ;
 
 matchCase
@@ -90,18 +90,18 @@ expression
     | expression ( '<'|'>'|'≤'|'≥'|'=='|'≠' ) expression   # relationalExpr
     | expression ( '&' | '|' | '.&' | '.|' ) expression     # bitwiseExpr
     | ( '!' | '.!' ) expression # notgateExpr
-    | INT_LITERAL
-    | DECIMAL_LITERAL
-    | CHAR_LITERAL
-    | STRING_LITERAL
-    | BOOLEAN_BIT
-    | BOOLEAN_TRIT
-		| POINTER_LITERAL
-    | arrayLiteral
-    | arrayAccess
-    | IDENTIFIER
-		| pkgDeclaration
-		| functionDeclaration
+    | INT_LITERAL # intLitExpr
+    | DECIMAL_LITERAL # decLitExpr
+    | CHAR_LITERAL # charLitExpr
+    | STRING_LITERAL # stringLitExpr
+    | BOOLEAN_BIT # boolBitExpr
+    | BOOLEAN_TRIT # boolTritExpr
+		| POINTER_LITERAL # ptrLitExpr
+    | arrayLiteral # arrayLitExpr
+    | arrayAccess # arrayAccExpr
+    | IDENTIFIER # identExpr
+		| pkgDeclaration # pkgExpr
+		| functionDeclaration # funcExpr
     ;
 
 arrayLiteral

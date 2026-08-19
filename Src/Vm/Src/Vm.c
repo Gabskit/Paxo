@@ -17,6 +17,7 @@ typedef struct {
 
 typedef struct {
   const uint8_t *bytecode;
+  size_t bytecode_size;
   size_t ip;
   CallFrame frames[MAX_FRAMES];
   size_t frame_count;
@@ -62,8 +63,9 @@ typedef enum {
   OP_DEC,
 } PaxoOpcode;
 
-void vm_init(VM *vm, const uint8_t *bytecode) {
+void vm_init(VM *vm, const uint8_t *bytecode, size_t bytecode_size) {
   vm->bytecode = bytecode;
+  vm->bytecode_size = bytecode_size;
   vm->ip = 0;
 }
 
@@ -82,10 +84,16 @@ static inline int16_t read_i16(VM *vm) {
   return val;
 }
 
+void vm_error(VM *vm, const char *msg);
+
 void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
   bool running = true;
 
   while (running) {
+    if (vm->ip >= vm->bytecode_size) {
+      vm_error(vm, "IP fuera de los limites del bytecode");
+      break;
+    }
     uint8_t op = vm->bytecode[vm->ip++];
 
     switch (op) {
@@ -882,5 +890,5 @@ void vm_error(VM *vm, const char *msg) {
   text_red(stderr);
   fprintf(stderr, "[PAXO EXEC ERROR]");
   reset_colors(stderr);
-  fprintf(stderr, " en IP 0x%04ZX: %s\n", vm->ip, msg);
+  fprintf(stderr, " en IP 0x%04zX: %s\n", vm->ip, msg);
 }

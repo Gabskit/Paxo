@@ -146,6 +146,78 @@ func (s *BasePaxoListener) EnterNotgateExpr(ctx *NotgateExprContext) {}
 // ExitNotgateExpr is called when production notgateExpr is exited.
 func (s *BasePaxoListener) ExitNotgateExpr(ctx *NotgateExprContext) {}
 
+// EnterIntLitExpr is called when production intLitExpr is entered.
+func (s *BasePaxoListener) EnterIntLitExpr(ctx *IntLitExprContext) {}
+
+// ExitIntLitExpr is called when production intLitExpr is exited.
+func (s *BasePaxoListener) ExitIntLitExpr(ctx *IntLitExprContext) {}
+
+// EnterDecLitExpr is called when production decLitExpr is entered.
+func (s *BasePaxoListener) EnterDecLitExpr(ctx *DecLitExprContext) {}
+
+// ExitDecLitExpr is called when production decLitExpr is exited.
+func (s *BasePaxoListener) ExitDecLitExpr(ctx *DecLitExprContext) {}
+
+// EnterCharLitExpr is called when production charLitExpr is entered.
+func (s *BasePaxoListener) EnterCharLitExpr(ctx *CharLitExprContext) {}
+
+// ExitCharLitExpr is called when production charLitExpr is exited.
+func (s *BasePaxoListener) ExitCharLitExpr(ctx *CharLitExprContext) {}
+
+// EnterStringLitExpr is called when production stringLitExpr is entered.
+func (s *BasePaxoListener) EnterStringLitExpr(ctx *StringLitExprContext) {}
+
+// ExitStringLitExpr is called when production stringLitExpr is exited.
+func (s *BasePaxoListener) ExitStringLitExpr(ctx *StringLitExprContext) {}
+
+// EnterBoolBitExpr is called when production boolBitExpr is entered.
+func (s *BasePaxoListener) EnterBoolBitExpr(ctx *BoolBitExprContext) {}
+
+// ExitBoolBitExpr is called when production boolBitExpr is exited.
+func (s *BasePaxoListener) ExitBoolBitExpr(ctx *BoolBitExprContext) {}
+
+// EnterBoolTritExpr is called when production boolTritExpr is entered.
+func (s *BasePaxoListener) EnterBoolTritExpr(ctx *BoolTritExprContext) {}
+
+// ExitBoolTritExpr is called when production boolTritExpr is exited.
+func (s *BasePaxoListener) ExitBoolTritExpr(ctx *BoolTritExprContext) {}
+
+// EnterPtrLitExpr is called when production ptrLitExpr is entered.
+func (s *BasePaxoListener) EnterPtrLitExpr(ctx *PtrLitExprContext) {}
+
+// ExitPtrLitExpr is called when production ptrLitExpr is exited.
+func (s *BasePaxoListener) ExitPtrLitExpr(ctx *PtrLitExprContext) {}
+
+// EnterArrayLitExpr is called when production arrayLitExpr is entered.
+func (s *BasePaxoListener) EnterArrayLitExpr(ctx *ArrayLitExprContext) {}
+
+// ExitArrayLitExpr is called when production arrayLitExpr is exited.
+func (s *BasePaxoListener) ExitArrayLitExpr(ctx *ArrayLitExprContext) {}
+
+// EnterArrayAccExpr is called when production arrayAccExpr is entered.
+func (s *BasePaxoListener) EnterArrayAccExpr(ctx *ArrayAccExprContext) {}
+
+// ExitArrayAccExpr is called when production arrayAccExpr is exited.
+func (s *BasePaxoListener) ExitArrayAccExpr(ctx *ArrayAccExprContext) {}
+
+// EnterIdentExpr is called when production identExpr is entered.
+func (s *BasePaxoListener) EnterIdentExpr(ctx *IdentExprContext) {}
+
+// ExitIdentExpr is called when production identExpr is exited.
+func (s *BasePaxoListener) ExitIdentExpr(ctx *IdentExprContext) {}
+
+// EnterPkgExpr is called when production pkgExpr is entered.
+func (s *BasePaxoListener) EnterPkgExpr(ctx *PkgExprContext) {}
+
+// ExitPkgExpr is called when production pkgExpr is exited.
+func (s *BasePaxoListener) ExitPkgExpr(ctx *PkgExprContext) {}
+
+// EnterFuncExpr is called when production funcExpr is entered.
+func (s *BasePaxoListener) EnterFuncExpr(ctx *FuncExprContext) {}
+
+// ExitFuncExpr is called when production funcExpr is exited.
+func (s *BasePaxoListener) ExitFuncExpr(ctx *FuncExprContext) {}
+
 // EnterMultDivExpr is called when production multDivExpr is entered.
 func (s *BasePaxoListener) EnterMultDivExpr(ctx *MultDivExprContext) {}
 

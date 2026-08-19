@@ -140,5 +140,20 @@ pub var main = (){
 }
 ```
 
+## Funciones nativas
+
+```
+print(valor)    // imprime sin salto de línea
+println(valor)  // imprime con salto de línea
+typeof(valor)   // retorna el tipo del valor como char
+```
+
+Soportan múltiples argumentos y strings:
+```
+println("hola mundo");
+println("nota: ", 8.5);
+print("suma: ", 2 + 3);
+```
+
 ## Dependencias usadas
 termcolor https://github.com/ararslan/termcolor-c.git

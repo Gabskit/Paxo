@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
     return 1;
 
   VM vm = {0};
-  vm_init(&vm, bytecode);
+  vm_init(&vm, bytecode, bytecode_size);
 
   Deque *stack = deque_create();
   PaxoVar globals[256] = {0};

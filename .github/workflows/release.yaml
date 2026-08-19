@@ -1,4 +1,4 @@
-name: Paxo Release Pipeline
+name: Paxo Release
 
 on:
   push:
@@ -6,39 +6,46 @@ on:
       - "v*"
 
 jobs:
-  create-release:
-    name: Create GitHub Release
+  release:
+    name: Build & Publish Release
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Zig
-        uses: goto-bus-stop/setup-zig@v2
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          version: 0.12.0
+          go-version: "1.23"
 
       - name: Install Clang
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang make
+          sudo apt-get install -y clang make ar
 
-      - name: Build Runtime
+      - name: Build Everything
         run: |
-          make
+          npm run build:vm
+          npm run build:bcg
+          npm run gen:lep
+          clang -Wall -Wextra -O3 -std=gnu23 -c Src/Vm/Src/Calc.c -o Build/Calc.o
+          clang -Wall -Wextra -O3 -std=gnu23 -c Src/Vm/Src/Deque.c -o Build/Deque.o
+          ar rcs Build/libpaxo_vm.a Build/Calc.o Build/Deque.o
 
-      - name: Package Release ZIP
+      - name: Package Release
         run: |
           mkdir -p paxo-sdk
-          cp paxo_vm.h paxo-sdk/
-          cp build/libpaxo_vm.a paxo-sdk/
+          cp Build/Lepvm paxo-sdk/
+          cp Build/Bcg paxo-sdk/
+          cp Build/lep.h paxo-sdk/
+          cp Build/libpaxo_vm.a paxo-sdk/
           tar -czvf paxo-sdk-${{ github.ref_name }}-linux-x64.tar.gz paxo-sdk/
 
-      - name: Publish Release Assets
-        uses: softprops/action-gh-release@v1
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
         with:
           files: paxo-sdk-${{ github.ref_name }}-linux-x64.tar.gz
         env:

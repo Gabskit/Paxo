@@ -23,45 +23,48 @@ typedef enum {
 static PaxoVar native_print(PaxoVar *args, uint8_t argc) {
   if (argc < 1)
     return (PaxoVar){0};
-  PaxoVar val = args[0];
 
-  switch (val.type) {
-  case NUM8: {
-    const char *s = (const char *)readnum8(val.as.number8, 1);
-    printf("%s", s);
-    break;
-  }
-  case NUM16: {
-    const char *s = (const char *)readnum16(val.as.number16, 1);
-    printf("%s", s);
-    break;
-  }
-  case NUM32: {
-    const char *s = (const char *)readnum32(val.as.number32, 1);
-    printf("%s", s);
-    break;
-  }
-  case NUM64: {
-    const char *s = (const char *)readnum64(val.as.number64, 1);
-    printf("%s", s);
-    break;
-  }
-  case BOOL:
-    printf("%s", val.as.truebool ? "true" : "false");
-    break;
-  case TRIT: {
-    const char *s = (const char *)readtrit(val.as.bit);
-    printf("%s", s);
-    break;
-  }
-  case CHAR:
-    printf("%c", val.as.chara);
-    break;
-  default:
-    break;
+  for (uint8_t i = 0; i < argc; i++) {
+    PaxoVar val = args[i];
+
+    switch (val.type) {
+    case NUM8: {
+      const char *s = (const char *)readnum8(val.as.number8, 1);
+      printf("%s", s);
+      break;
+    }
+    case NUM16: {
+      const char *s = (const char *)readnum16(val.as.number16, 1);
+      printf("%s", s);
+      break;
+    }
+    case NUM32: {
+      const char *s = (const char *)readnum32(val.as.number32, 1);
+      printf("%s", s);
+      break;
+    }
+    case NUM64: {
+      const char *s = (const char *)readnum64(val.as.number64, 1);
+      printf("%s", s);
+      break;
+    }
+    case BOOL:
+      printf("%s", val.as.truebool ? "true" : "false");
+      break;
+    case TRIT: {
+      const char *s = (const char *)readtrit(val.as.bit);
+      printf("%s", s);
+      break;
+    }
+    case CHAR:
+      printf("%c", val.as.chara);
+      break;
+    default:
+      break;
+    }
   }
 
-  return (PaxoVar){0}; // print no retorna valor
+  return (PaxoVar){0};
 }
 
 static PaxoVar native_println(PaxoVar *args, uint8_t argc) {

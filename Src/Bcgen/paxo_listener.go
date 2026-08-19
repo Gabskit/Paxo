@@ -71,6 +71,42 @@ type PaxoListener interface {
 	// EnterNotgateExpr is called when entering the notgateExpr production.
 	EnterNotgateExpr(c *NotgateExprContext)
 
+	// EnterIntLitExpr is called when entering the intLitExpr production.
+	EnterIntLitExpr(c *IntLitExprContext)
+
+	// EnterDecLitExpr is called when entering the decLitExpr production.
+	EnterDecLitExpr(c *DecLitExprContext)
+
+	// EnterCharLitExpr is called when entering the charLitExpr production.
+	EnterCharLitExpr(c *CharLitExprContext)
+
+	// EnterStringLitExpr is called when entering the stringLitExpr production.
+	EnterStringLitExpr(c *StringLitExprContext)
+
+	// EnterBoolBitExpr is called when entering the boolBitExpr production.
+	EnterBoolBitExpr(c *BoolBitExprContext)
+
+	// EnterBoolTritExpr is called when entering the boolTritExpr production.
+	EnterBoolTritExpr(c *BoolTritExprContext)
+
+	// EnterPtrLitExpr is called when entering the ptrLitExpr production.
+	EnterPtrLitExpr(c *PtrLitExprContext)
+
+	// EnterArrayLitExpr is called when entering the arrayLitExpr production.
+	EnterArrayLitExpr(c *ArrayLitExprContext)
+
+	// EnterArrayAccExpr is called when entering the arrayAccExpr production.
+	EnterArrayAccExpr(c *ArrayAccExprContext)
+
+	// EnterIdentExpr is called when entering the identExpr production.
+	EnterIdentExpr(c *IdentExprContext)
+
+	// EnterPkgExpr is called when entering the pkgExpr production.
+	EnterPkgExpr(c *PkgExprContext)
+
+	// EnterFuncExpr is called when entering the funcExpr production.
+	EnterFuncExpr(c *FuncExprContext)
+
 	// EnterMultDivExpr is called when entering the multDivExpr production.
 	EnterMultDivExpr(c *MultDivExprContext)
 
@@ -154,6 +190,42 @@ type PaxoListener interface {
 
 	// ExitNotgateExpr is called when exiting the notgateExpr production.
 	ExitNotgateExpr(c *NotgateExprContext)
+
+	// ExitIntLitExpr is called when exiting the intLitExpr production.
+	ExitIntLitExpr(c *IntLitExprContext)
+
+	// ExitDecLitExpr is called when exiting the decLitExpr production.
+	ExitDecLitExpr(c *DecLitExprContext)
+
+	// ExitCharLitExpr is called when exiting the charLitExpr production.
+	ExitCharLitExpr(c *CharLitExprContext)
+
+	// ExitStringLitExpr is called when exiting the stringLitExpr production.
+	ExitStringLitExpr(c *StringLitExprContext)
+
+	// ExitBoolBitExpr is called when exiting the boolBitExpr production.
+	ExitBoolBitExpr(c *BoolBitExprContext)
+
+	// ExitBoolTritExpr is called when exiting the boolTritExpr production.
+	ExitBoolTritExpr(c *BoolTritExprContext)
+
+	// ExitPtrLitExpr is called when exiting the ptrLitExpr production.
+	ExitPtrLitExpr(c *PtrLitExprContext)
+
+	// ExitArrayLitExpr is called when exiting the arrayLitExpr production.
+	ExitArrayLitExpr(c *ArrayLitExprContext)
+
+	// ExitArrayAccExpr is called when exiting the arrayAccExpr production.
+	ExitArrayAccExpr(c *ArrayAccExprContext)
+
+	// ExitIdentExpr is called when exiting the identExpr production.
+	ExitIdentExpr(c *IdentExprContext)
+
+	// ExitPkgExpr is called when exiting the pkgExpr production.
+	ExitPkgExpr(c *PkgExprContext)
+
+	// ExitFuncExpr is called when exiting the funcExpr production.
+	ExitFuncExpr(c *FuncExprContext)
 
 	// ExitMultDivExpr is called when exiting the multDivExpr production.
 	ExitMultDivExpr(c *MultDivExprContext)
