@@ -50,17 +50,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang make binutils
 
+      - name: Install System Dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install llvm -y
+
       - name: Install Node Dependencies
         run: npm ci
 
       - name: Build Everything
-        run: |
-          mkdir -p Build
-          npm run build:vm
-          npm run build:bcg
-          npm run gen:lep
-          clang -Wall -Wextra -O3 -std=gnu23 -c Src/Vm/Src/Calc.c -o Build/Calc.o
-          clang -Wall -Wextra -O3 -std=gnu23 -c Src/Vm/Src/Deque.c -o Build/Deque.o
+        run: npm run build
 
       - name: Package Release (Tarball - Linux/macOS)
         if: runner.os != 'Windows'
@@ -69,14 +68,15 @@ jobs:
           cp Build/Lepvm paxo-sdk/ 2>/dev/null || cp Build/Lepvm.exe paxo-sdk/ 2>/dev/null || true
           cp Build/Bcg paxo-sdk/ 2>/dev/null || cp Build/Bcg.exe paxo-sdk/ 2>/dev/null || true
           cp Build/lep.h paxo-sdk/
-          cp Build/libpaxo_vm.a paxo-sdk/ 2>/dev/null || cp Build/paxo_vm.lib paxo-sdk/ 2>/dev/null || true
           tar -czvf ${{ matrix.archive_name }} paxo-sdk/
 
       - name: Package Release (Zip - Windows)
         if: runner.os == 'Windows'
         run: |
           mkdir -p paxo-sdk
-          cp Build/* paxo-sdk/
+          cp Build/Bcg.exe paxo-sdk/
+          cp Build/Lepvm.exe paxo-sdk/
+          cp Build/lep.h paxo-sdk/
           7z a ${{ matrix.archive_name }} paxo-sdk/
 
       - name: Publish Release
