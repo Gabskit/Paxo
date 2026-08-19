@@ -19,9 +19,9 @@ statement
     ;
 
 varDeclaration
-    : scope type SIZE_POSFIX? IDENTIFIER '=' expression
-    | scope type SIZE_POSFIX? IDENTIFIER '[' INT_LITERAL? ']' '=' arrayLiteral
-    | scope type SIZE_POSFIX? IDENTIFIER
+    : scope type IDENTIFIER '=' expression
+    | scope type IDENTIFIER '[' INT_LITERAL? ']' '=' arrayLiteral
+    | scope type IDENTIFIER
     ;
 
 type
@@ -74,7 +74,7 @@ block
     ;
 
 parameterList
-    : type SIZE_POSFIX? IDENTIFIER (',' type SIZE_POSFIX? IDENTIFIER)*
+    : type IDENTIFIER (',' type IDENTIFIER)*
     ;
 
 argumentList
@@ -117,7 +117,7 @@ arrayAccess
 // ==========================================
 
 VAR_TYPE: 'var' | '📥' ;
-NUM_TYPE: 'n' ;
+NUM_TYPE: 'n' | 'n8' | 'n16' | 'n32' | 'n64' ;
 CHARA_TYPE: 'abc' ;
 TRIT_TYPE: 'trit' ;
 BOOLEAN_TYPE: 'bool' ;
@@ -132,7 +132,7 @@ ARROW      : '→' | '->';
 INCLUDE    : '+📚' | 'add' ;
 
 PAUSE_MODE : '⏸️' | 'stop' | '||' ;
-PLAY_MODE  : '▶️' | 'go' | '>' ;
+PLAY_MODE  : '▶️' | 'go' | '|>' ;
 
 // Literales
 INT_LITERAL     : [+-]? [0-9]+ ;
@@ -144,7 +144,6 @@ POINTER_LITERAL : '@' IDENTIFIER ;
 IDENTIFIER      : [a-zA-Z_\p{L}\p{Emoji}][a-zA-Z0-9_\p{L}\p{Emoji}]* ;
 STRING_LITERAL  : '"' (~["\r\n])* '"' ;
 CHAR_LITERAL    : '\'' . '\'' ;
-SIZE_POSFIX			: '.8' | '.16' | '.32' | '.64' ;
 LINE_COMMENT    : '//' ~[\r\n]* -> skip ;
 BLOCK_COMMENT   : '/*' .*? '*/' -> skip ;
 WS              : [ \t\r\n]+ -> skip ;

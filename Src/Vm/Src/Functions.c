@@ -1,6 +1,7 @@
 #pragma once
 #include "Calc.c"
 #include "Typecast_and_read.c"
+#include "termcolor-c.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -12,6 +13,11 @@ typedef enum {
   NATIVE_PRINT = 0,
   NATIVE_PRINTLN,
   NATIVE_TYPEOF,
+  NATIVE_SET_COLOR_TEXT,
+  NATIVE_SET_TYPE_TEXT,
+  NATIVE_SET_COLOR_BACK,
+  NATIVE_RESET_COLOR,
+  NATIVE_SCAN,
   NATIVE_LEN,
   NATIVE_ID_COUNT
 } NativeId;
@@ -58,6 +64,9 @@ static PaxoVar native_print(PaxoVar *args, uint8_t argc) {
     }
     case CHAR:
       printf("%c", val.as.chara);
+      break;
+    case STRING:
+      printf("%s", (const char *)val.as.puntero);
       break;
     default:
       break;
@@ -113,6 +122,110 @@ static PaxoVar native_typeof(PaxoVar *args, uint8_t argc) {
   return result;
 }
 
+static PaxoVar native_set_text_color(PaxoVar *args, uint8_t argc) {
+  if (argc < 1) {
+    return (PaxoVar){0};
+  }
+  const char *color = (const char *)args[0].as.puntero;
+  if (strcmp(color, "red") == 0) {
+    text_red(stdout);
+  } else if (strcmp(color, "yellow") == 0) {
+    text_yellow(stdout);
+  } else if (strcmp(color, "green") == 0) {
+    text_green(stdout);
+  } else if (strcmp(color, "cyan") == 0) {
+    text_cyan(stdout);
+  } else if (strcmp(color, "blue") == 0) {
+    text_blue(stdout);
+  } else if (strcmp(color, "magenta") == 0) {
+    text_magenta(stdout);
+  } else if (strcmp(color, "white") == 0) {
+    text_white(stdout);
+  } else if (strcmp(color, "gray") == 0) {
+    text_gray(stdout);
+  } else if (strcmp(color, "grey") == 0) {
+    text_grey(stdout);
+  } else if (strcmp(color, "dark red") == 0) {
+    text_dark(stdout);
+    text_red(stdout);
+  } else if (strcmp(color, "dark green") == 0) {
+    text_dark(stdout);
+    text_green(stdout);
+  } else if (strcmp(color, "dark blue") == 0) {
+    text_dark(stdout);
+    text_blue(stdout);
+  } else if (strcmp(color, "dark yellow") == 0) {
+    text_dark(stdout);
+    text_yellow(stdout);
+  } else if (strcmp(color, "dark cyan") == 0) {
+    text_dark(stdout);
+    text_cyan(stdout);
+  } else if (strcmp(color, "dark magenta") == 0) {
+    text_dark(stdout);
+    text_magenta(stdout);
+  } else if (strcmp(color, "dark white") == 0) {
+    text_dark(stdout);
+    text_white(stdout);
+  } else if (strcmp(color, "dark gray") == 0) {
+    text_dark(stdout);
+    text_gray(stdout);
+  }
+  return (PaxoVar){0};
+}
+
+static PaxoVar native_reset_color(PaxoVar *args, uint8_t argc) {
+  reset_colors(stdout);
+  return (PaxoVar){0};
+}
+
+static PaxoVar native_set_bg_color(PaxoVar *args, uint8_t argc) {
+  if (argc < 1) {
+    return (PaxoVar){0};
+  }
+  const char *color = (const char *)args[0].as.puntero;
+  if (strcmp(color, "red") == 0) {
+    background_red(stdout);
+  } else if (strcmp(color, "green") == 0) {
+    background_green(stdout);
+  } else if (strcmp(color, "blue") == 0) {
+    background_blue(stdout);
+  } else if (strcmp(color, "yellow") == 0) {
+    background_yellow(stdout);
+  } else if (strcmp(color, "cyan") == 0) {
+    background_cyan(stdout);
+  } else if (strcmp(color, "magenta") == 0) {
+    background_magenta(stdout);
+  } else if (strcmp(color, "white") == 0) {
+    background_white(stdout);
+  } else if (strcmp(color, "gray") == 0) {
+    background_gray(stdout);
+  } else if (strcmp(color, "grey") == 0) {
+    background_grey(stdout);
+  }
+  return (PaxoVar){0};
+}
+
+static PaxoVar native_set_text_type(PaxoVar *args, uint8_t argc) {
+  if (argc < 1) {
+    return (PaxoVar){0};
+  }
+  const char *type = (const char *)args[0].as.puntero;
+  if (strcmp(type, "bold") == 0) {
+    text_bold(stdout);
+  } else if (strcmp(type, "dark") == 0) {
+    text_dark(stdout);
+  } else if (strcmp(type, "underline") == 0) {
+    text_underline(stdout);
+  } else if (strcmp(type, "blink") == 0) {
+    text_blink(stdout);
+  } else if (strcmp(type, "reverse") == 0) {
+    text_reverse(stdout);
+  } else if (strcmp(type, "concealed") == 0) {
+    text_concealed(stdout);
+  }
+  return (PaxoVar){0};
+}
+
 // ==========================================
 // Dispatcher de llamadas nativas
 // ==========================================
@@ -125,6 +238,14 @@ PaxoVar native_call(uint16_t id, PaxoVar *args, uint8_t argc) {
     return native_println(args, argc);
   case NATIVE_TYPEOF:
     return native_typeof(args, argc);
+  case NATIVE_SET_COLOR_TEXT:
+    return native_set_text_color(args, argc);
+  case NATIVE_SET_COLOR_BACK:
+    return native_set_bg_color(args, argc);
+  case NATIVE_SET_TYPE_TEXT:
+    return native_set_text_type(args, argc);
+  case NATIVE_RESET_COLOR:
+    return native_reset_color(args, argc);
   default:
     break;
   }

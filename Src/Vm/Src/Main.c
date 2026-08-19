@@ -6,7 +6,7 @@ static uint8_t *load_file(const char *path, size_t *out_size) {
   FILE *f = fopen(path, "rb");
   if (!f) {
     text_red(stderr);
-    fprintf(stderr, "[PAXO VM]");
+    fprintf(stderr, "[lepvm]");
     reset_colors(stderr);
     fprintf(stderr, " No se pudo abrir '%s'\n", path);
     return NULL;
@@ -50,14 +50,14 @@ int main(int argc, char *argv[]) {
   PaxoVar globals[256] = {0};
 
   text_green(stderr);
-  fprintf(stderr, "[PAXO VM]");
+  fprintf(stderr, "[lepvm]");
   reset_colors(stderr);
   fprintf(stderr, " Ejecutando %s (%zu bytes)\n", argv[1], bytecode_size);
 
   vm_run(&vm, stack, globals);
 
   text_green(stderr);
-  fprintf(stderr, "[PAXO VM]");
+  fprintf(stderr, "[lepvm]");
   reset_colors(stderr);
   fprintf(stderr, " Terminado OK\n");
 

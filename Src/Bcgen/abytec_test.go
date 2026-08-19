@@ -62,6 +62,34 @@ func TestEmitterPushNum16(t *testing.T) {
 	}
 }
 
+func TestEmitterPushNum32(t *testing.T) {
+	e := Emitter{code: make([]byte, 0)}
+	e.pushNum32(70000)
+	if len(e.code) != 6 {
+		t.Fatalf("pushNum32(70000): expected 6 bytes, got %d", len(e.code))
+	}
+	if e.code[0] != OP_PUSH {
+		t.Errorf("byte 0: expected OP_PUSH, got %d", e.code[0])
+	}
+	if e.code[1] != TYPE_NUM32 {
+		t.Errorf("byte 1: expected TYPE_NUM32, got %d", e.code[1])
+	}
+}
+
+func TestEmitterPushNum64(t *testing.T) {
+	e := Emitter{code: make([]byte, 0)}
+	e.pushNum64(5000000000)
+	if len(e.code) != 10 {
+		t.Fatalf("pushNum64(5000000000): expected 10 bytes, got %d", len(e.code))
+	}
+	if e.code[0] != OP_PUSH {
+		t.Errorf("byte 0: expected OP_PUSH, got %d", e.code[0])
+	}
+	if e.code[1] != TYPE_NUM64 {
+		t.Errorf("byte 1: expected TYPE_NUM64, got %d", e.code[1])
+	}
+}
+
 func TestEmitterEmit(t *testing.T) {
 	e := Emitter{code: make([]byte, 0)}
 	e.emit(OP_ADD)
@@ -131,14 +159,18 @@ func TestResolveType(t *testing.T) {
 		input string
 		want  byte
 	}{
-		{"var", TYPE_NUM8},
-		{"📥", TYPE_NUM8},
-		{"n", TYPE_NUM8},
+		{"var", TYPE_NUM64},
+		{"📥", TYPE_NUM64},
+		{"n", TYPE_NUM64},
+		{"n8", TYPE_NUM8},
+		{"n16", TYPE_NUM16},
+		{"n32", TYPE_NUM32},
+		{"n64", TYPE_NUM64},
 		{"abc", TYPE_CHAR},
 		{"trit", TYPE_TRIT},
 		{"bool", TYPE_BOOL},
 		{"pin", TYPE_POINT},
-		{"unknown", TYPE_NUM8},
+		{"unknown", TYPE_NUM64},
 	}
 	for _, tt := range tests {
 		got := cg.resolveType(tt.input)
@@ -160,7 +192,7 @@ func TestCompileValidProgram(t *testing.T) {
 	paxoFile := filepath.Join(tmpDir, "simple.paxo")
 	pbcFile := filepath.Join(tmpDir, "simple.pbc")
 
-	err := os.WriteFile(paxoFile, []byte("local var x = 0\n"), 0644)
+	err := os.WriteFile(paxoFile, []byte("local n8 x = 0\n"), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,9 +235,9 @@ func TestCompileArithmetic(t *testing.T) {
 	paxoFile := filepath.Join(tmpDir, "arith.paxo")
 	pbcFile := filepath.Join(tmpDir, "arith.pbc")
 
-	prog := `local var a = 3
-local var b = 5
-local var c = a + b
+	prog := `local n8 a = 3
+local n8 b = 5
+local n8 c = a + b
 `
 	err := os.WriteFile(paxoFile, []byte(prog), 0644)
 	if err != nil {
@@ -239,7 +271,7 @@ func TestCompileIncrement(t *testing.T) {
 	paxoFile := filepath.Join(tmpDir, "inc.paxo")
 	pbcFile := filepath.Join(tmpDir, "inc.pbc")
 
-	prog := `local var x = 0
+	prog := `local n8 x = 0
 x++
 `
 	err := os.WriteFile(paxoFile, []byte(prog), 0644)
@@ -274,7 +306,7 @@ func TestCompileDecrement(t *testing.T) {
 	paxoFile := filepath.Join(tmpDir, "dec.paxo")
 	pbcFile := filepath.Join(tmpDir, "dec.pbc")
 
-	prog := `local var x = 10
+	prog := `local n8 x = 10
 x--
 `
 	err := os.WriteFile(paxoFile, []byte(prog), 0644)
@@ -309,9 +341,9 @@ func TestCompileComparison(t *testing.T) {
 	paxoFile := filepath.Join(tmpDir, "cmp.paxo")
 	pbcFile := filepath.Join(tmpDir, "cmp.pbc")
 
-	prog := `local var a = 5
-local var b = 3
-local var r = a > b
+	prog := `local n8 a = 5
+local n8 b = 3
+local bool r = a > b
 `
 	err := os.WriteFile(paxoFile, []byte(prog), 0644)
 	if err != nil {
@@ -345,9 +377,9 @@ func TestCompileBooleanLogic(t *testing.T) {
 	paxoFile := filepath.Join(tmpDir, "logic.paxo")
 	pbcFile := filepath.Join(tmpDir, "logic.pbc")
 
-	prog := `local var x = .✓
-local var y = .×
-local var r = x .& y
+	prog := `local bool x = .✓
+local bool y = .×
+local bool r = x .& y
 `
 	err := os.WriteFile(paxoFile, []byte(prog), 0644)
 	if err != nil {
@@ -381,7 +413,7 @@ func TestCompilePrintCall(t *testing.T) {
 	paxoFile := filepath.Join(tmpDir, "print.paxo")
 	pbcFile := filepath.Join(tmpDir, "print.pbc")
 
-	prog := `local var x = 42
+	prog := `local n8 x = 42
 println(x);
 `
 	err := os.WriteFile(paxoFile, []byte(prog), 0644)
@@ -416,9 +448,9 @@ func TestCompileBitwise(t *testing.T) {
 	paxoFile := filepath.Join(tmpDir, "bit.paxo")
 	pbcFile := filepath.Join(tmpDir, "bit.pbc")
 
-	prog := `local var a = 5
-local var b = 3
-local var c = a & b
+	prog := `local n8 a = 5
+local n8 b = 3
+local n8 c = a & b
 `
 	err := os.WriteFile(paxoFile, []byte(prog), 0644)
 	if err != nil {
@@ -452,7 +484,7 @@ func TestCompileCharLiteral(t *testing.T) {
 	paxoFile := filepath.Join(tmpDir, "char.paxo")
 	pbcFile := filepath.Join(tmpDir, "char.pbc")
 
-	prog := `local var c = 'A'
+	prog := `local abc c = 'A'
 `
 	err := os.WriteFile(paxoFile, []byte(prog), 0644)
 	if err != nil {
@@ -500,6 +532,15 @@ func TestTypeValues(t *testing.T) {
 	if TYPE_NUM8 != 0 {
 		t.Errorf("TYPE_NUM8 should be 0, got %d", TYPE_NUM8)
 	}
+	if TYPE_NUM16 != 1 {
+		t.Errorf("TYPE_NUM16 should be 1, got %d", TYPE_NUM16)
+	}
+	if TYPE_NUM32 != 2 {
+		t.Errorf("TYPE_NUM32 should be 2, got %d", TYPE_NUM32)
+	}
+	if TYPE_NUM64 != 3 {
+		t.Errorf("TYPE_NUM64 should be 3, got %d", TYPE_NUM64)
+	}
 	if TYPE_BOOL != 6 {
 		t.Errorf("TYPE_BOOL should be 6, got %d", TYPE_BOOL)
 	}
@@ -518,5 +559,87 @@ func TestNewCodeGen(t *testing.T) {
 	}
 	if len(cg.locals) != 0 {
 		t.Error("New code gen should have no locals")
+	}
+}
+
+func TestVarDefaultIsNum64(t *testing.T) {
+	tmpDir := t.TempDir()
+	paxoFile := filepath.Join(tmpDir, "vardefault.paxo")
+	pbcFile := filepath.Join(tmpDir, "vardefault.pbc")
+
+	prog := `local var x
+`
+	err := os.WriteFile(paxoFile, []byte(prog), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = Compile(paxoFile, pbcFile, false)
+	if err != nil {
+		t.Fatalf("Compile var default failed: %v", err)
+	}
+
+	data, err := os.ReadFile(pbcFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hasPushNum64 := false
+	for i := 0; i < len(data)-1; i++ {
+		if data[i] == OP_PUSH && data[i+1] == TYPE_NUM64 {
+			hasPushNum64 = true
+			break
+		}
+	}
+	if !hasPushNum64 {
+		t.Error("Expected PUSH NUM64 for var default type (uninitialized)")
+	}
+}
+
+func TestCompileExplicitTypes(t *testing.T) {
+	tests := []struct {
+		name  string
+		prog  string
+		typ   byte
+		check byte
+	}{
+		{"n8", "local n8 x = 5\n", TYPE_NUM8, OP_STORE_VAR},
+		{"n16", "local n16 x = 300\n", TYPE_NUM16, OP_STORE_VAR},
+		{"n32", "local n32 x = 70000\n", TYPE_NUM32, OP_STORE_VAR},
+		{"n64", "local n64 x = 5000000000\n", TYPE_NUM64, OP_STORE_VAR},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			paxoFile := filepath.Join(tmpDir, tt.name+".paxo")
+			pbcFile := filepath.Join(tmpDir, tt.name+".pbc")
+
+			err := os.WriteFile(paxoFile, []byte(tt.prog), 0644)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = Compile(paxoFile, pbcFile, false)
+			if err != nil {
+				t.Fatalf("Compile %s failed: %v", tt.name, err)
+			}
+
+			data, err := os.ReadFile(pbcFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			hasType := false
+			for i := 0; i < len(data)-1; i++ {
+				if data[i] == OP_PUSH && data[i+1] == tt.typ {
+					hasType = true
+					break
+				}
+			}
+			if !hasType {
+				t.Errorf("Expected PUSH %s in bytecode for type %s", tt.name, tt.name)
+			}
+		})
 	}
 }

@@ -52,7 +52,6 @@ jobs:
 
       - name: Install System Dependencies (Windows)
         if: runner.os == 'Windows'
-        shell: pwsh
         run: choco install llvm -y
 
       - name: Install Node Dependencies
@@ -74,9 +73,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           mkdir -p paxo-sdk
-          cp Build/Bcg.exe paxo-sdk/
-          cp Build/Lepvm.exe paxo-sdk/
-          cp Build/lep.h paxo-sdk/
+          cp Build/* paxo-sdk/
           7z a ${{ matrix.archive_name }} paxo-sdk/
 
       - name: Publish Release

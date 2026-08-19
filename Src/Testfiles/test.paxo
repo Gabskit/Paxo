@@ -1,9 +1,10 @@
-local var.8 i = 0
+local var.64 i = 0
 local 📥 texto = "Hola mundo"
 (i < 5) : go |: {
   i = i + 1
   println(i);
 } :|
+i = 986
 print(texto);
 texto = ✓
 println(texto);

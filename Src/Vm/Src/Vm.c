@@ -132,6 +132,12 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         memcpy(&val.as.puntero, vm->bytecode + vm->ip, sizeof(void *));
         vm->ip += sizeof(void *);
         break;
+      case STRING: {
+        uint16_t len = read_u16(vm);
+        val.as.puntero = (void *)(vm->bytecode + vm->ip);
+        vm->ip += len + 1;
+        break;
+      }
       default:
         break;
       }
@@ -888,7 +894,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
 
 void vm_error(VM *vm, const char *msg) {
   text_red(stderr);
-  fprintf(stderr, "[PAXO EXEC ERROR]");
+  fprintf(stderr, "[lepvm error]");
   reset_colors(stderr);
   fprintf(stderr, " en IP 0x%04zX: %s\n", vm->ip, msg);
 }

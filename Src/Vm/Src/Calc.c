@@ -38,7 +38,7 @@ typedef struct {
 
 typedef unsigned _BitInt(2) PaxoBool;
 
-enum type { NUM8, NUM16, NUM32, NUM64, CHAR, TRIT, BOOL, POINT, FUNC };
+enum type { NUM8, NUM16, NUM32, NUM64, CHAR, TRIT, BOOL, POINT, FUNC, STRING };
 
 typedef struct {
   uint8_t type;
