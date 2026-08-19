@@ -7,46 +7,81 @@ on:
 
 jobs:
   release:
-    name: Build & Publish Release
-    runs-on: ubuntu-latest
+    name: Build & Publish (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: write
 
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            archive_name: paxo-sdk-${{ github.ref_name }}-linux-x64.tar.gz
+          - os: macos-latest
+            target: macos-x64
+            archive_name: paxo-sdk-${{ github.ref_name }}-macos-x64.tar.gz
+          - os: windows-latest
+            target: windows-x64
+            archive_name: paxo-sdk-${{ github.ref_name }}-windows-x64.zip
+
+    defaults:
+      run:
+        shell: bash
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@v5
         with:
           go-version: "1.23"
 
-      - name: Install Clang
+      - name: Install System Dependencies (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang make ar
+          sudo apt-get install -y clang make binutils
+
+      - name: Install Node Dependencies
+        run: npm ci
 
       - name: Build Everything
         run: |
+          mkdir -p Build
           npm run build:vm
           npm run build:bcg
           npm run gen:lep
           clang -Wall -Wextra -O3 -std=gnu23 -c Src/Vm/Src/Calc.c -o Build/Calc.o
           clang -Wall -Wextra -O3 -std=gnu23 -c Src/Vm/Src/Deque.c -o Build/Deque.o
-          ar rcs Build/libpaxo_vm.a Build/Calc.o Build/Deque.o
 
-      - name: Package Release
+      - name: Package Release (Tarball - Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
           mkdir -p paxo-sdk
-          cp Build/Lepvm paxo-sdk/
-          cp Build/Bcg paxo-sdk/
+          cp Build/Lepvm paxo-sdk/ 2>/dev/null || cp Build/Lepvm.exe paxo-sdk/ 2>/dev/null || true
+          cp Build/Bcg paxo-sdk/ 2>/dev/null || cp Build/Bcg.exe paxo-sdk/ 2>/dev/null || true
           cp Build/lep.h paxo-sdk/
-          cp Build/libpaxo_vm.a paxo-sdk/
-          tar -czvf paxo-sdk-${{ github.ref_name }}-linux-x64.tar.gz paxo-sdk/
+          cp Build/libpaxo_vm.a paxo-sdk/ 2>/dev/null || cp Build/paxo_vm.lib paxo-sdk/ 2>/dev/null || true
+          tar -czvf ${{ matrix.archive_name }} paxo-sdk/
+
+      - name: Package Release (Zip - Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir -p paxo-sdk
+          cp Build/* paxo-sdk/
+          7z a ${{ matrix.archive_name }} paxo-sdk/
 
       - name: Publish Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v2
         with:
-          files: paxo-sdk-${{ github.ref_name }}-linux-x64.tar.gz
+          files: ${{ matrix.archive_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
