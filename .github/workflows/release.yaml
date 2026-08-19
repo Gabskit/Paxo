@@ -45,7 +45,7 @@ jobs:
           tar -czvf paxo-sdk-${{ github.ref_name }}-linux-x64.tar.gz paxo-sdk/
 
       - name: Publish Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: paxo-sdk-${{ github.ref_name }}-linux-x64.tar.gz
         env:
