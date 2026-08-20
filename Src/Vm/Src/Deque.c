@@ -118,3 +118,8 @@ void deque_free(Deque *dq) {
   }
   free(dq);
 }
+
+// Retorna el tamaño actual del deque
+static inline size_t deque_size(const Deque *dq) {
+  return dq ? dq->size : 0;
+}

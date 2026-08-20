@@ -38,9 +38,36 @@ typedef struct {
 
 typedef unsigned _BitInt(2) PaxoBool;
 
-enum type { NUM8, NUM16, NUM32, NUM64, CHAR, TRIT, BOOL, POINT, FUNC, STRING };
+enum type {
+  NUM8,
+  NUM16,
+  NUM32,
+  NUM64,
+  CHAR,
+  TRIT,
+  BOOL,
+  POINT,
+  FUNC,
+  STRING,
+  ARRAY,
+  PACKAGE
+};
+
+typedef struct PaxoVar PaxoVar;
+
+typedef struct PaxoPackageField {
+  char *key;
+  struct PaxoPackageField *next;
+  PaxoVar *value;
+} PaxoPackageField;
 
 typedef struct {
+  PaxoVar *items;
+  size_t len;
+  size_t capacity;
+} PaxoArray;
+
+struct PaxoVar {
   uint8_t type;
   union {
     Num8 number8;
@@ -55,8 +82,10 @@ typedef struct {
       uint32_t func_id;
       void *closure_env;
     } __attribute__((packed)) func;
+    PaxoArray *array;
+    PaxoPackageField *pkg;
   } as;
-} PaxoVar;
+};
 
 // Macro auxiliar para propagar el punto fijo de mayor precision
 #define PROPAGAR_P(a, b) ((a.p > b.p) ? a.p : b.p)
@@ -65,7 +94,7 @@ typedef struct {
 // 2. OPERACIONES ARITMÉTICAS: 8 BITS (MP8)
 // ==========================================
 
-Num8 add_num8(Num8 a, Num8 b) {
+inline Num8 add_num8(Num8 a, Num8 b) {
   if (a.bc == 0)
     return b;
   if (b.bc == 0)
@@ -129,12 +158,12 @@ Num8 add_num8(Num8 a, Num8 b) {
                 .p = PROPAGAR_P(a, b)};
 }
 
-Num8 sub_num8(Num8 a, Num8 b) {
+inline Num8 sub_num8(Num8 a, Num8 b) {
   b.signo = !b.signo;
   return add_num8(a, b);
 }
 
-Num8 mul_num8(Num8 a, Num8 b) {
+inline Num8 mul_num8(Num8 a, Num8 b) {
   if (a.bc == 0 || b.bc == 0)
     return (Num8){0, 0, 0, PROPAGAR_P(a, b)};
   const int8_t sesgo = 0, exp_max = 1;
@@ -163,7 +192,7 @@ Num8 mul_num8(Num8 a, Num8 b) {
                 .p = PROPAGAR_P(a, b)};
 }
 
-Num8 div_num8(Num8 a, Num8 b) {
+inline Num8 div_num8(Num8 a, Num8 b) {
   if (b.bc == 0 || a.bc == 0)
     return (Num8){0, 0, 0, PROPAGAR_P(a, b)};
   const int8_t sesgo = 0, exp_max = 1, escala = 2;
@@ -198,7 +227,7 @@ Num8 div_num8(Num8 a, Num8 b) {
 // 3. OPERACIONES ARITMÉTICAS: 16 BITS (MP16)
 // ==========================================
 
-Num16 add_num16(Num16 a, Num16 b) {
+inline Num16 add_num16(Num16 a, Num16 b) {
   if (a.bc == 0)
     return b;
   if (b.bc == 0)
@@ -262,12 +291,12 @@ Num16 add_num16(Num16 a, Num16 b) {
                  .p = PROPAGAR_P(a, b)};
 }
 
-Num16 sub_num16(Num16 a, Num16 b) {
+inline Num16 sub_num16(Num16 a, Num16 b) {
   b.signo = !b.signo;
   return add_num16(a, b);
 }
 
-Num16 mul_num16(Num16 a, Num16 b) {
+inline Num16 mul_num16(Num16 a, Num16 b) {
   if (a.bc == 0 || b.bc == 0)
     return (Num16){0, 0, 0, PROPAGAR_P(a, b)};
   const int16_t sesgo = 1, exp_max = 3;
@@ -296,7 +325,7 @@ Num16 mul_num16(Num16 a, Num16 b) {
                  .p = PROPAGAR_P(a, b)};
 }
 
-Num16 div_num16(Num16 a, Num16 b) {
+inline Num16 div_num16(Num16 a, Num16 b) {
   if (b.bc == 0 || a.bc == 0)
     return (Num16){0, 0, 0, PROPAGAR_P(a, b)};
   const int16_t sesgo = 1, exp_max = 3, escala = 3;
@@ -331,7 +360,7 @@ Num16 div_num16(Num16 a, Num16 b) {
 // 4. OPERACIONES ARITMÉTICAS: 32 BITS (MP32)
 // ==========================================
 
-Num32 add_num32(Num32 a, Num32 b) {
+inline Num32 add_num32(Num32 a, Num32 b) {
   if (a.bc == 0)
     return b;
   if (b.bc == 0)
@@ -395,12 +424,12 @@ Num32 add_num32(Num32 a, Num32 b) {
                  .p = PROPAGAR_P(a, b)};
 }
 
-Num32 sub_num32(Num32 a, Num32 b) {
+inline Num32 sub_num32(Num32 a, Num32 b) {
   b.signo = !b.signo;
   return add_num32(a, b);
 }
 
-Num32 mul_num32(Num32 a, Num32 b) {
+inline Num32 mul_num32(Num32 a, Num32 b) {
   if (a.bc == 0 || b.bc == 0)
     return (Num32){0, 0, 0, PROPAGAR_P(a, b)};
   const int16_t sesgo = 15, exp_max = 31;
@@ -429,7 +458,7 @@ Num32 mul_num32(Num32 a, Num32 b) {
                  .p = PROPAGAR_P(a, b)};
 }
 
-Num32 div_num32(Num32 a, Num32 b) {
+inline Num32 div_num32(Num32 a, Num32 b) {
   if (b.bc == 0 || a.bc == 0)
     return (Num32){0, 0, 0, PROPAGAR_P(a, b)};
   const int16_t sesgo = 15, exp_max = 31, escala = 5;
@@ -529,12 +558,12 @@ Num64 add_num64(Num64 a, Num64 b) {
                  .p = PROPAGAR_P(a, b)};
 }
 
-Num64 sub_num64(Num64 a, Num64 b) {
+inline Num64 sub_num64(Num64 a, Num64 b) {
   b.signo = !b.signo;
   return add_num64(a, b);
 }
 
-Num64 mul_num64(Num64 a, Num64 b) {
+inline Num64 mul_num64(Num64 a, Num64 b) {
   if (a.bc == 0 || b.bc == 0)
     return (Num64){0, 0, 0, PROPAGAR_P(a, b)};
   const int16_t sesgo = 511, exp_max = 1023;
@@ -563,7 +592,7 @@ Num64 mul_num64(Num64 a, Num64 b) {
                  .p = PROPAGAR_P(a, b)};
 }
 
-Num64 div_num64(Num64 a, Num64 b) {
+inline Num64 div_num64(Num64 a, Num64 b) {
   if (b.bc == 0 || a.bc == 0)
     return (Num64){0, 0, 0, PROPAGAR_P(a, b)};
   const int16_t sesgo = 511, exp_max = 1023, escala = 12;

@@ -59,14 +59,17 @@ type PaxoListener interface {
 	// EnterParameterList is called when entering the parameterList production.
 	EnterParameterList(c *ParameterListContext)
 
+	// EnterReturnStatement is called when entering the returnStatement production.
+	EnterReturnStatement(c *ReturnStatementContext)
+
+	// EnterThrowStatement is called when entering the throwStatement production.
+	EnterThrowStatement(c *ThrowStatementContext)
+
 	// EnterArgumentList is called when entering the argumentList production.
 	EnterArgumentList(c *ArgumentListContext)
 
 	// EnterCallExpr is called when entering the callExpr production.
 	EnterCallExpr(c *CallExprContext)
-
-	// EnterArrayAccessExpr is called when entering the arrayAccessExpr production.
-	EnterArrayAccessExpr(c *ArrayAccessExprContext)
 
 	// EnterNotgateExpr is called when entering the notgateExpr production.
 	EnterNotgateExpr(c *NotgateExprContext)
@@ -95,9 +98,6 @@ type PaxoListener interface {
 	// EnterArrayLitExpr is called when entering the arrayLitExpr production.
 	EnterArrayLitExpr(c *ArrayLitExprContext)
 
-	// EnterArrayAccExpr is called when entering the arrayAccExpr production.
-	EnterArrayAccExpr(c *ArrayAccExprContext)
-
 	// EnterIdentExpr is called when entering the identExpr production.
 	EnterIdentExpr(c *IdentExprContext)
 
@@ -122,11 +122,14 @@ type PaxoListener interface {
 	// EnterBitwiseExpr is called when entering the bitwiseExpr production.
 	EnterBitwiseExpr(c *BitwiseExprContext)
 
+	// EnterIndexedAccessExpr is called when entering the indexedAccessExpr production.
+	EnterIndexedAccessExpr(c *IndexedAccessExprContext)
+
+	// EnterDotAccessExpr is called when entering the dotAccessExpr production.
+	EnterDotAccessExpr(c *DotAccessExprContext)
+
 	// EnterArrayLiteral is called when entering the arrayLiteral production.
 	EnterArrayLiteral(c *ArrayLiteralContext)
-
-	// EnterArrayAccess is called when entering the arrayAccess production.
-	EnterArrayAccess(c *ArrayAccessContext)
 
 	// ExitProgram is called when exiting the program production.
 	ExitProgram(c *ProgramContext)
@@ -179,14 +182,17 @@ type PaxoListener interface {
 	// ExitParameterList is called when exiting the parameterList production.
 	ExitParameterList(c *ParameterListContext)
 
+	// ExitReturnStatement is called when exiting the returnStatement production.
+	ExitReturnStatement(c *ReturnStatementContext)
+
+	// ExitThrowStatement is called when exiting the throwStatement production.
+	ExitThrowStatement(c *ThrowStatementContext)
+
 	// ExitArgumentList is called when exiting the argumentList production.
 	ExitArgumentList(c *ArgumentListContext)
 
 	// ExitCallExpr is called when exiting the callExpr production.
 	ExitCallExpr(c *CallExprContext)
-
-	// ExitArrayAccessExpr is called when exiting the arrayAccessExpr production.
-	ExitArrayAccessExpr(c *ArrayAccessExprContext)
 
 	// ExitNotgateExpr is called when exiting the notgateExpr production.
 	ExitNotgateExpr(c *NotgateExprContext)
@@ -215,9 +221,6 @@ type PaxoListener interface {
 	// ExitArrayLitExpr is called when exiting the arrayLitExpr production.
 	ExitArrayLitExpr(c *ArrayLitExprContext)
 
-	// ExitArrayAccExpr is called when exiting the arrayAccExpr production.
-	ExitArrayAccExpr(c *ArrayAccExprContext)
-
 	// ExitIdentExpr is called when exiting the identExpr production.
 	ExitIdentExpr(c *IdentExprContext)
 
@@ -242,9 +245,12 @@ type PaxoListener interface {
 	// ExitBitwiseExpr is called when exiting the bitwiseExpr production.
 	ExitBitwiseExpr(c *BitwiseExprContext)
 
+	// ExitIndexedAccessExpr is called when exiting the indexedAccessExpr production.
+	ExitIndexedAccessExpr(c *IndexedAccessExprContext)
+
+	// ExitDotAccessExpr is called when exiting the dotAccessExpr production.
+	ExitDotAccessExpr(c *DotAccessExprContext)
+
 	// ExitArrayLiteral is called when exiting the arrayLiteral production.
 	ExitArrayLiteral(c *ArrayLiteralContext)
-
-	// ExitArrayAccess is called when exiting the arrayAccess production.
-	ExitArrayAccess(c *ArrayAccessContext)
 }

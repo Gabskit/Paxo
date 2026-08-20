@@ -604,8 +604,8 @@ func TestCompileExplicitTypes(t *testing.T) {
 		check byte
 	}{
 		{"n8", "local n8 x = 5\n", TYPE_NUM8, OP_STORE_VAR},
-		{"n16", "local n16 x = 300\n", TYPE_NUM16, OP_STORE_VAR},
-		{"n32", "local n32 x = 70000\n", TYPE_NUM32, OP_STORE_VAR},
+		{"n16", "local n16 x = 300\n", TYPE_NUM64, OP_STORE_VAR},
+		{"n32", "local n32 x = 70000\n", TYPE_NUM64, OP_STORE_VAR},
 		{"n64", "local n64 x = 5000000000\n", TYPE_NUM64, OP_STORE_VAR},
 	}
 

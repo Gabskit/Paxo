@@ -122,6 +122,18 @@ func (s *BasePaxoListener) EnterParameterList(ctx *ParameterListContext) {}
 // ExitParameterList is called when production parameterList is exited.
 func (s *BasePaxoListener) ExitParameterList(ctx *ParameterListContext) {}
 
+// EnterReturnStatement is called when production returnStatement is entered.
+func (s *BasePaxoListener) EnterReturnStatement(ctx *ReturnStatementContext) {}
+
+// ExitReturnStatement is called when production returnStatement is exited.
+func (s *BasePaxoListener) ExitReturnStatement(ctx *ReturnStatementContext) {}
+
+// EnterThrowStatement is called when production throwStatement is entered.
+func (s *BasePaxoListener) EnterThrowStatement(ctx *ThrowStatementContext) {}
+
+// ExitThrowStatement is called when production throwStatement is exited.
+func (s *BasePaxoListener) ExitThrowStatement(ctx *ThrowStatementContext) {}
+
 // EnterArgumentList is called when production argumentList is entered.
 func (s *BasePaxoListener) EnterArgumentList(ctx *ArgumentListContext) {}
 
@@ -133,12 +145,6 @@ func (s *BasePaxoListener) EnterCallExpr(ctx *CallExprContext) {}
 
 // ExitCallExpr is called when production callExpr is exited.
 func (s *BasePaxoListener) ExitCallExpr(ctx *CallExprContext) {}
-
-// EnterArrayAccessExpr is called when production arrayAccessExpr is entered.
-func (s *BasePaxoListener) EnterArrayAccessExpr(ctx *ArrayAccessExprContext) {}
-
-// ExitArrayAccessExpr is called when production arrayAccessExpr is exited.
-func (s *BasePaxoListener) ExitArrayAccessExpr(ctx *ArrayAccessExprContext) {}
 
 // EnterNotgateExpr is called when production notgateExpr is entered.
 func (s *BasePaxoListener) EnterNotgateExpr(ctx *NotgateExprContext) {}
@@ -194,12 +200,6 @@ func (s *BasePaxoListener) EnterArrayLitExpr(ctx *ArrayLitExprContext) {}
 // ExitArrayLitExpr is called when production arrayLitExpr is exited.
 func (s *BasePaxoListener) ExitArrayLitExpr(ctx *ArrayLitExprContext) {}
 
-// EnterArrayAccExpr is called when production arrayAccExpr is entered.
-func (s *BasePaxoListener) EnterArrayAccExpr(ctx *ArrayAccExprContext) {}
-
-// ExitArrayAccExpr is called when production arrayAccExpr is exited.
-func (s *BasePaxoListener) ExitArrayAccExpr(ctx *ArrayAccExprContext) {}
-
 // EnterIdentExpr is called when production identExpr is entered.
 func (s *BasePaxoListener) EnterIdentExpr(ctx *IdentExprContext) {}
 
@@ -248,14 +248,20 @@ func (s *BasePaxoListener) EnterBitwiseExpr(ctx *BitwiseExprContext) {}
 // ExitBitwiseExpr is called when production bitwiseExpr is exited.
 func (s *BasePaxoListener) ExitBitwiseExpr(ctx *BitwiseExprContext) {}
 
+// EnterIndexedAccessExpr is called when production indexedAccessExpr is entered.
+func (s *BasePaxoListener) EnterIndexedAccessExpr(ctx *IndexedAccessExprContext) {}
+
+// ExitIndexedAccessExpr is called when production indexedAccessExpr is exited.
+func (s *BasePaxoListener) ExitIndexedAccessExpr(ctx *IndexedAccessExprContext) {}
+
+// EnterDotAccessExpr is called when production dotAccessExpr is entered.
+func (s *BasePaxoListener) EnterDotAccessExpr(ctx *DotAccessExprContext) {}
+
+// ExitDotAccessExpr is called when production dotAccessExpr is exited.
+func (s *BasePaxoListener) ExitDotAccessExpr(ctx *DotAccessExprContext) {}
+
 // EnterArrayLiteral is called when production arrayLiteral is entered.
 func (s *BasePaxoListener) EnterArrayLiteral(ctx *ArrayLiteralContext) {}
 
 // ExitArrayLiteral is called when production arrayLiteral is exited.
 func (s *BasePaxoListener) ExitArrayLiteral(ctx *ArrayLiteralContext) {}
-
-// EnterArrayAccess is called when production arrayAccess is entered.
-func (s *BasePaxoListener) EnterArrayAccess(ctx *ArrayAccessContext) {}
-
-// ExitArrayAccess is called when production arrayAccess is exited.
-func (s *BasePaxoListener) ExitArrayAccess(ctx *ArrayAccessContext) {}

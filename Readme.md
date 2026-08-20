@@ -15,8 +15,8 @@ Paxo/
 │       ├── Main.c      # Entry point de la VM (lepvm)
 │       ├── Vm.c        # Intérprete de bytecode
 │       ├── Functions.c # Funciones nativas (print, colores, etc.)
-│       ├── Calc.c      # Tipos y estructuras de datos
-│       ├── Deque.c     #Deque (pila doble)
+│       ├── Calc.c      # Tipos y estructuras de datos (incluye arrays, packages)
+│       ├── Deque.c     # Deque (pila doble)
 │       ├── Typecast_and_read.c # Conversión de tipos
 │       └── termcolor-c.h       # Colores ANSI en terminal
 ├── sh/
@@ -63,7 +63,7 @@ npm run antlr        # Regenerar parser desde Paxo.g4
 ## Tipos
 
 ```
-var foo = 6.7          // número (inferido)
+var foo = 6.7          // número (inferido, siempre num64)
 n foo = 6.7
 
 var foo = •            // trit (ternario: •, ↑, ↓)
@@ -78,36 +78,144 @@ abc foo = "Texto"
 var goo = @foo          // puntero
 pin goo = @foo
 
-var foo = .×            // booleano bit (.× = false, .• = true)
+var foo = .×            // booleano bit (.× = false, .✓ = true)
 bool foo = .×
-
-var foo[] = «4, 5.08, •, "arreglos", «6 + 8.0, 7»»  // arreglo (anidado)
 ```
 
-### Paquetes
+Los literales numéricos se empaquetan como **num64** por defecto. Puedes usar tipos más pequeños para ahorrar memoria:
 
 ```
-var foo = {
-  var goo = "Paquetes"   // contiene variables y funciones
+n8  var chica = 10     // 8 bits
+n16 var mediana = 1000 // 16 bits
+n32 var grande = 50000 // 32 bits
+n64 var maxima = 99999 // 64 bits (default)
+```
+
+## Arrays
+
+Los arrays almacenan **tipos mixtos** y se crean con la sintaxis `«»`:
+
+```
+var arr = «1, 2, 3»                        // array de números
+var mixed = «"hola", .✓, 42»               // mixto: string, bool, num
+var nested = ««1, 2», «3, 4, 5»»          // arrays anidados
+var vacio = «»                              // array vacío
+```
+
+### Acceso por índice
+
+```
+var arr = «10, 20, 30»
+println(arr[0]);    // 10
+println(arr[2]);    // 30
+arr[1] = 99;        // asignación por índice
+println(arr);        // «10, 99, 30»
+```
+
+Las expresiones también funcionan:
+
+```
+arr[2] = arr[0] + arr[1];
+arr[0] = 100;
+```
+
+### Funciones nativas de arrays
+
+```
+array_len(arr)        // retorna longitud del array
+array_push(arr, val)  // agrega un elemento al final
+```
+
+**Ejemplo completo:**
+
+```
+var arr = «1, 2, 3»
+println(array_len(arr));    // 3
+
+array_push(arr, 99)
+println(arr);               // «1, 2, 3, 99»
+println(array_len(arr));    // 4
+
+println(arr[1]);            // 2
+```
+
+### Nota sobre tipos mixtos
+
+Los arrays pueden contener cualquier tipo:
+
+```
+var datos = «"Paxo", 42, .✓, •, 'X'»
+println(datos[0]);    // Paxo
+println(datos[1]);    // 42
+println(datos[2]);    // true
+```
+
+## Paquetes (clases)
+
+Los bloques `{}` declaran paquetes con campos propios. Se accede a los campos con notación de punto (`pkg.campo`):
+
+```
+var persona = {
+    var nombre = "Paxo";
+    var edad = 25;
+    var activo = .✓;
+}
+
+println(persona.nombre);    // Paxo
+println(persona.edad);      // 25
+println(persona.activo);    // true
+println(typeof(persona));   // package
+```
+
+Los campos pueden contener arrays u otros tipos:
+
+```
+var config = {
+    var lang = "paxo";
+    var version = 2;
+    var debug = .✓;
+}
+
+println(config.lang);       // paxo
+println(config.version);    // 2
+```
+
+El acceso encadenado funciona: `obj.tags[0]`, `obj.tags[1]`, etc.
+
+## Funciones
+
+```
+var foo = () {
+    var goo = "Esto es una función"
+    return goo;
 }
 ```
 
-### Funciones
+Las funciones pueden declarar tipo de retorno con `: tipo` después de los paréntesis:
 
 ```
-var foo = (){
-  var goo = "Esto es una función"
-  return goo;
+📥 sumar = (n64 a, n64 b) : n64 {
+    return a + b;
 }
 ```
 
-## Tamaños de variable
+### Return
 
 ```
-n8    8 bits
-n16   16 bits
-n32   32 bits
-n64   64 bits
+return expresión;    // retorna un valor
+return;              // retorna sin valor
+```
+
+**Ejemplo con cond:**
+
+```
+📥 buscar = (n64 x) : bool {
+    (x) ? 42 -> {
+        return .✓;
+    } : _ -> {
+        return .×;
+    };
+}
 ```
 
 ## Acceso de variables
@@ -118,57 +226,64 @@ pub var      // global
 🌎 var       // global (alias)
 ```
 
-## Funciones
-
-```
-📥 var name = (){
-  //codigo
-}
-```
-
-Las funciones también pueden estar en paquetes para generar clases:
-
-```
-pub var hi = {
-  local var i1 = 8
-  local var metodo = (){
-    //codigo
-  }
-}
-```
+> **Nota:** Actualmente `local` y `pub` no separan scopes reales. Todas las variables se almacenan en un array flat de globals. Las variables dentro de funciones o bloques `{}` son accesibles desde afuera.
 
 ## Condicionales
 
 ```
-(expresión | variable)?
-    //caso default
-  : 'a' ->
-    //caso a
-  : (expresión) ->
-    //caso
-  : _ ->
-    //caso por defecto
-  ;
+(condición) ? valor -> {
+    // caso: condición == valor
+} : valor2 -> {
+    // caso: condición == valor2
+} : _ -> {
+    // caso por defecto (wildcard)
+} ;
+```
+
+El condicional compara la condición con cada valor usando igualdad (`==`). El caso `_` es el wildcard (siempre ejecuta). Se usan temp variables internamente para re-evaluar la condición en cada caso.
+
+**Ejemplo:**
+
+```
+local n64 x = 5
+(x) ? 5 -> {
+    println("x es 5");
+} : _ -> {
+    println("x no es 5");
+};
+```
+
+**Múltiples casos:**
+
+```
+local 📥 dia = "lunes"
+(dia) ? "lunes" -> {
+    println("Inicio de semana");
+} : "viernes" -> {
+    println("Casi fin de semana");
+} : _ -> {
+    println("Otro día");
+};
 ```
 
 ## Bucles
 
 ```
 (condicion): ⏸️ | ▶️ |:
-  //codigo
+    //codigo
 :|
 ```
 
 - `⏸️` | `||`: ejecuta hasta que la condición sea verdadera (while not)
-- `▶️` | `>`: ejecuta mientras la condición sea verdadera (while)
+- `▶️` | `|>`: ejecuta mientras la condición sea verdadera (while)
 
 ## Manejo de errores
 
 ```
 ↻ {
-  //codigo
+    //codigo
 } 🪤 | /] (error){
-  //manejo del error
+    //manejo del error
 }
 ```
 
@@ -178,6 +293,7 @@ pub var hi = {
 |----------|-------------|
 | `==` | igual |
 | `=` | asignación |
+| `++`, `--` | incremento, decremento |
 | `<`, `>` | menor, mayor |
 | `≤`, `≥` | menor o igual, mayor o igual |
 | `≠` | distinto |
@@ -185,9 +301,9 @@ pub var hi = {
 | `×`, `÷` | multiplicación, división |
 | `√` | raíz cuadrada |
 | `•«`, `»•` | desplazamiento de bits izq/der |
-| `&`, `\|`, `!` | and, or, not lógico |
-| `.&`, `.\|`, `.!` | and, or, not bit a bit |
-| `^` | xor |
+| `&`, `\|` | and, or bit a bit |
+| `.&`, `.\|` | and, or lógico |
+| `!`, `.!` | not lógico, not bit a bit |
 
 ## Funciones nativas
 
@@ -196,7 +312,7 @@ pub var hi = {
 ```
 print(valor, ...)       // imprime sin salto de línea
 println(valor, ...)     // imprime con salto de línea
-scan(@var1, @var2, ...) // lee entrada del usuario (punteros)
+scan()                  // lee una línea de stdin, retorna string
 ```
 
 Soportan múltiples argumentos:
@@ -205,14 +321,26 @@ Soportan múltiples argumentos:
 println("hola mundo");
 println("nota: ", 8.5);
 print("suma: ", 2 + 3);
-scan(@goo, @foo);
+
+local 📥 nombre = ""
+nombre = scan()
+println("Hola ", nombre);
+```
+
+### Arrays
+
+```
+array_len(arr)          // retorna la cantidad de elementos
+array_push(arr, valor)  // agrega un elemento al final del array
 ```
 
 ### Información de tipos
 
 ```
-typeof(valor)   // retorna el tipo del valor como char
+typeof(valor)   // retorna el tipo del valor como string
 ```
+
+Valores posibles: `"num8"`, `"num16"`, `"num32"`, `"num64"`, `"bool"`, `"trit"`, `"char"`, `"pin"`, `"func"`, `"string"`, `"array"`, `"package"`
 
 ### Colores y formato
 
@@ -258,23 +386,41 @@ println("color normal")
 ## Ejemplo completo
 
 ```
-local var entero = •
-local var i = 0
-pub var main = (){
-  entero = 9
-  (i > 50): || |:
-  i++
-  :|
-  ↻{
-    (i ≠ 1000) ?
-      i = "completado"
-    : _ →
-      i = "en progreso"
-    ;
-  } 🪤 (paxo.vartype) {
-    print(i)
-  }
+// Arrays mixtos
+var arr = «1, 2, 3»;
+array_push(arr, 4);
+println("Array: ", arr);
+println("Len: ", array_len(arr));
+
+// Asignación por índice
+arr[0] = 100;
+println("arr[0]=100: ", arr);
+
+// Nested arrays
+var nested = ««1, 2», «3, 4»»;
+println("nested[0]: ", nested[0]);
+
+// Paquetes con dot-access
+var persona = {
+    var nombre = "Paxo";
+    var edad = 25;
 }
+println("nombre: ", persona.nombre);
+
+// Funciones con return
+📥 sumar = (n64 a, n64 b) : n64 {
+    return a + b;
+};
+println("Suma: ", sumar(3, 4));
+
+// Scan + cond
+local 📥 entrada = "";
+entrada = scan();
+(entrada) ? "si" -> {
+    println("Aceptado");
+} : _ -> {
+    println("Rechazado");
+};
 ```
 
 ## Generación de lep.h
@@ -292,6 +438,40 @@ npm run test        # Ejecuta todos los tests
 npm run test:vm     # Tests de la VM
 npm run test:bcg    # Tests del compilador (Go)
 ```
+
+## Changelog reciente
+
+### Paquetes con dot-access (nuevo)
+- `{ var campo = valor; }` crea objetos PACKAGE con campos propios
+- `pkg.campo` accede a campos via notación de punto
+- `typeof(pkg)` retorna `"package"`
+
+### Asignación por índice (nuevo)
+- `arr[i] = expr;` asigna valores en índices específicos
+- Soporta expresiones: `arr[i] = arr[0] + arr[1]`
+
+### Arrays (nuevo)
+- Tipos `«»` para crear arrays con elementos mixtos
+- Acceso por índice: `arr[i]`
+- Nativas: `array_len()`, `array_push()`
+- Soporte para arrays anidados: `««1,2», «3,4»»`
+- Opcodes: `OP_ARRAY_NEW`, `OP_ARRAY_GET`, `OP_ARRAY_SET`
+
+### Return (nuevo)
+- Palabra clave `return` para retornar valores de funciones
+- Funciona dentro de condicionales y bucles anidados
+
+### typeof (corregido)
+- Ahora retorna un string completo (`"num64"`, `"bool"`, etc.) en vez de solo el primer carácter
+
+### scan (nuevo)
+- `scan()` lee una línea de stdin y la retorna como string
+
+### Literales numéricos (corregido)
+- Los literales enteros siempre se empaquetan como num64 para evitar pérdida de precisión del formato base-20
+
+### Dark backgrounds (nuevo)
+- `bg_color()` soporta variantes oscuras: `"dark red"`, `"dark cyan"`, etc.
 
 ## Licencia
 

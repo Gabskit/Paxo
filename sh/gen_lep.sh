@@ -11,9 +11,9 @@ OUT="$ROOT_DIR/Build/lep.h" #se guarda en /Build junto con los binarios de vm y 
 FILES=(
   "$VM_SRC/Calc.c"
   "$VM_SRC/Deque.c"
+  "$VM_SRC/termcolor-c.h"
   "$VM_SRC/Typecast_and_read.c"
   "$VM_SRC/Functions.c"
-  "$VM_SRC/termcolor-c.h"
   "$VM_SRC/Vm.c"
 )
 
@@ -59,7 +59,7 @@ done
   # Types y declaraciones siempre visibles
   for f in "${FILES[@]}"; do
     echo "/* --- $(basename "$f") --- */"
-    sed -E '/^#pragma once$/d; /^[[:space:]]*#include[[:space:]]+"[^"]+"$/d' "$f"
+    sed -E '/^#pragma once$/d; /^[[:space:]]*#include[[:space:]]+"[^"]+"$/d; s/inline /static inline /g; s/static static inline/static inline/g' "$f"
     echo ""
   done
 

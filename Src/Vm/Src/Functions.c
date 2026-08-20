@@ -18,7 +18,8 @@ typedef enum {
   NATIVE_SET_COLOR_BACK,
   NATIVE_RESET_COLOR,
   NATIVE_SCAN,
-  NATIVE_LEN,
+  NATIVE_ARRAY_LEN,
+  NATIVE_ARRAY_PUSH,
   NATIVE_ID_COUNT
 } NativeId;
 
@@ -68,6 +69,32 @@ static PaxoVar native_print(PaxoVar *args, uint8_t argc) {
     case STRING:
       printf("%s", (const char *)val.as.puntero);
       break;
+    case ARRAY: {
+      printf("«");
+      PaxoArray *arr = val.as.array;
+      for (size_t i = 0; i < arr->len; i++) {
+        if (i > 0) printf(", ");
+        PaxoVar elem = arr->items[i];
+        switch (elem.type) {
+        case NUM8: printf("%s", (const char *)readnum8(elem.as.number8, 1)); break;
+        case NUM16: printf("%s", (const char *)readnum16(elem.as.number16, 1)); break;
+        case NUM32: printf("%s", (const char *)readnum32(elem.as.number32, 1)); break;
+        case NUM64: printf("%s", (const char *)readnum64(elem.as.number64, 1)); break;
+        case BOOL: printf("%s", elem.as.truebool ? "true" : "false"); break;
+        case TRIT: printf("%s", (const char *)readtrit(elem.as.bit)); break;
+        case CHAR: printf("'%c'", elem.as.chara); break;
+        case STRING: printf("\"%s\"", (const char *)elem.as.puntero); break;
+        case ARRAY: printf("«...»"); break;
+        case PACKAGE: printf("{...}"); break;
+        default: break;
+        }
+      }
+      printf("»");
+      break;
+    }
+    case PACKAGE:
+      printf("{package}");
+      break;
     default:
       break;
     }
@@ -114,11 +141,20 @@ static PaxoVar native_typeof(PaxoVar *args, uint8_t argc) {
   case FUNC:
     type_name = "func";
     break;
+  case STRING:
+    type_name = "string";
+    break;
+  case ARRAY:
+    type_name = "array";
+    break;
+  case PACKAGE:
+    type_name = "package";
+    break;
   }
 
   PaxoVar result = {0};
-  result.type = CHAR;
-  result.as.chara = type_name[0];
+  result.type = STRING;
+  result.as.puntero = (void *)type_name;
   return result;
 }
 
@@ -197,11 +233,65 @@ static PaxoVar native_set_bg_color(PaxoVar *args, uint8_t argc) {
     background_magenta(stdout);
   } else if (strcmp(color, "white") == 0) {
     background_white(stdout);
-  } else if (strcmp(color, "gray") == 0) {
+  } else if (strcmp(color, "gray") == 0 || strcmp(color, "grey") == 0) {
     background_gray(stdout);
-  } else if (strcmp(color, "grey") == 0) {
-    background_grey(stdout);
+  } else if (strcmp(color, "dark red") == 0) {
+    background_dark_red(stdout);
+  } else if (strcmp(color, "dark green") == 0) {
+    background_dark_green(stdout);
+  } else if (strcmp(color, "dark blue") == 0) {
+    background_dark_blue(stdout);
+  } else if (strcmp(color, "dark yellow") == 0) {
+    background_dark_yellow(stdout);
+  } else if (strcmp(color, "dark cyan") == 0) {
+    background_dark_cyan(stdout);
+  } else if (strcmp(color, "dark magenta") == 0) {
+    background_dark_magenta(stdout);
+  } else if (strcmp(color, "dark white") == 0) {
+    background_dark_white(stdout);
+  } else if (strcmp(color, "dark gray") == 0 || strcmp(color, "dark grey") == 0) {
+    background_dark_gray(stdout);
   }
+  return (PaxoVar){0};
+}
+
+static PaxoVar native_scan(PaxoVar *args, uint8_t argc) {
+  static char buf[1024];
+  if (!fgets(buf, sizeof(buf), stdin)) {
+    buf[0] = '\0';
+  }
+  size_t len = strlen(buf);
+  if (len > 0 && buf[len - 1] == '\n') {
+    buf[len - 1] = '\0';
+  }
+  PaxoVar result = {0};
+  result.type = STRING;
+  result.as.puntero = (void *)buf;
+  return result;
+}
+
+static PaxoVar native_array_len(PaxoVar *args, uint8_t argc) {
+  if (argc < 1 || args[0].type != ARRAY)
+    return (PaxoVar){0};
+  PaxoVar result = {0};
+  result.type = NUM64;
+  size_t len = args[0].as.array->len;
+  result.as.number64.bc = len;
+  result.as.number64.exp = 511;
+  result.as.number64.signo = 0;
+  result.as.number64.p = 0;
+  return result;
+}
+
+static PaxoVar native_array_push(PaxoVar *args, uint8_t argc) {
+  if (argc < 2 || args[0].type != ARRAY)
+    return (PaxoVar){0};
+  PaxoArray *arr = args[0].as.array;
+  if (arr->len >= arr->capacity) {
+    arr->capacity *= 2;
+    arr->items = realloc(arr->items, sizeof(PaxoVar) * arr->capacity);
+  }
+  arr->items[arr->len++] = args[1];
   return (PaxoVar){0};
 }
 
@@ -246,6 +336,12 @@ PaxoVar native_call(uint16_t id, PaxoVar *args, uint8_t argc) {
     return native_set_text_type(args, argc);
   case NATIVE_RESET_COLOR:
     return native_reset_color(args, argc);
+  case NATIVE_SCAN:
+    return native_scan(args, argc);
+  case NATIVE_ARRAY_LEN:
+    return native_array_len(args, argc);
+  case NATIVE_ARRAY_PUSH:
+    return native_array_push(args, argc);
   default:
     break;
   }

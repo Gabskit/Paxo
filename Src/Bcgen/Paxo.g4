@@ -14,6 +14,8 @@ statement
     | condStatement
     | loopStatement
     | tryCatchStatement
+    | throwStatement
+    | returnStatement
     | expression ';'
     | INCLUDE '<' IDENTIFIER ('.' IDENTIFIER)? '>'
     ;
@@ -31,9 +33,10 @@ scope
 	: GLOBAL | LOCAL ;
 
 assignment
-    : IDENTIFIER '=' expression
-    | IDENTIFIER '++'
-    | IDENTIFIER '--'
+    : IDENTIFIER '=' expression ';'
+    | IDENTIFIER '[' expression ']' '=' expression ';'
+    | IDENTIFIER '++' ';'
+    | IDENTIFIER '--' ';'
     ;
 
 condStatement
@@ -62,7 +65,7 @@ tryCatchStatement
     ;
 
 functionDeclaration
-    : '(' parameterList? ')' ':' type block
+    : '(' parameterList? ')' (':' type)? block
     ;
 
 pkgDeclaration
@@ -77,17 +80,26 @@ parameterList
     : type IDENTIFIER (',' type IDENTIFIER)*
     ;
 
+returnStatement
+    : RETURN expression? ';'
+    ;
+
+throwStatement
+    : THROW expression ';'
+    ;
+
 argumentList
     : expression (',' expression)*
     ;
 
 expression
     : IDENTIFIER '(' argumentList? ')' # callExpr
-    | IDENTIFIER '[' expression ']'                         # arrayAccessExpr
+    | expression '[' expression ']'                        # indexedAccessExpr
+    | expression '.' IDENTIFIER                             # dotAccessExpr
     | expression ( '÷' | '×' ) expression       # multDivExpr
     | expression ( '+' | '-' ) expression                   # addSubExpr
     | expression ( '•«' | '»•' ) expression                 # shiftExpr
-    | expression ( '<'|'>'|'≤'|'≥'|'=='|'≠' ) expression   # relationalExpr
+    | expression ( '<'|'>'|'≤'|'<='|'≥'|'>='|'=='|'!='|'≠' ) expression   # relationalExpr
     | expression ( '&' | '|' | '.&' | '.|' ) expression     # bitwiseExpr
     | ( '!' | '.!' ) expression # notgateExpr
     | INT_LITERAL # intLitExpr
@@ -98,7 +110,6 @@ expression
     | BOOLEAN_TRIT # boolTritExpr
 		| POINTER_LITERAL # ptrLitExpr
     | arrayLiteral # arrayLitExpr
-    | arrayAccess # arrayAccExpr
     | IDENTIFIER # identExpr
 		| pkgDeclaration # pkgExpr
 		| functionDeclaration # funcExpr
@@ -106,10 +117,6 @@ expression
 
 arrayLiteral
     : '«' expression (',' expression)* '»'
-    ;
-
-arrayAccess
-    : IDENTIFIER '[' expression ']'
     ;
 
 // ==========================================
@@ -130,6 +137,8 @@ TRY        : '↻' | 'try' ;
 CATCH      : '🪤' | 'catch' | '/]' ;
 ARROW      : '→' | '->';
 INCLUDE    : '+📚' | 'add' ;
+RETURN     : 'return' ;
+THROW      : 'throw' | '⚡' ;
 
 PAUSE_MODE : '⏸️' | 'stop' | '||' ;
 PLAY_MODE  : '▶️' | 'go' | '|>' ;

@@ -45,6 +45,17 @@ const (
 	OP_BIT_SHR       byte = 30
 	OP_INC           byte = 31
 	OP_DEC           byte = 32
+	OP_RETURN        byte = 33
+	OP_CALL_VAR      byte = 34
+	OP_ARRAY_NEW     byte = 35
+	OP_ARRAY_GET     byte = 36
+	OP_ARRAY_SET     byte = 37
+	OP_PKG_NEW       byte = 38
+	OP_PKG_GET       byte = 39
+	OP_PKG_SET       byte = 40
+	OP_TRY_SETUP     byte = 41
+	OP_TRY_END       byte = 42
+	OP_THROW         byte = 43
 )
 
 const (
@@ -56,7 +67,10 @@ const (
 	TYPE_TRIT   byte = 5
 	TYPE_BOOL   byte = 6
 	TYPE_POINT  byte = 7
+	TYPE_FUNC   byte = 8
 	TYPE_STRING byte = 9
+	TYPE_ARRAY  byte = 10
+	TYPE_PKG    byte = 11
 )
 
 const (
@@ -68,17 +82,20 @@ const (
 	NATIVE_SET_COLOR_BACK uint16 = 5
 	NATIVE_RESET_COLOR    uint16 = 6
 	NATIVE_SCAN           uint16 = 7
+	NATIVE_ARRAY_LEN      uint16 = 8
+	NATIVE_ARRAY_PUSH     uint16 = 9
 )
 
 // ==========================================
 // EMITTER
 // ==========================================
 type Emitter struct {
-	code        []byte
-	deferred    bool
-	deferredBuf []byte
-	condStart   int
-	inControl   bool
+	code         []byte
+	deferred     bool
+	deferredBuf  []byte
+	deferredList [][]byte
+	condStart    int
+	inControl    bool
 }
 
 func (e *Emitter) emit(b byte) {
@@ -118,6 +135,12 @@ func (e *Emitter) pushBool(val bool) {
 	}
 }
 func (e *Emitter) pushChar(val uint8) { e.emit(OP_PUSH); e.emit(TYPE_CHAR); e.emit(val) }
+
+func (e *Emitter) pushFunc(offset uint16) {
+	e.emit(OP_PUSH)
+	e.emit(TYPE_FUNC)
+	e.emit16(offset)
+}
 
 func (e *Emitter) pushString(val string) {
 	e.emit(OP_PUSH)
@@ -213,6 +236,23 @@ type CodeGen struct {
 	locals    map[string]uint16
 	nextLocal uint16
 	errors    []string
+
+	inFunction        bool
+	savedCode         []byte
+	funcBodies        [][]byte
+	funcPatchPositions []int
+
+	inCond        bool
+	condCodeStart int
+
+	inPkg     bool
+	pkgFields []string
+
+	inTryCatch       bool
+	tryBlockCount    int
+	tryCatchVarIdx   uint16
+	catchOffsetPatch int
+	tryCatchEndPatch int
 }
 
 func NewCodeGen() *CodeGen {
@@ -247,6 +287,8 @@ func (cg *CodeGen) resolveType(token string) byte {
 		return TYPE_BOOL
 	case "pin":
 		return TYPE_POINT
+	case "func":
+		return TYPE_FUNC
 	}
 	return TYPE_NUM64
 }
@@ -260,6 +302,21 @@ func (cg *CodeGen) walkTree(tree antlr.ParseTree) {
 // ==========================================
 func (cg *CodeGen) ExitProgram(ctx *ProgramContext) {
 	cg.emit(OP_HALT)
+
+	funcStart := len(cg.code)
+	offsets := make([]int, len(cg.funcBodies))
+	running := funcStart
+	for i, body := range cg.funcBodies {
+		offsets[i] = running
+		cg.code = append(cg.code, body...)
+		running += len(body)
+	}
+
+	for i, pos := range cg.funcPatchPositions {
+		offset := uint16(offsets[i])
+		cg.code[pos] = byte(offset)
+		cg.code[pos+1] = byte(offset >> 8)
+	}
 }
 
 // ==========================================
@@ -273,11 +330,20 @@ func (cg *CodeGen) ExitVarDeclaration(ctx *VarDeclarationContext) {
 		varType = cg.resolveType(ctx.Type_().GetStart().GetText())
 	}
 
+	if cg.inPkg {
+		cg.pkgFields = append(cg.pkgFields, name)
+		return
+	}
+
 	idx := cg.nextLocal
 	cg.locals[name] = idx
 	cg.nextLocal++
 
 	if ctx.Expression() != nil {
+		cg.emit(OP_STORE_VAR)
+		cg.emit16(idx)
+	} else if ctx.ArrayLiteral() != nil {
+		cg.emitArrayLiteral(ctx.ArrayLiteral())
 		cg.emit(OP_STORE_VAR)
 		cg.emit16(idx)
 	} else {
@@ -294,6 +360,8 @@ func (cg *CodeGen) ExitVarDeclaration(ctx *VarDeclarationContext) {
 			cg.pushBool(false)
 		case TYPE_CHAR:
 			cg.pushChar(0)
+		case TYPE_FUNC:
+			cg.pushFunc(0)
 		default:
 			cg.pushNum64(0)
 		}
@@ -305,6 +373,20 @@ func (cg *CodeGen) ExitVarDeclaration(ctx *VarDeclarationContext) {
 // ==========================================
 // Assignment
 // ==========================================
+func (cg *CodeGen) EnterAssignment(ctx *AssignmentContext) {
+	exprs := ctx.AllExpression()
+	if len(exprs) == 2 {
+		name := ctx.IDENTIFIER().GetText()
+		idx, ok := cg.locals[name]
+		if !ok {
+			cg.reportError("variable no declarada: " + name)
+			return
+		}
+		cg.emit(OP_LOAD_VAR)
+		cg.emit16(idx)
+	}
+}
+
 func (cg *CodeGen) ExitAssignment(ctx *AssignmentContext) {
 	name := ctx.IDENTIFIER().GetText()
 	idx, ok := cg.locals[name]
@@ -313,11 +395,13 @@ func (cg *CodeGen) ExitAssignment(ctx *AssignmentContext) {
 		return
 	}
 
-	if ctx.Expression() != nil {
+	exprs := ctx.AllExpression()
+	if len(exprs) == 2 {
+		cg.emit(OP_ARRAY_SET)
+	} else if len(exprs) == 1 {
 		cg.emit(OP_STORE_VAR)
 		cg.emit16(idx)
 	} else {
-		// x++ o x--
 		cg.emit(OP_LOAD_VAR)
 		cg.emit16(idx)
 		if childTokText(ctx, 1) == "++" {
@@ -333,39 +417,66 @@ func (cg *CodeGen) ExitAssignment(ctx *AssignmentContext) {
 // ==========================================
 // CondStatement
 // ==========================================
+func (cg *CodeGen) EnterCondStatement(ctx *CondStatementContext) {
+	cg.inCond = true
+	cg.condCodeStart = len(cg.code)
+}
+
 func (cg *CodeGen) ExitCondStatement(ctx *CondStatementContext) {
-	blockCode := cg.deferredBuf
+	cg.inCond = false
+
+	if len(cg.deferredBuf) > 0 {
+		cg.deferredList = append(cg.deferredList, cg.deferredBuf)
+	}
 	cg.deferredBuf = nil
-	condStart := cg.condStart
-	cg.inControl = false
+
+	blocks := cg.deferredList
+	cg.deferredList = nil
 
 	cases := ctx.AllMatchCase()
 	if len(cases) == 0 {
 		return
 	}
 
-	first := cases[0]
-	if childTokText(first, 0) == "_" {
-		cg.emit(OP_POP)
-		cg.code = append(cg.code, blockCode...)
-		return
+	cg.code = cg.code[:cg.condCodeStart]
+
+	condVar := cg.nextLocal
+	cg.nextLocal++
+
+	cg.walkTree(ctx.Expression())
+	cg.emit(OP_STORE_VAR)
+	cg.emit16(condVar)
+
+	var endPatches []int
+
+	for i, mc := range cases {
+		isWildcard := childTokText(mc, 0) == "_"
+
+		if isWildcard {
+			if i < len(blocks) {
+				cg.code = append(cg.code, blocks[i]...)
+			}
+		} else {
+			cg.walkTree(mc.Expression())
+			cg.emit(OP_JUMP_IF_FALSE)
+			skipPatch := cg.pos()
+			cg.emitI16(0)
+			if i < len(blocks) {
+				cg.code = append(cg.code, blocks[i]...)
+			}
+			cg.emit(OP_JUMP)
+			endPatch := cg.pos()
+			cg.emitI16(0)
+			cg.patchI16(skipPatch, int16(cg.pos()-skipPatch-2))
+			endPatches = append(endPatches, endPatch)
+		}
 	}
 
-	cg.walkTree(first.Expression())
-	cg.emit(OP_EQ)
-	cg.emit(OP_JUMP_IF_FALSE)
-	skipPatch := cg.pos()
-	cg.emitI16(0)
-	cg.emit(OP_POP)
-	cg.code = append(cg.code, blockCode...)
-	cg.emit(OP_JUMP)
-	jumpEnd := cg.pos()
-	cg.emitI16(0)
-	cg.patchI16(skipPatch, int16(cg.pos()-skipPatch-2))
+	for _, ep := range endPatches {
+		cg.patchI16(ep, int16(cg.pos()-ep-2))
+	}
 
-	_ = condStart
-	_ = jumpEnd
-	_ = cases
+	cg.nextLocal--
 }
 
 // ==========================================
@@ -409,27 +520,11 @@ func (cg *CodeGen) handleBaseExpression(ctx antlr.ParserRuleContext) {
 	case *IntLitExprContext:
 		text := expr.INT_LITERAL().GetText()
 		val, _ := strconv.ParseInt(text, 10, 64)
-		if val >= 0 && val <= 255 {
-			cg.pushNum8(uint8(val))
-		} else if val >= 0 && val <= 65535 {
-			cg.pushNum16(uint16(val))
-		} else if val >= 0 && val <= 4294967295 {
-			cg.pushNum32(uint32(val))
-		} else {
-			cg.pushNum64(uint64(val))
-		}
+		cg.pushNum64(uint64(val))
 	case *DecLitExprContext:
 		text := expr.DECIMAL_LITERAL().GetText()
 		val, _ := strconv.ParseFloat(text, 64)
-		if val >= 0 && val <= 255 {
-			cg.pushNum8(uint8(int(val)))
-		} else if val >= 0 && val <= 65535 {
-			cg.pushNum16(uint16(int(val)))
-		} else if val >= 0 && val <= 4294967295 {
-			cg.pushNum32(uint32(int(val)))
-		} else {
-			cg.pushNum64(uint64(int(val)))
-		}
+		cg.pushNum64(uint64(int(val)))
 	case *CharLitExprContext:
 		text := expr.CHAR_LITERAL().GetText()
 		if len(text) >= 3 {
@@ -461,6 +556,28 @@ func (cg *CodeGen) handleBaseExpression(ctx antlr.ParserRuleContext) {
 		}
 		cg.emit(OP_LOAD_VAR)
 		cg.emit16(idx)
+	case *PtrLitExprContext:
+		text := expr.POINTER_LITERAL().GetText()
+		name := text[1:] // strip leading '@'
+		idx, ok := cg.locals[name]
+		if !ok {
+			cg.reportError("variable no declarada para puntero: " + name)
+			return
+		}
+		cg.emit(OP_PUSH)
+		cg.emit(TYPE_POINT)
+		ptr := uintptr(idx)
+		for i := 0; i < 8; i++ {
+			cg.emit(byte(ptr >> (i * 8)))
+		}
+	case *ArrayLitExprContext:
+		cg.emitArrayLiteral(expr.ArrayLiteral())
+	case *IndexedAccessExprContext:
+		cg.emit(OP_ARRAY_GET)
+	case *DotAccessExprContext:
+		cg.emitDotAccess(expr)
+	case *PkgExprContext:
+		cg.emitPackage(expr.PkgDeclaration())
 	}
 }
 
@@ -489,15 +606,15 @@ func (cg *CodeGen) ExitRelationalExpr(ctx *RelationalExprContext) {
 	switch childTokText(ctx, 1) {
 	case "==":
 		cg.emit(OP_EQ)
-	case "≠":
+	case "≠", "!=":
 		cg.emit(OP_NEQ)
 	case "<":
 		cg.emit(OP_LT)
 	case ">":
 		cg.emit(OP_GT)
-	case "≤":
+	case "≤", "<=":
 		cg.emit(OP_LTE)
-	case "≥":
+	case "≥", ">=":
 		cg.emit(OP_GTE)
 	}
 }
@@ -574,27 +691,184 @@ func (cg *CodeGen) ExitCallExpr(ctx *CallExprContext) {
 		cg.emit(OP_CALL_NATIVE)
 		cg.emit16(NATIVE_RESET_COLOR)
 		cg.emit(byte(argCount))
+	case "scan":
+		cg.emit(OP_CALL_NATIVE)
+		cg.emit16(NATIVE_SCAN)
+		cg.emit(byte(argCount))
+	case "array_len":
+		cg.emit(OP_CALL_NATIVE)
+		cg.emit16(NATIVE_ARRAY_LEN)
+		cg.emit(byte(argCount))
+	case "array_push":
+		cg.emit(OP_CALL_NATIVE)
+		cg.emit16(NATIVE_ARRAY_PUSH)
+		cg.emit(byte(argCount))
 	default:
-		cg.reportError("función no definida: " + name)
+		idx, ok := cg.locals[name]
+		if !ok {
+			cg.reportError("función no definida: " + name)
+			return
+		}
+		cg.emit(OP_LOAD_VAR)
+		cg.emit16(idx)
+		cg.emit(OP_CALL_VAR)
+		cg.emit(byte(argCount))
 	}
 }
 
 func (cg *CodeGen) EnterBlock(ctx *BlockContext) {
-	if cg.inControl {
+	if cg.inTryCatch {
+		if cg.tryBlockCount == 1 {
+			// Second block (catch): emit OP_TRY_END + STORE_VAR for catch variable
+			cg.emit(OP_TRY_END)
+			cg.tryCatchEndPatch = cg.pos()
+			cg.emitI16(0) // placeholder — end_offset
+			cg.emit(OP_STORE_VAR)
+			cg.emit16(cg.tryCatchVarIdx)
+		}
+		return
+	}
+	if cg.inControl || cg.inCond {
+		if cg.deferred && len(cg.deferredBuf) > 0 {
+			cg.deferredList = append(cg.deferredList, cg.deferredBuf)
+		}
 		cg.deferred = true
 		cg.deferredBuf = make([]byte, 0)
 	}
 }
 
 func (cg *CodeGen) ExitBlock(ctx *BlockContext) {
+	if cg.inTryCatch {
+		cg.tryBlockCount++
+		return
+	}
 	if cg.deferred {
+		if cg.inCond {
+			cg.deferredList = append(cg.deferredList, cg.deferredBuf)
+			cg.deferredBuf = nil
+		}
 		cg.deferred = false
 	}
 }
 func (cg *CodeGen) ExitMatchCase(ctx *MatchCaseContext) {}
 
 // ==========================================
-// Compile
+// ReturnStatement
+// ==========================================
+func (cg *CodeGen) ExitReturnStatement(ctx *ReturnStatementContext) {
+	cg.emit(OP_RETURN)
+}
+
+// ==========================================
+// TryCatchStatement
+// ==========================================
+func (cg *CodeGen) EnterTryCatchStatement(ctx *TryCatchStatementContext) {
+	catchVarName := ctx.AllIDENTIFIER()[0].GetText()
+	idx := cg.nextLocal
+	cg.nextLocal++
+	cg.tryCatchVarIdx = idx
+	cg.locals[catchVarName] = idx
+
+	cg.inTryCatch = true
+	cg.tryBlockCount = 0
+
+	cg.emit(OP_TRY_SETUP)
+	cg.catchOffsetPatch = cg.pos()
+	cg.emitI16(0) // placeholder — catch_offset
+}
+
+func (cg *CodeGen) ExitTryCatchStatement(ctx *TryCatchStatementContext) {
+	// Patch catch_offset to point to STORE_VAR (right after OP_TRY_END operand)
+	catchTarget := cg.tryCatchEndPatch + 2
+	cg.patchI16(cg.catchOffsetPatch, int16(catchTarget-cg.catchOffsetPatch-2))
+
+	// Patch end_offset to jump past catch block
+	cg.patchI16(cg.tryCatchEndPatch, int16(cg.pos()-cg.tryCatchEndPatch-2))
+
+	cg.inTryCatch = false
+	cg.tryBlockCount = 0
+}
+
+// ==========================================
+// ThrowStatement
+// ==========================================
+func (cg *CodeGen) ExitThrowStatement(ctx *ThrowStatementContext) {
+	cg.emit(OP_THROW)
+}
+
+// ==========================================
+// FuncExpr
+// ==========================================
+func (cg *CodeGen) EnterFuncExpr(ctx *FuncExprContext) {
+	cg.savedCode = cg.code
+	cg.code = make([]byte, 0)
+	cg.inFunction = true
+}
+
+func (cg *CodeGen) ExitFuncExpr(ctx *FuncExprContext) {
+	cg.emit(OP_RETURN)
+
+	funcBody := cg.code
+	cg.funcBodies = append(cg.funcBodies, funcBody)
+
+	cg.code = cg.savedCode
+	cg.inFunction = false
+
+	cg.emit(OP_PUSH)
+	cg.emit(TYPE_FUNC)
+	cg.funcPatchPositions = append(cg.funcPatchPositions, len(cg.code))
+	cg.emit16(0)
+}
+
+// ==========================================
+// Array Literals
+// ==========================================
+func (cg *CodeGen) emitArrayLiteral(ctx IArrayLiteralContext) {
+	exprs := ctx.AllExpression()
+	count := uint16(len(exprs))
+	cg.emit(OP_ARRAY_NEW)
+	cg.emit16(count)
+}
+
+// ==========================================
+// Dot Access (pkg.field) — expression already on stack from walker
+// ==========================================
+func (cg *CodeGen) emitDotAccess(ctx *DotAccessExprContext) {
+	fieldName := ctx.IDENTIFIER().GetText()
+	cg.emit(OP_PKG_GET)
+	cg.emit16(uint16(len(fieldName)))
+	for _, b := range []byte(fieldName) {
+		cg.emit(b)
+	}
+}
+
+// ==========================================
+// Package Declaration
+// ==========================================
+func (cg *CodeGen) EnterPkgExpr(ctx *PkgExprContext) {
+	cg.inPkg = true
+	cg.pkgFields = nil
+}
+
+func (cg *CodeGen) emitPackage(ctx IPkgDeclarationContext) {
+	cg.inPkg = false
+	fields := cg.pkgFields
+	cg.pkgFields = nil
+
+	count := uint16(len(fields))
+	cg.emit(OP_PKG_NEW)
+	cg.emit16(count)
+	for i := len(fields) - 1; i >= 0; i-- {
+		name := fields[i]
+		cg.emit16(uint16(len(name)))
+		for _, b := range []byte(name) {
+			cg.emit(b)
+		}
+	}
+}
+
+// ==========================================
+// Array native functions (len, push)
 // ==========================================
 func Compile(inputFile, outputFile string, dump bool) error {
 	input, err := antlr.NewFileStream(inputFile)

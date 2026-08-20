@@ -20,7 +20,7 @@ typedef unsigned char char8_t;
 // ==========================================
 
 // --- 8 BITS A OTROS ---
-Num16 num8tonum16(Num8 num) {
+inline Num16 num8tonum16(Num8 num) {
   Num16 result;
   result.signo = num.signo;
   result.exp = num.exp + 1;          // 1 - 0
@@ -29,7 +29,7 @@ Num16 num8tonum16(Num8 num) {
   return result;
 }
 
-Num32 num8tonum32(Num8 num) {
+inline Num32 num8tonum32(Num8 num) {
   Num32 result;
   result.signo = num.signo;
   result.exp = num.exp + 15;          // 15 - 0
@@ -38,7 +38,7 @@ Num32 num8tonum32(Num8 num) {
   return result;
 }
 
-Num64 num8tonum64(Num8 num) {
+inline Num64 num8tonum64(Num8 num) {
   Num64 result;
   result.signo = num.signo;
   result.exp = num.exp + 511;         // 511 - 0
@@ -48,7 +48,7 @@ Num64 num8tonum64(Num8 num) {
 }
 
 // --- 16 BITS A OTROS ---
-Num8 num16tonum8(Num16 num) {
+inline Num8 num16tonum8(Num16 num) {
   Num8 result;
   result.signo = num.signo;
   int new_exp = (int)num.exp - 1; // 0 - 1
@@ -58,7 +58,7 @@ Num8 num16tonum8(Num16 num) {
   return result;
 }
 
-Num32 num16tonum32(Num16 num) {
+inline Num32 num16tonum32(Num16 num) {
   Num32 result;
   result.signo = num.signo;
   result.exp = num.exp + 14;          // 15 - 1
@@ -67,7 +67,7 @@ Num32 num16tonum32(Num16 num) {
   return result;
 }
 
-Num64 num16tonum64(Num16 num) {
+inline Num64 num16tonum64(Num16 num) {
   Num64 result;
   result.signo = num.signo;
   result.exp = num.exp + 510;         // 511 - 1
@@ -77,7 +77,7 @@ Num64 num16tonum64(Num16 num) {
 }
 
 // --- 32 BITS A OTROS ---
-Num8 num32tonum8(Num32 num) {
+inline Num8 num32tonum8(Num32 num) {
   Num8 result;
   result.signo = num.signo;
   int new_exp = (int)num.exp - 15; // 0 - 15
@@ -87,7 +87,7 @@ Num8 num32tonum8(Num32 num) {
   return result;
 }
 
-Num16 num32tonum16(Num32 num) {
+inline Num16 num32tonum16(Num32 num) {
   Num16 result;
   result.signo = num.signo;
   int new_exp = (int)num.exp - 14; // 1 - 15
@@ -97,7 +97,7 @@ Num16 num32tonum16(Num32 num) {
   return result;
 }
 
-Num64 num32tonum64(Num32 num) {
+inline Num64 num32tonum64(Num32 num) {
   Num64 result;
   result.signo = num.signo;
   int new_exp = (int)num.exp + 496; // 511 - 15
@@ -108,7 +108,7 @@ Num64 num32tonum64(Num32 num) {
 }
 
 // --- 64 BITS A OTROS ---
-Num8 num64tonum8(Num64 num) {
+inline Num8 num64tonum8(Num64 num) {
   Num8 result;
   result.signo = num.signo;
   int new_exp = (int)num.exp - 511; // 0 - 511
@@ -118,7 +118,7 @@ Num8 num64tonum8(Num64 num) {
   return result;
 }
 
-Num16 num64tonum16(Num64 num) {
+inline Num16 num64tonum16(Num64 num) {
   Num16 result;
   result.signo = num.signo;
   int new_exp = (int)num.exp - 510; // 1 - 511
@@ -128,7 +128,7 @@ Num16 num64tonum16(Num64 num) {
   return result;
 }
 
-Num32 num64tonum32(Num64 num) {
+inline Num32 num64tonum32(Num64 num) {
   Num32 result;
   result.signo = num.signo;
   int new_exp = (int)num.exp - 496; // 15 - 511
@@ -139,80 +139,80 @@ Num32 num64tonum32(Num64 num) {
 }
 
 // --- CONVERSIÓN CON TRIT / BOOL ---
-Num8 trittonum8(PaxoBool trit) {
+inline Num8 trittonum8(PaxoBool trit) {
   Num8 result = {0};
   result.exp = 0; // Bias 0 = 20^0
   result.bc = (uint8_t)trit;
   return result;
 }
 
-Num16 trittonum16(PaxoBool trit) {
+inline Num16 trittonum16(PaxoBool trit) {
   Num16 result = {0};
   result.exp = 1; // Bias 1 = 20^0
   result.bc = (uint16_t)trit;
   return result;
 }
 
-Num32 trittonum32(PaxoBool trit) {
+inline Num32 trittonum32(PaxoBool trit) {
   Num32 result = {0};
   result.exp = 15; // Bias 15 = 20^0
   result.bc = (uint32_t)trit;
   return result;
 }
 
-Num64 trittonum64(PaxoBool trit) {
+inline Num64 trittonum64(PaxoBool trit) {
   Num64 result = {0};
   result.exp = 511; // Bias 511 = 20^0
   result.bc = (uint64_t)trit;
   return result;
 }
 
-PaxoBool num8totrit(Num8 num) { return (num.bc < 3) ? (PaxoBool)num.bc : 0; }
-PaxoBool num16totrit(Num16 num) { return (num.bc < 3) ? (PaxoBool)num.bc : 0; }
-PaxoBool num32totrit(Num32 num) { return (num.bc < 3) ? (PaxoBool)num.bc : 0; }
-PaxoBool num64totrit(Num64 num) { return (num.bc < 3) ? (PaxoBool)num.bc : 0; }
+inline PaxoBool num8totrit(Num8 num) { return (num.bc < 3) ? (PaxoBool)num.bc : 0; }
+inline PaxoBool num16totrit(Num16 num) { return (num.bc < 3) ? (PaxoBool)num.bc : 0; }
+inline PaxoBool num32totrit(Num32 num) { return (num.bc < 3) ? (PaxoBool)num.bc : 0; }
+inline PaxoBool num64totrit(Num64 num) { return (num.bc < 3) ? (PaxoBool)num.bc : 0; }
 
-Num8 booltonum8(bool bit) {
+inline Num8 booltonum8(bool bit) {
   Num8 result = {0};
   result.exp = 0;
   result.bc = bit ? 1 : 0;
   return result;
 }
 
-Num16 booltonum16(bool bit) {
+inline Num16 booltonum16(bool bit) {
   Num16 result = {0};
   result.exp = 1;
   result.bc = bit ? 1 : 0;
   return result;
 }
 
-Num32 booltonum32(bool bit) {
+inline Num32 booltonum32(bool bit) {
   Num32 result = {0};
   result.exp = 15;
   result.bc = bit ? 1 : 0;
   return result;
 }
 
-Num64 booltonum64(bool bit) {
+inline Num64 booltonum64(bool bit) {
   Num64 result = {0};
   result.exp = 511;
   result.bc = bit ? 1 : 0;
   return result;
 }
 
-bool num8tobool(Num8 num) { return (num.bc != 0); }
-bool num16tobool(Num16 num) { return (num.bc != 0); }
-bool num32tobool(Num32 num) { return (num.bc != 0); }
-bool num64tobool(Num64 num) { return (num.bc != 0); }
+inline bool num8tobool(Num8 num) { return (num.bc != 0); }
+inline bool num16tobool(Num16 num) { return (num.bc != 0); }
+inline bool num32tobool(Num32 num) { return (num.bc != 0); }
+inline bool num64tobool(Num64 num) { return (num.bc != 0); }
 
-PaxoBool booltotrit(bool bit) { return bit ? 1 : 0; }
-bool trittobool(PaxoBool trit) { return (trit == 1); }
+inline PaxoBool booltotrit(bool bit) { return bit ? 1 : 0; }
+inline bool trittobool(PaxoBool trit) { return (trit == 1); }
 
 // ==========================================
 // LECTURA / FORMATEO DE CADENAS
 // ==========================================
 
-const char8_t *readtrit(PaxoBool trit) {
+inline const char8_t *readtrit(PaxoBool trit) {
   if (trit == 0)
     return u8"×";
   if (trit == 1)
@@ -220,9 +220,9 @@ const char8_t *readtrit(PaxoBool trit) {
   return u8"✓";
 }
 
-const char8_t *readbool(bool bit) { return bit ? u8"true" : u8"false"; }
+inline const char8_t *readbool(bool bit) { return bit ? u8"true" : u8"false"; }
 
-const char8_t *readnum8(Num8 num, PaxoBool rep) {
+inline const char8_t *readnum8(Num8 num, PaxoBool rep) {
   static char8_t buffer[64];
   int exp_real = (int)num.exp - 0; // Bias = 0
 
@@ -241,7 +241,7 @@ const char8_t *readnum8(Num8 num, PaxoBool rep) {
   return buffer;
 }
 
-const char8_t *readnum16(Num16 num, PaxoBool rep) {
+inline const char8_t *readnum16(Num16 num, PaxoBool rep) {
   static char8_t buffer[128];
   int exp_real = (int)num.exp - 1; // Bias = 1
 
@@ -260,7 +260,7 @@ const char8_t *readnum16(Num16 num, PaxoBool rep) {
   return buffer;
 }
 
-const char8_t *readnum32(Num32 num, PaxoBool rep) {
+inline const char8_t *readnum32(Num32 num, PaxoBool rep) {
   static char8_t buffer[128];
   int exp_real = (int)num.exp - 15; // Bias = 15
 
@@ -279,7 +279,7 @@ const char8_t *readnum32(Num32 num, PaxoBool rep) {
   return buffer;
 }
 
-const char8_t *readnum64(Num64 num, PaxoBool rep) {
+inline const char8_t *readnum64(Num64 num, PaxoBool rep) {
   static char8_t buffer[128];
   int exp_real = (int)num.exp - 511; // Bias = 511
 

@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #define MAX_FRAMES 128
+#define MAX_TRY_FRAMES 64
 
 typedef struct {
   size_t return_ip;
@@ -16,11 +17,19 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
+  size_t catch_ip;
+  size_t stack_size;
+  size_t frame_count;
+} TryFrame;
+
+typedef struct {
   const uint8_t *bytecode;
   size_t bytecode_size;
   size_t ip;
   CallFrame frames[MAX_FRAMES];
   size_t frame_count;
+  TryFrame try_frames[MAX_TRY_FRAMES];
+  size_t try_frame_count;
 } VM;
 
 typedef enum {
@@ -61,6 +70,20 @@ typedef enum {
   // --- Incremento/Decremento ---
   OP_INC,
   OP_DEC,
+  OP_RETURN,
+  OP_CALL_VAR,
+  // --- Arrays ---
+  OP_ARRAY_NEW,  // [uint16_t count] — pops count elements, pushes ARRAY
+  OP_ARRAY_GET,  // pops index (NUM64) + array, pushes element
+  OP_ARRAY_SET,  // pops value + index (NUM64) + array, sets element
+  // --- Packages ---
+  OP_PKG_NEW,    // [uint16_t field_count] — pops field_count name/value pairs, pushes PACKAGE
+  OP_PKG_GET,    // [uint16_t name_len] [chars...] — pops package, pushes field value
+  OP_PKG_SET,    // [uint16_t name_len] [chars...] — pops value + package, sets field
+  // --- Try/Catch ---
+  OP_TRY_SETUP,  // [int16_t catch_offset] — pushes try frame, catch target = ip + catch_offset
+  OP_TRY_END,    // pops try frame, jumps past catch block
+  OP_THROW,      // pops error value, unwinds to nearest catch handler
 } PaxoOpcode;
 
 void vm_init(VM *vm, const uint8_t *bytecode, size_t bytecode_size) {
@@ -136,6 +159,12 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         uint16_t len = read_u16(vm);
         val.as.puntero = (void *)(vm->bytecode + vm->ip);
         vm->ip += len + 1;
+        break;
+      }
+      case FUNC: {
+        uint16_t offset = read_u16(vm);
+        val.as.func.func_id = offset;
+        val.as.func.closure_env = NULL;
         break;
       }
       default:
@@ -481,6 +510,225 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       break;
     }
 
+    case OP_RETURN: {
+      if (vm->frame_count == 0) {
+        running = false;
+        break;
+      }
+      vm->ip = vm->frames[--vm->frame_count].return_ip;
+      break;
+    }
+
+    case OP_CALL_VAR: {
+      uint8_t argc = vm->bytecode[vm->ip++];
+      PaxoVar func_val = deque_pop_back(stack);
+      for (int i = 0; i < argc; i++)
+        deque_pop_back(stack);
+      if (func_val.type != FUNC) {
+        vm_error(vm, "se esperaba una función");
+        running = false;
+        break;
+      }
+      vm->frames[vm->frame_count++] = (CallFrame){.return_ip = vm->ip};
+      vm->ip = func_val.as.func.func_id;
+      break;
+    }
+
+    // ==========================================
+    // ARRAYS
+    // ==========================================
+    case OP_ARRAY_NEW: {
+      uint16_t count = read_u16(vm);
+      PaxoArray *arr = malloc(sizeof(PaxoArray));
+      arr->len = count;
+      arr->capacity = count > 0 ? count : 4;
+      arr->items = malloc(sizeof(PaxoVar) * arr->capacity);
+      for (int i = count - 1; i >= 0; i--)
+        arr->items[i] = deque_pop_back(stack);
+      PaxoVar val = {0};
+      val.type = ARRAY;
+      val.as.array = arr;
+      deque_push_back(stack, val);
+      break;
+    }
+
+    case OP_ARRAY_GET: {
+      PaxoVar idx_val = deque_pop_back(stack);
+      PaxoVar arr_val = deque_pop_back(stack);
+      if (arr_val.type != ARRAY) {
+        vm_error(vm, "se esperaba un array");
+        running = false;
+        break;
+      }
+      size_t idx = 0;
+      if (idx_val.type == NUM8) {
+        idx = idx_val.as.number8.bc;
+      } else if (idx_val.type == NUM16) {
+        idx = idx_val.as.number16.bc;
+      } else if (idx_val.type == NUM32) {
+        idx = idx_val.as.number32.bc;
+      } else if (idx_val.type == NUM64) {
+        idx = idx_val.as.number64.bc;
+      }
+      if (idx >= arr_val.as.array->len) {
+        vm_error(vm, "índice fuera de rango");
+        running = false;
+        break;
+      }
+      deque_push_back(stack, arr_val.as.array->items[idx]);
+      break;
+    }
+
+    case OP_ARRAY_SET: {
+      PaxoVar value = deque_pop_back(stack);
+      PaxoVar idx_val = deque_pop_back(stack);
+      PaxoVar arr_val = deque_pop_back(stack);
+      if (arr_val.type != ARRAY) {
+        vm_error(vm, "se esperaba un array");
+        running = false;
+        break;
+      }
+      size_t idx = 0;
+      if (idx_val.type == NUM8) {
+        idx = idx_val.as.number8.bc;
+      } else if (idx_val.type == NUM16) {
+        idx = idx_val.as.number16.bc;
+      } else if (idx_val.type == NUM32) {
+        idx = idx_val.as.number32.bc;
+      } else if (idx_val.type == NUM64) {
+        idx = idx_val.as.number64.bc;
+      }
+      if (idx >= arr_val.as.array->len) {
+        vm_error(vm, "índice fuera de rango");
+        running = false;
+        break;
+      }
+      arr_val.as.array->items[idx] = value;
+      break;
+    }
+
+    // ==========================================
+    // PACKAGES
+    // ==========================================
+    case OP_PKG_NEW: {
+      uint16_t field_count = read_u16(vm);
+      PaxoPackageField *head = NULL;
+      for (uint16_t i = 0; i < field_count; i++) {
+        PaxoVar val = deque_pop_back(stack);
+        uint16_t name_len = read_u16(vm);
+        char *name = malloc(name_len + 1);
+        memcpy(name, vm->bytecode + vm->ip, name_len);
+        name[name_len] = '\0';
+        vm->ip += name_len;
+        PaxoPackageField *field = malloc(sizeof(PaxoPackageField));
+        field->key = name;
+        field->value = malloc(sizeof(PaxoVar));
+        *field->value = val;
+        field->next = head;
+        head = field;
+      }
+      PaxoVar val = {0};
+      val.type = PACKAGE;
+      val.as.pkg = head;
+      deque_push_back(stack, val);
+      break;
+    }
+
+    case OP_PKG_GET: {
+      uint16_t name_len = read_u16(vm);
+      char name[256];
+      memcpy(name, vm->bytecode + vm->ip, name_len);
+      name[name_len] = '\0';
+      vm->ip += name_len;
+      PaxoVar pkg_val = deque_pop_back(stack);
+      if (pkg_val.type != PACKAGE) {
+        vm_error(vm, "se esperaba un package");
+        running = false;
+        break;
+      }
+      PaxoPackageField *f = pkg_val.as.pkg;
+      bool found = false;
+      while (f) {
+        if (strcmp(f->key, name) == 0) {
+          deque_push_back(stack, *f->value);
+          found = true;
+          break;
+        }
+        f = f->next;
+      }
+      if (!found) {
+        vm_error(vm, "campo no encontrado");
+        running = false;
+        break;
+      }
+      break;
+    }
+
+    case OP_PKG_SET: {
+      uint16_t name_len = read_u16(vm);
+      char name[256];
+      memcpy(name, vm->bytecode + vm->ip, name_len);
+      name[name_len] = '\0';
+      vm->ip += name_len;
+      PaxoVar value = deque_pop_back(stack);
+      PaxoVar pkg_val = deque_pop_back(stack);
+      if (pkg_val.type != PACKAGE) {
+        vm_error(vm, "se esperaba un package");
+        running = false;
+        break;
+      }
+      PaxoPackageField *f = pkg_val.as.pkg;
+      while (f) {
+        if (strcmp(f->key, name) == 0) {
+          *f->value = value;
+          break;
+        }
+        f = f->next;
+      }
+      break;
+    }
+
+    // ==========================================
+    // TRY / CATCH / THROW
+    // ==========================================
+    case OP_TRY_SETUP: {
+      int16_t catch_offset = read_i16(vm);
+      if (vm->try_frame_count >= MAX_TRY_FRAMES) {
+        vm_error(vm, "demasiados try/catch anidados");
+        running = false;
+        break;
+      }
+      TryFrame *tf = &vm->try_frames[vm->try_frame_count++];
+      tf->catch_ip = vm->ip + catch_offset;
+      tf->stack_size = deque_size(stack);
+      tf->frame_count = vm->frame_count;
+      break;
+    }
+
+    case OP_TRY_END: {
+      int16_t end_offset = read_i16(vm);
+      if (vm->try_frame_count > 0)
+        vm->try_frame_count--;
+      vm->ip += end_offset;
+      break;
+    }
+
+    case OP_THROW: {
+      PaxoVar error_val = deque_pop_back(stack);
+      if (vm->try_frame_count == 0) {
+        vm_error(vm, "throw sin try/catch");
+        running = false;
+        break;
+      }
+      TryFrame *tf = &vm->try_frames[--vm->try_frame_count];
+      while (deque_size(stack) > tf->stack_size)
+        deque_pop_back(stack);
+      vm->frame_count = tf->frame_count;
+      deque_push_back(stack, error_val);
+      vm->ip = tf->catch_ip;
+      break;
+    }
+
     case OP_JUMP_IF_TRUE: {
       int16_t offset = read_i16(vm);
       PaxoVar condition = deque_pop_back(stack);
@@ -550,6 +798,9 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
           break;
         case POINT:
           res.as.truebool = (a.as.puntero == b.as.puntero);
+          break;
+        case STRING:
+          res.as.truebool = (strcmp((const char *)a.as.puntero, (const char *)b.as.puntero) == 0);
           break;
         default:
           res.as.truebool = false;
