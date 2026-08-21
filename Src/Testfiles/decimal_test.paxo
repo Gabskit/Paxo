@@ -1,0 +1,17 @@
+local n a = 0.1
+local n b = 0.2
+local n c = a + b
+println(c);
+
+local n d = 0.3
+local n e = 0.3
+local n f = d + e
+println(f);
+
+local n g = 1.5
+local n h = 2.5
+local n i = g + h
+println(i);
+
+local n j = 100.0
+println(j);

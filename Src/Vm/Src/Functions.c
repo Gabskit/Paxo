@@ -35,18 +35,8 @@ static PaxoVar native_print(PaxoVar *args, uint8_t argc) {
     PaxoVar val = args[i];
 
     switch (val.type) {
-    case NUM8: {
-      const char *s = (const char *)readnum8(val.as.number8, 1);
-      printf("%s", s);
-      break;
-    }
     case NUM16: {
       const char *s = (const char *)readnum16(val.as.number16, 1);
-      printf("%s", s);
-      break;
-    }
-    case NUM32: {
-      const char *s = (const char *)readnum32(val.as.number32, 1);
       printf("%s", s);
       break;
     }
@@ -73,20 +63,36 @@ static PaxoVar native_print(PaxoVar *args, uint8_t argc) {
       printf("«");
       PaxoArray *arr = val.as.array;
       for (size_t i = 0; i < arr->len; i++) {
-        if (i > 0) printf(", ");
+        if (i > 0)
+          printf(", ");
         PaxoVar elem = arr->items[i];
         switch (elem.type) {
-        case NUM8: printf("%s", (const char *)readnum8(elem.as.number8, 1)); break;
-        case NUM16: printf("%s", (const char *)readnum16(elem.as.number16, 1)); break;
-        case NUM32: printf("%s", (const char *)readnum32(elem.as.number32, 1)); break;
-        case NUM64: printf("%s", (const char *)readnum64(elem.as.number64, 1)); break;
-        case BOOL: printf("%s", elem.as.truebool ? "true" : "false"); break;
-        case TRIT: printf("%s", (const char *)readtrit(elem.as.bit)); break;
-        case CHAR: printf("'%c'", elem.as.chara); break;
-        case STRING: printf("\"%s\"", (const char *)elem.as.puntero); break;
-        case ARRAY: printf("«...»"); break;
-        case PACKAGE: printf("{...}"); break;
-        default: break;
+        case NUM16:
+          printf("%s", (const char *)readnum16(elem.as.number16, 1));
+          break;
+        case NUM64:
+          printf("%s", (const char *)readnum64(elem.as.number64, 1));
+          break;
+        case BOOL:
+          printf("%s", elem.as.truebool ? "true" : "false");
+          break;
+        case TRIT:
+          printf("%s", (const char *)readtrit(elem.as.bit));
+          break;
+        case CHAR:
+          printf("'%c'", elem.as.chara);
+          break;
+        case STRING:
+          printf("\"%s\"", (const char *)elem.as.puntero);
+          break;
+        case ARRAY:
+          printf("«...»");
+          break;
+        case PACKAGE:
+          printf("{...}");
+          break;
+        default:
+          break;
         }
       }
       printf("»");
@@ -114,14 +120,8 @@ static PaxoVar native_typeof(PaxoVar *args, uint8_t argc) {
     return (PaxoVar){0};
   const char *type_name = "unknown";
   switch (args[0].type) {
-  case NUM8:
-    type_name = "num8";
-    break;
   case NUM16:
     type_name = "num16";
-    break;
-  case NUM32:
-    type_name = "num32";
     break;
   case NUM64:
     type_name = "num64";
@@ -249,7 +249,8 @@ static PaxoVar native_set_bg_color(PaxoVar *args, uint8_t argc) {
     background_dark_magenta(stdout);
   } else if (strcmp(color, "dark white") == 0) {
     background_dark_white(stdout);
-  } else if (strcmp(color, "dark gray") == 0 || strcmp(color, "dark grey") == 0) {
+  } else if (strcmp(color, "dark gray") == 0 ||
+             strcmp(color, "dark grey") == 0) {
     background_dark_gray(stdout);
   }
   return (PaxoVar){0};

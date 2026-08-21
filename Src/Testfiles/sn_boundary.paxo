@@ -1,0 +1,9 @@
+local sn i = 1020
+println(i);i = i + 1
+println(i);i = i + 1
+println(i);i = i + 1
+println(i);i = i + 1
+println(i);i = i + 1
+println(i);i = i + 1
+println(i);i = i + 1
+println(i)

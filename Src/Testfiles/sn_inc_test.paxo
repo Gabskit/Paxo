@@ -1,0 +1,5 @@
+local sn i = 0
+(i <= 1100) : |> |:{
+	println(i);
+	i = i + 1
+}:|

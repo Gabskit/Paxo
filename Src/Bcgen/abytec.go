@@ -56,21 +56,21 @@ const (
 	OP_TRY_SETUP     byte = 41
 	OP_TRY_END       byte = 42
 	OP_THROW         byte = 43
+	OP_STORE_LOCAL   byte = 44
+	OP_LOAD_LOCAL    byte = 45
 )
 
 const (
-	TYPE_NUM8   byte = 0
-	TYPE_NUM16  byte = 1
-	TYPE_NUM32  byte = 2
-	TYPE_NUM64  byte = 3
-	TYPE_CHAR   byte = 4
-	TYPE_TRIT   byte = 5
-	TYPE_BOOL   byte = 6
-	TYPE_POINT  byte = 7
-	TYPE_FUNC   byte = 8
-	TYPE_STRING byte = 9
-	TYPE_ARRAY  byte = 10
-	TYPE_PKG    byte = 11
+	TYPE_NUM16  byte = 0
+	TYPE_NUM64  byte = 1
+	TYPE_CHAR   byte = 2
+	TYPE_TRIT   byte = 3
+	TYPE_BOOL   byte = 4
+	TYPE_POINT  byte = 5
+	TYPE_FUNC   byte = 6
+	TYPE_STRING byte = 7
+	TYPE_ARRAY  byte = 8
+	TYPE_PKG    byte = 9
 )
 
 const (
@@ -113,18 +113,6 @@ func (e *Emitter) patchI16(off int, val int16) {
 }
 func (e *Emitter) pos() int { return len(e.code) }
 
-func (e *Emitter) pushNum8(val uint8) {
-	e.emit(OP_PUSH)
-	e.emit(TYPE_NUM8)
-	var signo, exp, bc, p uint8
-	bc = val
-	for bc > 15 {
-		bc /= 20
-		exp++
-	}
-	e.emit((p << 6) | (bc << 2) | (exp << 1) | signo)
-}
-
 func (e *Emitter) pushBool(val bool) {
 	e.emit(OP_PUSH)
 	e.emit(TYPE_BOOL)
@@ -136,10 +124,11 @@ func (e *Emitter) pushBool(val bool) {
 }
 func (e *Emitter) pushChar(val uint8) { e.emit(OP_PUSH); e.emit(TYPE_CHAR); e.emit(val) }
 
-func (e *Emitter) pushFunc(offset uint16) {
+func (e *Emitter) pushFunc(offset uint16, paramCount uint8) {
 	e.emit(OP_PUSH)
 	e.emit(TYPE_FUNC)
 	e.emit16(offset)
+	e.emit(paramCount)
 }
 
 func (e *Emitter) pushString(val string) {
@@ -156,11 +145,12 @@ func (e *Emitter) pushString(val string) {
 func (e *Emitter) pushNum16(val uint16) {
 	e.emit(OP_PUSH)
 	e.emit(TYPE_NUM16)
-	var signo, p uint16
+	var p uint16
+	var signo uint16
 	exp := uint16(1) // bias de Num16 = 1
 	bc := val
 	for bc > 1023 {
-		bc /= 20
+		bc /= 10
 		exp++
 	}
 	raw := (p << 13) | (bc << 3) | (exp << 1) | signo
@@ -168,34 +158,96 @@ func (e *Emitter) pushNum16(val uint16) {
 	e.emit(byte(raw >> 8))
 }
 
-func (e *Emitter) pushNum32(val uint32) {
+func (e *Emitter) pushNum16Signed(val int64) {
 	e.emit(OP_PUSH)
-	e.emit(TYPE_NUM32)
-	var signo, p uint32
-	exp := uint32(15) // bias de Num32 = 15
-	bc := val
-	for bc > 4194303 {
-		bc /= 20
+	e.emit(TYPE_NUM16)
+	var p uint16
+	signo := uint16(0)
+	if val < 0 {
+		signo = 1
+		val = -val
+	}
+	exp := uint16(1) // bias de Num16 = 1
+	bc := uint16(val)
+	for bc > 1023 {
+		bc /= 10
 		exp++
 	}
-	raw := (p << 28) | (bc << 6) | (exp << 1) | signo
+	raw := (p << 13) | (bc << 3) | (exp << 1) | signo
 	e.emit(byte(raw))
 	e.emit(byte(raw >> 8))
-	e.emit(byte(raw >> 16))
-	e.emit(byte(raw >> 24))
 }
 
 func (e *Emitter) pushNum64(val uint64) {
 	e.emit(OP_PUSH)
 	e.emit(TYPE_NUM64)
-	var signo, p uint64
+	var p uint64
+	var signo uint64
 	exp := uint64(511) // bias de Num64 = 511
 	bc := val
 	for bc > 281474976710655 {
-		bc /= 20
+		bc /= 10
 		exp++
 	}
 	raw := (p << 59) | (bc << 11) | (exp << 1) | signo
+	e.emit(byte(raw))
+	e.emit(byte(raw >> 8))
+	e.emit(byte(raw >> 16))
+	e.emit(byte(raw >> 24))
+	e.emit(byte(raw >> 32))
+	e.emit(byte(raw >> 40))
+	e.emit(byte(raw >> 48))
+	e.emit(byte(raw >> 56))
+}
+
+func (e *Emitter) pushNum64Signed(val int64) {
+	e.emit(OP_PUSH)
+	e.emit(TYPE_NUM64)
+	var p uint64
+	signo := uint64(0)
+	if val < 0 {
+		signo = 1
+		val = -val
+	}
+	exp := uint64(511) // bias de Num64 = 511
+	bc := uint64(val)
+	for bc > 281474976710655 {
+		bc /= 10
+		exp++
+	}
+	raw := (p << 59) | (bc << 11) | (exp << 1) | signo
+	e.emit(byte(raw))
+	e.emit(byte(raw >> 8))
+	e.emit(byte(raw >> 16))
+	e.emit(byte(raw >> 24))
+	e.emit(byte(raw >> 32))
+	e.emit(byte(raw >> 40))
+	e.emit(byte(raw >> 48))
+	e.emit(byte(raw >> 56))
+}
+
+func (e *Emitter) pushNum64Float(val float64) {
+	e.emit(OP_PUSH)
+	e.emit(TYPE_NUM64)
+	signo := uint64(0)
+	if val < 0 {
+		signo = 1
+		val = -val
+	}
+	exp := uint64(511) // bias de Num64 = 511
+	// Convertir a representación base-10: val = bc * 10^(exp - bias - p)
+	// Usamos p=4 como precisión fraccionaria para decimales
+	const fracDigits = 4
+	bcFloat := val
+	for i := 0; i < fracDigits; i++ {
+		bcFloat *= 10.0
+	}
+	bc := uint64(bcFloat)
+	for bc > 281474976710655 {
+		bc /= 10
+		exp++
+	}
+	raw := (uint64(fracDigits) << 59) | (bc << 11) | (exp << 1) | signo
 	e.emit(byte(raw))
 	e.emit(byte(raw >> 8))
 	e.emit(byte(raw >> 16))
@@ -237,10 +289,19 @@ type CodeGen struct {
 	nextLocal uint16
 	errors    []string
 
-	inFunction        bool
-	savedCode         []byte
-	funcBodies        [][]byte
+	varTypes      map[string]byte
+	funcVarTypes  map[string]byte
+
+	inFunction         bool
+	savedCode          []byte
+	funcBodies         [][]byte
 	funcPatchPositions []int
+	funcParamCounts    []int
+
+	funcLocals      map[string]uint16
+	funcNextLocal   uint16
+	savedFuncLocals map[string]uint16
+	savedFuncNext   uint16
 
 	inCond        bool
 	condCodeStart int
@@ -260,6 +321,8 @@ func NewCodeGen() *CodeGen {
 		BasePaxoListener: &BasePaxoListener{},
 		Emitter:          Emitter{code: make([]byte, 0)},
 		locals:           make(map[string]uint16),
+		varTypes:         make(map[string]byte),
+		funcVarTypes:     make(map[string]byte),
 	}
 }
 
@@ -267,17 +330,25 @@ func (cg *CodeGen) reportError(msg string) { cg.errors = append(cg.errors, msg) 
 func (cg *CodeGen) Code() []byte           { return cg.code }
 func (cg *CodeGen) Errors() []string       { return cg.errors }
 
+func (cg *CodeGen) resolveIdent(name string) (idx uint16, isLocal bool, found bool) {
+	if cg.inFunction {
+		if i, ok := cg.funcLocals[name]; ok {
+			return i, true, true
+		}
+	}
+	if i, ok := cg.locals[name]; ok {
+		return i, false, true
+	}
+	return 0, false, false
+}
+
 func (cg *CodeGen) resolveType(token string) byte {
 	switch token {
-	case "var", "📥", "n":
+	case "var", "📥":
 		return TYPE_NUM64
-	case "n8":
-		return TYPE_NUM8
-	case "n16":
+	case "sn":
 		return TYPE_NUM16
-	case "n32":
-		return TYPE_NUM32
-	case "n64":
+	case "n":
 		return TYPE_NUM64
 	case "abc":
 		return TYPE_CHAR
@@ -289,8 +360,10 @@ func (cg *CodeGen) resolveType(token string) byte {
 		return TYPE_POINT
 	case "func":
 		return TYPE_FUNC
+	default:
+		cg.reportError("tipo desconocido: " + token)
+		return TYPE_NUM64
 	}
-	return TYPE_NUM64
 }
 
 func (cg *CodeGen) walkTree(tree antlr.ParseTree) {
@@ -326,8 +399,13 @@ func (cg *CodeGen) ExitVarDeclaration(ctx *VarDeclarationContext) {
 	name := ctx.IDENTIFIER().GetText()
 
 	var varType byte = TYPE_NUM64
+	var isDynamic bool
 	if ctx.Type_() != nil {
-		varType = cg.resolveType(ctx.Type_().GetStart().GetText())
+		token := ctx.Type_().GetStart().GetText()
+		varType = cg.resolveType(token)
+		isDynamic = (token == "var" || token == "📥")
+	} else {
+		isDynamic = true
 	}
 
 	if cg.inPkg {
@@ -335,25 +413,44 @@ func (cg *CodeGen) ExitVarDeclaration(ctx *VarDeclarationContext) {
 		return
 	}
 
-	idx := cg.nextLocal
-	cg.locals[name] = idx
-	cg.nextLocal++
+	var idx uint16
+	var storeOp byte
+	if cg.inFunction {
+		idx = cg.funcNextLocal
+		cg.funcLocals[name] = idx
+		cg.funcNextLocal++
+		storeOp = OP_STORE_LOCAL
+		if !isDynamic {
+			cg.funcVarTypes[name] = varType
+		}
+	} else {
+		idx = cg.nextLocal
+		cg.locals[name] = idx
+		cg.nextLocal++
+		storeOp = OP_STORE_VAR
+		if !isDynamic {
+			cg.varTypes[name] = varType
+		}
+	}
 
 	if ctx.Expression() != nil {
-		cg.emit(OP_STORE_VAR)
+		if ctx.Type_() != nil {
+			token := ctx.Type_().GetStart().GetText()
+			if token != "var" && token != "📥" {
+				cg.emit(OP_CAST)
+				cg.emit(varType)
+			}
+		}
+		cg.emit(storeOp)
 		cg.emit16(idx)
 	} else if ctx.ArrayLiteral() != nil {
 		cg.emitArrayLiteral(ctx.ArrayLiteral())
-		cg.emit(OP_STORE_VAR)
+		cg.emit(storeOp)
 		cg.emit16(idx)
 	} else {
 		switch varType {
-		case TYPE_NUM8:
-			cg.pushNum8(0)
 		case TYPE_NUM16:
 			cg.pushNum16(0)
-		case TYPE_NUM32:
-			cg.pushNum32(0)
 		case TYPE_NUM64:
 			cg.pushNum64(0)
 		case TYPE_BOOL:
@@ -361,11 +458,11 @@ func (cg *CodeGen) ExitVarDeclaration(ctx *VarDeclarationContext) {
 		case TYPE_CHAR:
 			cg.pushChar(0)
 		case TYPE_FUNC:
-			cg.pushFunc(0)
+			cg.pushFunc(0, 0)
 		default:
 			cg.pushNum64(0)
 		}
-		cg.emit(OP_STORE_VAR)
+		cg.emit(storeOp)
 		cg.emit16(idx)
 	}
 }
@@ -377,39 +474,61 @@ func (cg *CodeGen) EnterAssignment(ctx *AssignmentContext) {
 	exprs := ctx.AllExpression()
 	if len(exprs) == 2 {
 		name := ctx.IDENTIFIER().GetText()
-		idx, ok := cg.locals[name]
+		idx, isLocal, ok := cg.resolveIdent(name)
 		if !ok {
 			cg.reportError("variable no declarada: " + name)
 			return
 		}
-		cg.emit(OP_LOAD_VAR)
+		if isLocal {
+			cg.emit(OP_LOAD_LOCAL)
+		} else {
+			cg.emit(OP_LOAD_VAR)
+		}
 		cg.emit16(idx)
 	}
 }
 
 func (cg *CodeGen) ExitAssignment(ctx *AssignmentContext) {
 	name := ctx.IDENTIFIER().GetText()
-	idx, ok := cg.locals[name]
+	idx, isLocal, ok := cg.resolveIdent(name)
 	if !ok {
 		cg.reportError("variable no declarada: " + name)
 		return
+	}
+
+	storeOp := OP_STORE_VAR
+	loadOp := OP_LOAD_VAR
+	if isLocal {
+		storeOp = OP_STORE_LOCAL
+		loadOp = OP_LOAD_LOCAL
 	}
 
 	exprs := ctx.AllExpression()
 	if len(exprs) == 2 {
 		cg.emit(OP_ARRAY_SET)
 	} else if len(exprs) == 1 {
-		cg.emit(OP_STORE_VAR)
+		var varType byte
+		found := false
+		if isLocal {
+			varType, found = cg.funcVarTypes[name]
+		} else {
+			varType, found = cg.varTypes[name]
+		}
+		if found {
+			cg.emit(OP_CAST)
+			cg.emit(varType)
+		}
+		cg.emit(storeOp)
 		cg.emit16(idx)
 	} else {
-		cg.emit(OP_LOAD_VAR)
+		cg.emit(loadOp)
 		cg.emit16(idx)
 		if childTokText(ctx, 1) == "++" {
 			cg.emit(OP_INC)
 		} else {
 			cg.emit(OP_DEC)
 		}
-		cg.emit(OP_STORE_VAR)
+		cg.emit(storeOp)
 		cg.emit16(idx)
 	}
 }
@@ -519,12 +638,24 @@ func (cg *CodeGen) handleBaseExpression(ctx antlr.ParserRuleContext) {
 	switch expr := ctx.(type) {
 	case *IntLitExprContext:
 		text := expr.INT_LITERAL().GetText()
-		val, _ := strconv.ParseInt(text, 10, 64)
-		cg.pushNum64(uint64(val))
+		val, err := strconv.ParseInt(text, 10, 64)
+		if err != nil {
+			cg.reportError("literal entero inválido: " + text)
+			cg.pushNum64(0)
+		} else if val < 0 {
+			cg.pushNum64Signed(val)
+		} else {
+			cg.pushNum64(uint64(val))
+		}
 	case *DecLitExprContext:
 		text := expr.DECIMAL_LITERAL().GetText()
-		val, _ := strconv.ParseFloat(text, 64)
-		cg.pushNum64(uint64(int(val)))
+		val, err := strconv.ParseFloat(text, 64)
+		if err != nil {
+			cg.reportError("literal decimal inválido: " + text)
+			cg.pushNum64(0)
+		} else {
+			cg.pushNum64Float(val)
+		}
 	case *CharLitExprContext:
 		text := expr.CHAR_LITERAL().GetText()
 		if len(text) >= 3 {
@@ -549,18 +680,22 @@ func (cg *CodeGen) handleBaseExpression(ctx antlr.ParserRuleContext) {
 		cg.pushString(expr.STRING_LITERAL().GetText())
 	case *IdentExprContext:
 		name := expr.IDENTIFIER().GetText()
-		idx, ok := cg.locals[name]
-		if !ok {
+		idx, isLocal, found := cg.resolveIdent(name)
+		if !found {
 			cg.reportError("variable no declarada: " + name)
 			return
 		}
-		cg.emit(OP_LOAD_VAR)
+		if isLocal {
+			cg.emit(OP_LOAD_LOCAL)
+		} else {
+			cg.emit(OP_LOAD_VAR)
+		}
 		cg.emit16(idx)
 	case *PtrLitExprContext:
 		text := expr.POINTER_LITERAL().GetText()
-		name := text[1:] // strip leading '@'
-		idx, ok := cg.locals[name]
-		if !ok {
+		name := text[1:]
+		idx, _, found := cg.resolveIdent(name)
+		if !found {
 			cg.reportError("variable no declarada para puntero: " + name)
 			return
 		}
@@ -753,6 +888,21 @@ func (cg *CodeGen) ExitBlock(ctx *BlockContext) {
 func (cg *CodeGen) ExitMatchCase(ctx *MatchCaseContext) {}
 
 // ==========================================
+// ParameterList
+// ==========================================
+func (cg *CodeGen) EnterParameterList(ctx *ParameterListContext) {
+	if !cg.inFunction {
+		return
+	}
+	identifiers := ctx.AllIDENTIFIER()
+	for _, id := range identifiers {
+		name := id.GetText()
+		cg.funcLocals[name] = cg.funcNextLocal
+		cg.funcNextLocal++
+	}
+}
+
+// ==========================================
 // ReturnStatement
 // ==========================================
 func (cg *CodeGen) ExitReturnStatement(ctx *ReturnStatementContext) {
@@ -803,21 +953,37 @@ func (cg *CodeGen) EnterFuncExpr(ctx *FuncExprContext) {
 	cg.savedCode = cg.code
 	cg.code = make([]byte, 0)
 	cg.inFunction = true
+
+	cg.savedFuncLocals = cg.funcLocals
+	cg.savedFuncNext = cg.funcNextLocal
+	cg.funcLocals = make(map[string]uint16)
+	cg.funcNextLocal = 0
 }
 
 func (cg *CodeGen) ExitFuncExpr(ctx *FuncExprContext) {
 	cg.emit(OP_RETURN)
 
 	funcBody := cg.code
+	paramCount := 0
+	if fd := ctx.FunctionDeclaration(); fd != nil {
+		if pl := fd.ParameterList(); pl != nil {
+			paramCount = len(pl.AllIDENTIFIER())
+		}
+	}
 	cg.funcBodies = append(cg.funcBodies, funcBody)
+	cg.funcParamCounts = append(cg.funcParamCounts, paramCount)
 
 	cg.code = cg.savedCode
 	cg.inFunction = false
+
+	cg.funcLocals = cg.savedFuncLocals
+	cg.funcNextLocal = cg.savedFuncNext
 
 	cg.emit(OP_PUSH)
 	cg.emit(TYPE_FUNC)
 	cg.funcPatchPositions = append(cg.funcPatchPositions, len(cg.code))
 	cg.emit16(0)
+	cg.emit(byte(paramCount))
 }
 
 // ==========================================

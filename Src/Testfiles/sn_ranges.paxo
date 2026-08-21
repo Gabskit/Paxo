@@ -1,0 +1,22 @@
+local sn i = 0
+println(i)
+i = i + 100
+println(i)
+i = i + 100
+println(i)
+i = i + 100
+println(i)
+i = i + 100
+println(i)
+i = i + 1000
+println(i)
+i = i + 1000
+println(i)
+i = i + 1000
+println(i)
+i = i + 1000
+println(i)
+i = i + 1000
+println(i)
+i = i + 1000
+println(i)

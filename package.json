@@ -1,6 +1,6 @@
 {
 	"name": "paxo",
-	"version": "1.0.0",
+	"version": "1.0.3",
 	"type": "module",
 	"scripts": {
 		"antlr": "antlr-ng -Dlanguage=Go -o ./Src/Bcgen ./Src/Bcgen/Paxo.g4",

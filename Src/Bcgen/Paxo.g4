@@ -124,7 +124,7 @@ arrayLiteral
 // ==========================================
 
 VAR_TYPE: 'var' | '📥' ;
-NUM_TYPE: 'n' | 'n8' | 'n16' | 'n32' | 'n64' ;
+NUM_TYPE: 'n' | 'sn' ;
 CHARA_TYPE: 'abc' ;
 TRIT_TYPE: 'trit' ;
 BOOLEAN_TYPE: 'bool' ;

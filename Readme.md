@@ -65,6 +65,7 @@ npm run antlr        # Regenerar parser desde Paxo.g4
 ```
 var foo = 6.7          // número (inferido, siempre num64)
 n foo = 6.7
+sn foo = 3.14
 
 var foo = •            // trit (ternario: •, ↑, ↓)
 trit foo = •
@@ -82,14 +83,7 @@ var foo = .×            // booleano bit (.× = false, .✓ = true)
 bool foo = .×
 ```
 
-Los literales numéricos se empaquetan como **num64** por defecto. Puedes usar tipos más pequeños para ahorrar memoria:
-
-```
-n8  var chica = 10     // 8 bits
-n16 var mediana = 1000 // 16 bits
-n32 var grande = 50000 // 32 bits
-n64 var maxima = 99999 // 64 bits (default)
-```
+Los literales numéricos se empaquetan como **num64** por defecto. Los tamaños se removieron al no dar ahorro de memoria por el funcionamiento de la vm propiamente
 
 ## Arrays
 
@@ -194,7 +188,7 @@ var foo = () {
 Las funciones pueden declarar tipo de retorno con `: tipo` después de los paréntesis:
 
 ```
-📥 sumar = (n64 a, n64 b) : n64 {
+📥 sumar = (n a, n b) : n {
     return a + b;
 }
 ```
@@ -209,7 +203,7 @@ return;              // retorna sin valor
 **Ejemplo con cond:**
 
 ```
-📥 buscar = (n64 x) : bool {
+📥 buscar = (n x) : bool {
     (x) ? 42 -> {
         return .✓;
     } : _ -> {
@@ -245,7 +239,7 @@ El condicional compara la condición con cada valor usando igualdad (`==`). El c
 **Ejemplo:**
 
 ```
-local n64 x = 5
+local n x = 5
 (x) ? 5 -> {
     println("x es 5");
 } : _ -> {
@@ -340,7 +334,7 @@ array_push(arr, valor)  // agrega un elemento al final del array
 typeof(valor)   // retorna el tipo del valor como string
 ```
 
-Valores posibles: `"num8"`, `"num16"`, `"num32"`, `"num64"`, `"bool"`, `"trit"`, `"char"`, `"pin"`, `"func"`, `"string"`, `"array"`, `"package"`
+Valores posibles: `"num"`, `"bool"`, `"trit"`, `"char"`, `"pin"`, `"func"`, `"string"`, `"array"`, `"package"`
 
 ### Colores y formato
 
@@ -387,40 +381,40 @@ println("color normal")
 
 ```
 // Arrays mixtos
-var arr = «1, 2, 3»;
+local var arr = «1, 2, 3»
 array_push(arr, 4);
 println("Array: ", arr);
 println("Len: ", array_len(arr));
 
 // Asignación por índice
-arr[0] = 100;
+arr[0] = 100
 println("arr[0]=100: ", arr);
 
 // Nested arrays
-var nested = ««1, 2», «3, 4»»;
+local var nested = ««1, 2», «3, 4»»
 println("nested[0]: ", nested[0]);
 
 // Paquetes con dot-access
-var persona = {
-    var nombre = "Paxo";
-    var edad = 25;
+local var persona = {
+    local var nombre = "Paxo"
+    local var edad = 25
 }
 println("nombre: ", persona.nombre);
 
 // Funciones con return
-📥 sumar = (n64 a, n64 b) : n64 {
-    return a + b;
-};
+local 📥 sumar = (n a, n b) : n {
+    return a + b
+}
 println("Suma: ", sumar(3, 4));
 
 // Scan + cond
-local 📥 entrada = "";
-entrada = scan();
-(entrada) ? "si" -> {
+local 📥 entrada = ""
+entrada = scan()
+(entrada) ? entrada == "si" -> {
     println("Aceptado");
 } : _ -> {
     println("Rechazado");
-};
+}
 ```
 
 ## Generación de lep.h
@@ -462,7 +456,7 @@ npm run test:bcg    # Tests del compilador (Go)
 - Funciona dentro de condicionales y bucles anidados
 
 ### typeof (corregido)
-- Ahora retorna un string completo (`"num64"`, `"bool"`, etc.) en vez de solo el primer carácter
+- Ahora retorna un string completo (`"num"`, `"bool"`, etc.) en vez de solo el primer carácter
 
 ### scan (nuevo)
 - `scan()` lee una línea de stdin y la retorna como string

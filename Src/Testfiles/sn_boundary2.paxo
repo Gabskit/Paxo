@@ -1,0 +1,13 @@
+local sn i = 9990
+println(i);i = i + 1
+println(i);i = i + 1
+println(i);i = i + 1
+println(i);i = i + 1
+println(i);i = i + 1
+println(i);i = i + 1
+println(i);i = i + 1
+println(i);i = i + 1
+println(i);i = i + 1
+println(i);i = i + 1
+println(i);i = i + 1
+println(i)
