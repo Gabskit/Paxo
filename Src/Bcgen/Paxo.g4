@@ -9,14 +9,15 @@ program
     ;
 
 statement
-    : varDeclaration
+    : ';' // sentencia vacía
+    | varDeclaration
     | assignment
     | condStatement
     | loopStatement
     | tryCatchStatement
     | throwStatement
     | returnStatement
-    | expression ';'
+    | expression ';'?
     | INCLUDE '<' IDENTIFIER ('.' IDENTIFIER)? '>'
     ;
 
@@ -33,14 +34,14 @@ scope
 	: GLOBAL | LOCAL ;
 
 assignment
-    : IDENTIFIER '=' expression ';'
-    | IDENTIFIER '[' expression ']' '=' expression ';'
-    | IDENTIFIER '++' ';'
-    | IDENTIFIER '--' ';'
+    : IDENTIFIER '=' expression ';'?
+    | IDENTIFIER '[' expression ']' '=' expression ';'?
+    | IDENTIFIER '++' ';'?
+    | IDENTIFIER '--' ';'?
     ;
 
 condStatement
-    : '(' expression ')' '?' matchCase ( ':' matchCase )*? ';'
+    : '(' expression ')' '?' matchCase ( ':' matchCase )*? ';'?
     ;
 
 matchCase
@@ -81,11 +82,11 @@ parameterList
     ;
 
 returnStatement
-    : RETURN expression? ';'
+    : RETURN expression? ';'?
     ;
 
 throwStatement
-    : THROW expression ';'
+    : THROW expression ';'?
     ;
 
 argumentList

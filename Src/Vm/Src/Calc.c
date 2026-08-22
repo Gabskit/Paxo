@@ -373,8 +373,15 @@ static inline Num16 num16_repack(uint8_t signo, int64_t V, int16_t e,
   }
 
   // --- paso 2: redondeo ---
+  // El error se mide en unidades canónicas de una década base común
+  // (la más fina del escaneo) para que comparar décadas sea justo
+  const int16_t base = e_min;
+  unsigned _BitInt(128) objetivo = (unsigned _BitInt(128))mag;
+  for (int16_t i = 0; i < e - base; i++)
+    objetivo *= 10;
+
   int have = 0;
-  uint64_t b_bc = 0, b_den = 1;
+  uint64_t b_bc = 0;
   int16_t b_s = 0, b_p = 0;
   unsigned _BitInt(128) b_err = 0;
   for (int16_t s = e_min; s <= e_max; s++) {
@@ -388,17 +395,21 @@ static inline Num16 num16_repack(uint8_t signo, int64_t V, int16_t e,
       if (modo == MP16_ARRIBA)
         return (Num16){signo, (uint16_t)(s + BIAS16), (uint16_t)bc,
                        (uint16_t)p};
-      unsigned _BitInt(128) prod = (unsigned _BitInt(128))bc * den;
-      unsigned _BitInt(128) err = (prod > num) ? prod - num : num - prod;
-      if (!have || err * b_den < b_err * den ||
-          (err * b_den == b_err * den &&
-           (bc > b_bc || (bc == b_bc && (p > b_p || s < b_s))))) {
+      // |objetivo − canon(bc,p)·10^(s−base)|
+      unsigned _BitInt(128) valc =
+          (unsigned _BitInt(128))bc << (2 * (MP16_FRAC - p));
+      for (int16_t i = 0; i < s - base; i++)
+        valc *= 10;
+      unsigned _BitInt(128) err =
+          (valc > objetivo) ? valc - objetivo : objetivo - valc;
+      if (!have || err < b_err ||
+          (err == b_err &&
+           (s < b_s || (s == b_s && (p > b_p || bc > b_bc))))) {
         have = 1;
         b_bc = bc;
-        b_den = (uint64_t)den;
-        b_err = err;
         b_s = s;
         b_p = p;
+        b_err = err;
       }
     }
   }
@@ -501,6 +512,8 @@ static inline Num16 div_num16(Num16 a, Num16 b) {
 
 // ==========================================
 // 5. OPERACIONES ARITMÉTICAS: 64 BITS (MP64)
+//    El valor es v = bc · 10^(exp-BIAS-p); p cuenta décadas fraccionarias
+//    y debe entrar en la alineación (no solo exp)
 // ==========================================
 
 Num64 add_num64(Num64 a, Num64 b) {
@@ -512,8 +525,9 @@ Num64 add_num64(Num64 a, Num64 b) {
   const int16_t sesgo = BIAS64, exp_max = 255;
   const uint64_t bc_max = bc_max64();
 
-  int16_t exp_a = (int16_t)a.exp - sesgo;
-  int16_t exp_b = (int16_t)b.exp - sesgo;
+  // décadas netas de cada operando (exp menos su punto fijo p)
+  int16_t exp_a = (int16_t)a.exp - sesgo - (int16_t)a.p;
+  int16_t exp_b = (int16_t)b.exp - sesgo - (int16_t)b.p;
 
   if (exp_a < exp_b) {
     Num64 temp = a;
@@ -549,15 +563,19 @@ Num64 add_num64(Num64 a, Num64 b) {
   unsigned _BitInt(128) abs_suma = (suma < 0) ? -suma : suma;
   int16_t exp_res = exp_b;
 
+  // Suavizado en el techo: la subida de década redondea con techo para que
+  // sumar 1 siempre avance (sin regresión ni quedarse clavado)
   while (abs_suma > bc_max) {
-    abs_suma /= 10;
+    abs_suma = (abs_suma + 9) / 10;
     exp_res++;
   }
 
   if (abs_suma == 0)
     return (Num64){0, (uint64_t)sesgo, 0, PROPAGAR_P(a, b)};
 
-  int16_t exp_almacenado = exp_res + sesgo;
+  // el p propagado vuelve al exponente almacenado para conservar la década
+  uint16_t p_res = PROPAGAR_P(a, b);
+  int16_t exp_almacenado = exp_res + (int16_t)p_res + sesgo;
   if (exp_almacenado > exp_max) {
     exp_almacenado = exp_max;
     abs_suma = bc_max;
@@ -568,7 +586,7 @@ Num64 add_num64(Num64 a, Num64 b) {
   return (Num64){.signo = signo_res,
                  .exp = (uint64_t)exp_almacenado,
                  .bc = (uint64_t)abs_suma,
-                 .p = PROPAGAR_P(a, b)};
+                 .p = p_res};
 }
 
 static inline Num64 sub_num64(Num64 a, Num64 b) {
@@ -585,28 +603,35 @@ static inline Num64 mul_num64(Num64 a, Num64 b) {
   const uint64_t bc_max = bc_max64();
 
   uint8_t signo_res = (a.signo != b.signo) ? 1 : 0;
-  unsigned _BitInt(128) mult = (unsigned _BitInt(128))a.bc * b.bc;
-  int16_t exp_res = ((int16_t)a.exp - sesgo) + ((int16_t)b.exp - sesgo);
+  uint16_t p_res = PROPAGAR_P(a, b);
 
+  // el producto suma las décadas netas de ambos operandos
+  int16_t exp_res = ((int16_t)a.exp - sesgo - (int16_t)a.p) +
+                    ((int16_t)b.exp - sesgo - (int16_t)b.p);
+
+  unsigned _BitInt(128) mult = (unsigned _BitInt(128))a.bc * b.bc;
+
+  // Suavizado en el techo: la subida de década redondea con techo
   while (mult > bc_max) {
-    mult /= 10;
+    mult = (mult + 9) / 10;
     exp_res++;
   }
 
   if (mult == 0)
-    return (Num64){0, (uint64_t)sesgo, 0, PROPAGAR_P(a, b)};
-  int16_t exp_almacenado = exp_res + sesgo;
+    return (Num64){0, (uint64_t)sesgo, 0, p_res};
+  // el p propagado vuelve al exponente almacenado para conservar la década
+  int16_t exp_almacenado = exp_res + (int16_t)p_res + sesgo;
   if (exp_almacenado > exp_max) {
     exp_almacenado = exp_max;
     mult = bc_max;
   }
   if (exp_almacenado < 0)
-    return (Num64){0, (uint64_t)sesgo, 0, PROPAGAR_P(a, b)};
+    return (Num64){0, (uint64_t)sesgo, 0, p_res};
 
   return (Num64){.signo = signo_res,
                  .exp = (uint64_t)exp_almacenado,
                  .bc = (uint64_t)mult,
-                 .p = PROPAGAR_P(a, b)};
+                 .p = p_res};
 }
 
 static inline Num64 div_num64(Num64 a, Num64 b) {
@@ -616,31 +641,37 @@ static inline Num64 div_num64(Num64 a, Num64 b) {
   const uint64_t bc_max = bc_max64();
 
   uint8_t signo_res = (a.signo != b.signo) ? 1 : 0;
+  uint16_t p_res = PROPAGAR_P(a, b);
+
+  // el cociente resta las décadas netas del divisor
+  int16_t exp_res = ((int16_t)a.exp - sesgo - (int16_t)a.p) -
+                    ((int16_t)b.exp - sesgo - (int16_t)b.p) - escala;
+
   unsigned _BitInt(128) num_a =
       (unsigned _BitInt(128))a.bc * 1000000000000000ULL; // 10^15
   unsigned _BitInt(128) div = num_a / b.bc;
-  int16_t exp_res =
-      ((int16_t)a.exp - sesgo) - ((int16_t)b.exp - sesgo) - escala;
 
+  // Suavizado en el techo: la subida de década redondea con techo
   while (div > bc_max) {
-    div /= 10;
+    div = (div + 9) / 10;
     exp_res++;
   }
 
   if (div == 0)
-    return (Num64){0, (uint64_t)sesgo, 0, PROPAGAR_P(a, b)};
-  int16_t exp_almacenado = exp_res + sesgo;
+    return (Num64){0, (uint64_t)sesgo, 0, p_res};
+  // el p propagado vuelve al exponente almacenado para conservar la década
+  int16_t exp_almacenado = exp_res + (int16_t)p_res + sesgo;
   if (exp_almacenado > exp_max) {
     exp_almacenado = exp_max;
     div = bc_max;
   }
   if (exp_almacenado < 0)
-    return (Num64){0, (uint64_t)sesgo, 0, PROPAGAR_P(a, b)};
+    return (Num64){0, (uint64_t)sesgo, 0, p_res};
 
   return (Num64){.signo = signo_res,
                  .exp = (uint64_t)exp_almacenado,
                  .bc = (uint64_t)div,
-                 .p = PROPAGAR_P(a, b)};
+                 .p = p_res};
 }
 
 // ==========================================
@@ -679,8 +710,9 @@ static inline int cmp_num64(Num64 a, Num64 b) {
   __int128 val_a = (__int128)a.bc;
   __int128 val_b = (__int128)b.bc;
 
-  int16_t bias_a = (int16_t)a.exp - BIAS64;
-  int16_t bias_b = (int16_t)b.exp - BIAS64;
+  // décadas netas: el punto fijo p resta del exponente
+  int16_t bias_a = (int16_t)a.exp - BIAS64 - (int16_t)a.p;
+  int16_t bias_b = (int16_t)b.exp - BIAS64 - (int16_t)b.p;
 
   if (bias_a > bias_b) {
     int16_t diff = bias_a - bias_b;
