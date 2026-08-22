@@ -111,6 +111,37 @@ static inline int16_t read_i16(VM *vm) {
 
 void vm_error(VM *vm, const char *msg);
 
+static inline bool var_is_num_type(enum type t) {
+  return t == NUM16 || t == NUM64;
+}
+
+static inline Num64 var_num_as64(PaxoVar v) {
+  return (var_type(v) == NUM16) ? num16tonum64(var_num16_get(v))
+                                : var_num64_get(v);
+}
+
+static inline bool var_truthy(PaxoVar v) {
+  switch (var_type(v)) {
+  case BOOL:
+    return var_bool_get(v);
+  case TRIT:
+    return var_trit_get(v) == 1;
+  default:
+    return false;
+  }
+}
+
+static inline size_t var_to_index(PaxoVar v) {
+  switch (var_type(v)) {
+  case NUM16:
+    return (size_t)var_num16_get(v).bc;
+  case NUM64:
+    return (size_t)var_num64_get(v).bc;
+  default:
+    return 0;
+  }
+}
+
 void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
   bool running = true;
 
@@ -123,47 +154,58 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
 
     switch (op) {
     case OP_PUSH: {
-      uint8_t var_type = vm->bytecode[vm->ip++];
-      PaxoVar val = {0};
-      val.type = var_type;
+      uint8_t var_type_tag = vm->bytecode[vm->ip++];
+      PaxoVar val = 0;
 
-      switch (var_type) {
-      case NUM16:
-        memcpy(&val.as.number16, vm->bytecode + vm->ip, sizeof(Num16));
-        vm->ip += sizeof(Num16);
+      switch (var_type_tag) {
+      case NUM16: {
+        uint16_t raw;
+        memcpy(&raw, vm->bytecode + vm->ip, sizeof(raw));
+        vm->ip += sizeof(raw);
+        val = var_num16(num16_unpack(raw));
         break;
-      case NUM64:
-        memcpy(&val.as.number64, vm->bytecode + vm->ip, sizeof(Num64));
-        vm->ip += sizeof(Num64);
+      }
+      case NUM64: {
+        uint64_t raw;
+        memcpy(&raw, vm->bytecode + vm->ip, sizeof(raw));
+        vm->ip += sizeof(raw);
+        val = var_num64((Num64){.signo = raw & 1,
+                                .exp = (raw >> 1) & 0xFF,
+                                .bc = (raw >> 9) & bc_max64(),
+                                .p = (raw >> 59)});
         break;
+      }
       case BOOL:
-        val.as.truebool = vm->bytecode[vm->ip++];
+        val = var_bool(vm->bytecode[vm->ip++] != 0);
         break;
       case TRIT:
-        val.as.bit = vm->bytecode[vm->ip++];
+        val = var_trit(vm->bytecode[vm->ip++] & 0x3);
         break;
       case CHAR:
-        val.as.chara = vm->bytecode[vm->ip++];
+        val = var_char((char32_t)vm->bytecode[vm->ip++]);
         break;
-      case POINT:
-        memcpy(&val.as.puntero, vm->bytecode + vm->ip, sizeof(void *));
-        vm->ip += sizeof(void *);
+      case POINT: {
+        uint64_t raw;
+        memcpy(&raw, vm->bytecode + vm->ip, sizeof(raw));
+        vm->ip += sizeof(raw);
+        val = var_pin((uint32_t)raw);
         break;
+      }
       case STRING: {
         uint16_t len = read_u16(vm);
-        val.as.puntero = (void *)(vm->bytecode + vm->ip);
+        val = var_string((const char *)(vm->bytecode + vm->ip));
         vm->ip += len + 1;
         break;
       }
       case FUNC: {
         uint16_t offset = read_u16(vm);
         uint8_t param_count = vm->bytecode[vm->ip++];
-        val.as.func.func_id = offset;
-        val.as.func.closure_env = NULL;
-        val.as.func.param_count = param_count;
+        val = var_func(offset, param_count);
         break;
       }
       default:
+        vm_error(vm, "tipo de valor desconocido en bytecode");
+        running = false;
         break;
       }
 
@@ -176,118 +218,33 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       break;
     }
 
-#define ARITH_PROMOTE()                                                        \
-  if (a.type == NUM16 && b.type == NUM64) {                                    \
-    a.as.number64 = num16tonum64(a.as.number16);                               \
-    a.type = NUM64;                                                            \
-  } else if (a.type == NUM64 && b.type == NUM16) {                             \
-    b.as.number64 = num16tonum64(b.as.number16);                               \
-    b.type = NUM64;                                                            \
+#define ARITH_OP(name, op16, op64)                                            \
+  case name: {                                                                \
+    PaxoVar b = deque_pop_back(stack);                                        \
+    PaxoVar a = deque_pop_back(stack);                                        \
+    enum type ta = var_type(a), tb = var_type(b);                             \
+    PaxoVar res = PAXO_ZERO;                                                  \
+    if (var_is_num_type(ta) && var_is_num_type(tb)) {                         \
+      if (ta == NUM64 || tb == NUM64) {                                       \
+        Num64 r = op64(var_num_as64(a), var_num_as64(b));                     \
+        res = var_num64(r);                                                   \
+      } else {                                                                \
+        Num16 r = op16(var_num16_get(a), var_num16_get(b));                   \
+        res = var_num16(r);                                                   \
+      }                                                                       \
+    } else {                                                                  \
+      vm_error(vm, "tipos incompatibles en operación aritmética");            \
+    }                                                                         \
+    deque_push_back(stack, res);                                              \
+    break;                                                                    \
   }
 
-    case OP_ADD: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
-      ARITH_PROMOTE()
-      PaxoVar res = {0};
+    ARITH_OP(OP_ADD, add_num16, add_num64)
+    ARITH_OP(OP_SUB, sub_num16, sub_num64)
+    ARITH_OP(OP_MUL, mul_num16, mul_num64)
+    ARITH_OP(OP_DIV, div_num16, div_num64)
 
-      if (a.type == b.type) {
-        res.type = a.type;
-        switch (a.type) {
-        case NUM16:
-          res.as.number16 = add_num16(a.as.number16, b.as.number16);
-          break;
-        case NUM64:
-          res.as.number64 = add_num64(a.as.number64, b.as.number64);
-          break;
-        default:
-          vm_error(vm, "operación '+' no soportada para este tipo");
-          break;
-        }
-      } else {
-        vm_error(vm, "tipos incompatibles en operación '+'");
-      }
-      deque_push_back(stack, res);
-      break;
-    }
-
-    case OP_SUB: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
-      ARITH_PROMOTE()
-      PaxoVar res = {0};
-
-      if (a.type == b.type) {
-        res.type = a.type;
-        switch (a.type) {
-        case NUM16:
-          res.as.number16 = sub_num16(a.as.number16, b.as.number16);
-          break;
-        case NUM64:
-          res.as.number64 = sub_num64(a.as.number64, b.as.number64);
-          break;
-        default:
-          vm_error(vm, "operación '-' no soportada para este tipo");
-          break;
-        }
-      } else {
-        vm_error(vm, "tipos incompatibles en operación '-'");
-      }
-      deque_push_back(stack, res);
-      break;
-    }
-
-    case OP_MUL: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
-      ARITH_PROMOTE()
-      PaxoVar res = {0};
-
-      if (a.type == b.type) {
-        res.type = a.type;
-        switch (a.type) {
-        case NUM16:
-          res.as.number16 = mul_num16(a.as.number16, b.as.number16);
-          break;
-        case NUM64:
-          res.as.number64 = mul_num64(a.as.number64, b.as.number64);
-          break;
-        default:
-          vm_error(vm, "operación '×' no soportada para este tipo");
-          break;
-        }
-      } else {
-        vm_error(vm, "tipos incompatibles en operación '×'");
-      }
-      deque_push_back(stack, res);
-      break;
-    }
-
-    case OP_DIV: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
-      ARITH_PROMOTE()
-      PaxoVar res = {0};
-
-      if (a.type == b.type) {
-        res.type = a.type;
-        switch (a.type) {
-        case NUM16:
-          res.as.number16 = div_num16(a.as.number16, b.as.number16);
-          break;
-        case NUM64:
-          res.as.number64 = div_num64(a.as.number64, b.as.number64);
-          break;
-        default:
-          vm_error(vm, "operación '÷' no soportada para este tipo");
-          break;
-        }
-      } else {
-        vm_error(vm, "tipos incompatibles en operación '÷'");
-      }
-      deque_push_back(stack, res);
-      break;
-    }
+#undef ARITH_OP
 
     case OP_LOAD_VAR: {
       uint16_t index = read_u16(vm);
@@ -305,18 +262,20 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       PaxoVar val = deque_pop_back(stack);
       const char8_t *str = NULL;
 
-      switch (val.type) {
+      switch (var_type(val)) {
       case NUM16:
-        str = readnum16(val.as.number16, 1);
+        str = readnum16(var_num16_get(val), 1);
         break;
       case NUM64:
-        str = readnum64(val.as.number64, 1);
+        str = readnum64(var_num64_get(val), 1);
         break;
       case BOOL:
-        str = readbool(val.as.truebool);
+        str = readbool(var_bool_get(val));
         break;
       case CHAR:
-        printf("%c\n", val.as.chara);
+        str = readchar32(var_char_get(val));
+        break;
+      default:
         break;
       }
 
@@ -337,11 +296,10 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       PaxoVar condition = deque_pop_back(stack);
 
       bool is_false = false;
-      if (condition.type == BOOL) {
-        is_false = !condition.as.truebool;
-      } else if (condition.type == TRIT) {
-        is_false = (condition.as.bit == 0);
-      }
+      if (var_type(condition) == BOOL)
+        is_false = !var_bool_get(condition);
+      else if (var_type(condition) == TRIT)
+        is_false = (var_trit_get(condition) == 0);
 
       if (is_false) {
         vm->ip += offset;
@@ -351,110 +309,131 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     case OP_CAST: {
       uint8_t target_type = vm->bytecode[vm->ip++];
       PaxoVar val = deque_pop_back(stack);
-      PaxoVar res = {0};
-      res.type = target_type;
+      enum type src = var_type(val);
 
-      if (val.type == target_type) {
+      if (src == target_type) {
         deque_push_back(stack, val);
         break;
       }
 
-      // NUM16 -> ?
-      else if (val.type == NUM16) {
+      PaxoVar res = 0;
+      if (target_type == POINT)
+        res = var_pin(0);
+
+      switch (src) {
+      case NUM16: {
+        Num16 n = var_num16_get(val);
         switch (target_type) {
         case NUM64:
-          res.as.number64 = num16tonum64(val.as.number16);
+          res = var_num64(num16tonum64(n));
           break;
         case BOOL:
-          res.as.truebool = num16tobool(val.as.number16);
+          res = var_bool(num16tobool(n));
           break;
         case TRIT:
-          res.as.bit = num16totrit(val.as.number16);
+          res = var_trit(num16totrit(n));
+          break;
+        case CHAR:
+          res = var_char((char32_t)(n.bc > bc_max16() ? bc_max16() : n.bc));
+          break;
+        default:
           break;
         }
+        break;
       }
-      // NUM64 -> ?
-      else if (val.type == NUM64) {
+      case NUM64: {
+        Num64 n = var_num64_get(val);
         switch (target_type) {
         case NUM16:
-          res.as.number16 = num64tonum16(val.as.number64);
+          res = var_num16(num64tonum16(n));
           break;
         case BOOL:
-          res.as.truebool = num64tobool(val.as.number64);
+          res = var_bool(num64tobool(n));
           break;
         case TRIT:
-          res.as.bit = num64totrit(val.as.number64);
+          res = var_trit(num64totrit(n));
+          break;
+        case CHAR:
+          res = var_char((char32_t)(n.bc & 0xFF));
+          break;
+        default:
           break;
         }
+        break;
       }
-      // BOOL -> ?
-      else if (val.type == BOOL) {
+      case BOOL: {
+        bool b = var_bool_get(val);
         switch (target_type) {
         case NUM16:
-          res.as.number16 = booltonum16(val.as.truebool);
+          res = var_num16(booltonum16(b));
           break;
         case NUM64:
-          res.as.number64 = booltonum64(val.as.truebool);
+          res = var_num64(booltonum64(b));
           break;
         case TRIT:
-          res.as.bit = booltotrit(val.as.truebool);
+          res = var_trit(booltotrit(b));
+          break;
+        default:
           break;
         }
+        break;
       }
-      // TRIT -> ?
-      else if (val.type == TRIT) {
+      case TRIT: {
+        uint8_t t = var_trit_get(val);
         switch (target_type) {
         case NUM16:
-          res.as.number16 = trittonum16(val.as.bit);
+          res = var_num16(trittonum16(t));
           break;
         case NUM64:
-          res.as.number64 = trittonum64(val.as.bit);
+          res = var_num64(trittonum64(t));
           break;
         case BOOL:
-          res.as.truebool = trittobool(val.as.bit);
+          res = var_bool(trittobool(t));
+          break;
+        default:
           break;
         }
+        break;
       }
-      else if (val.type == CHAR) {
+      case CHAR: {
+        char32_t c = var_char_get(val);
         switch (target_type) {
         case NUM16: {
           Num16 conv = {0};
-          conv.bc = val.as.chara;
-          conv.exp = 1; // Bias Num16 = 1 (exp real = 0)
-          res.as.number16 = conv;
+          conv.bc = (c > bc_max16()) ? bc_max16() : (uint16_t)c;
+          conv.exp = BIAS16;
+          conv.p = 0;
+          res = var_num16(conv);
           break;
         }
         case NUM64: {
           Num64 conv = {0};
-          conv.bc = (uint64_t)val.as.chara << 38;
-          conv.exp = 511; // Bias Num64 = 511 (exp real = 0)
-          res.as.number64 = conv;
+          conv.bc = (uint64_t)c;
+          conv.exp = BIAS64;
+          conv.p = 0;
+          res = var_num64(conv);
           break;
         }
         case BOOL:
-          res.as.truebool = (val.as.chara != 0);
+          res = var_bool(c != 0);
           break;
         case TRIT:
-          res.as.bit = (val.as.chara < 3) ? (PaxoBool)val.as.chara : 0;
+          res = var_trit(c < 3 ? (uint8_t)c : 0);
           break;
         default:
-          res.type = val.type;
-          res.as.chara = val.as.chara;
           break;
         }
+        break;
       }
-      // STRING -> CHAR (primer char)
-      else if (val.type == STRING && target_type == CHAR) {
-        const char *s = (const char *)val.as.puntero;
-        res.as.chara = (s && s[0]) ? (char8_t)s[0] : 0;
+      case STRING: {
+        if (target_type == CHAR) {
+          const char *s = var_string_get(val);
+          res = var_char((s && s[0]) ? (char32_t)(uint8_t)s[0] : 0);
+        }
+        break;
       }
-      // NUM16 -> CHAR
-      else if (val.type == NUM16 && target_type == CHAR) {
-        res.as.chara = (char8_t)val.as.number16.bc;
-      }
-      // NUM64 -> CHAR
-      else if (val.type == NUM64 && target_type == CHAR) {
-        res.as.chara = (char8_t)val.as.number64.bc;
+      default:
+        break;
       }
 
       deque_push_back(stack, res);
@@ -463,6 +442,11 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
 
     case OP_CALL: {
       uint16_t target_ip = read_u16(vm);
+      if (vm->frame_count >= MAX_FRAMES) {
+        vm_error(vm, "desbordamiento de pila de llamadas");
+        running = false;
+        break;
+      }
       vm->frames[vm->frame_count++] = (CallFrame){.return_ip = vm->ip};
       vm->ip = target_ip;
       break;
@@ -476,7 +460,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         args[i] = deque_pop_back(stack);
 
       PaxoVar result = native_call(native_id, args, argc);
-      if (result.type != 0xFF)
+      if (result != PAXO_NO_VALUE)
         deque_push_back(stack, result);
       break;
     }
@@ -493,7 +477,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     case OP_CALL_VAR: {
       uint8_t argc = vm->bytecode[vm->ip++];
       PaxoVar func_val = deque_pop_back(stack);
-      if (func_val.type != FUNC) {
+      if (var_type(func_val) != FUNC) {
         vm_error(vm, "se esperaba una función");
         running = false;
         break;
@@ -508,7 +492,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       for (int i = 0; i < argc; i++)
         frame->locals[i] = args[i];
 
-      vm->ip = func_val.as.func.func_id;
+      vm->ip = var_func_id(func_val);
       break;
     }
 
@@ -538,33 +522,25 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       arr->items = malloc(sizeof(PaxoVar) * arr->capacity);
       for (int i = count - 1; i >= 0; i--)
         arr->items[i] = deque_pop_back(stack);
-      PaxoVar val = {0};
-      val.type = ARRAY;
-      val.as.array = arr;
-      deque_push_back(stack, val);
+      deque_push_back(stack, var_array(arr));
       break;
     }
 
     case OP_ARRAY_GET: {
       PaxoVar idx_val = deque_pop_back(stack);
       PaxoVar arr_val = deque_pop_back(stack);
-      if (arr_val.type != ARRAY) {
+      if (var_type(arr_val) != ARRAY) {
         vm_error(vm, "se esperaba un array");
         running = false;
         break;
       }
-      size_t idx = 0;
-      if (idx_val.type == NUM16) {
-        idx = idx_val.as.number16.bc;
-      } else if (idx_val.type == NUM64) {
-        idx = idx_val.as.number64.bc;
-      }
-      if (idx >= arr_val.as.array->len) {
+      size_t idx = var_to_index(idx_val);
+      if (idx >= var_array_get(arr_val)->len) {
         vm_error(vm, "índice fuera de rango");
         running = false;
         break;
       }
-      deque_push_back(stack, arr_val.as.array->items[idx]);
+      deque_push_back(stack, var_array_get(arr_val)->items[idx]);
       break;
     }
 
@@ -572,23 +548,18 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       PaxoVar value = deque_pop_back(stack);
       PaxoVar idx_val = deque_pop_back(stack);
       PaxoVar arr_val = deque_pop_back(stack);
-      if (arr_val.type != ARRAY) {
+      if (var_type(arr_val) != ARRAY) {
         vm_error(vm, "se esperaba un array");
         running = false;
         break;
       }
-      size_t idx = 0;
-      if (idx_val.type == NUM16) {
-        idx = idx_val.as.number16.bc;
-      } else if (idx_val.type == NUM64) {
-        idx = idx_val.as.number64.bc;
-      }
-      if (idx >= arr_val.as.array->len) {
+      size_t idx = var_to_index(idx_val);
+      if (idx >= var_array_get(arr_val)->len) {
         vm_error(vm, "índice fuera de rango");
         running = false;
         break;
       }
-      arr_val.as.array->items[idx] = value;
+      var_array_get(arr_val)->items[idx] = value;
       break;
     }
 
@@ -607,15 +578,11 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         vm->ip += name_len;
         PaxoPackageField *field = malloc(sizeof(PaxoPackageField));
         field->key = name;
-        field->value = malloc(sizeof(PaxoVar));
-        *field->value = val;
+        field->value = val;
         field->next = head;
         head = field;
       }
-      PaxoVar val = {0};
-      val.type = PACKAGE;
-      val.as.pkg = head;
-      deque_push_back(stack, val);
+      deque_push_back(stack, var_pkg(head));
       break;
     }
 
@@ -626,16 +593,16 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       name[name_len] = '\0';
       vm->ip += name_len;
       PaxoVar pkg_val = deque_pop_back(stack);
-      if (pkg_val.type != PACKAGE) {
+      if (var_type(pkg_val) != PACKAGE) {
         vm_error(vm, "se esperaba un package");
         running = false;
         break;
       }
-      PaxoPackageField *f = pkg_val.as.pkg;
+      PaxoPackageField *f = var_pkg_get(pkg_val);
       bool found = false;
       while (f) {
         if (strcmp(f->key, name) == 0) {
-          deque_push_back(stack, *f->value);
+          deque_push_back(stack, f->value);
           found = true;
           break;
         }
@@ -657,15 +624,15 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       vm->ip += name_len;
       PaxoVar value = deque_pop_back(stack);
       PaxoVar pkg_val = deque_pop_back(stack);
-      if (pkg_val.type != PACKAGE) {
+      if (var_type(pkg_val) != PACKAGE) {
         vm_error(vm, "se esperaba un package");
         running = false;
         break;
       }
-      PaxoPackageField *f = pkg_val.as.pkg;
+      PaxoPackageField *f = var_pkg_get(pkg_val);
       while (f) {
         if (strcmp(f->key, name) == 0) {
-          *f->value = value;
+          f->value = value;
           break;
         }
         f = f->next;
@@ -718,13 +685,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       int16_t offset = read_i16(vm);
       PaxoVar condition = deque_pop_back(stack);
 
-      bool is_true = false;
-      if (condition.type == BOOL)
-        is_true = condition.as.truebool;
-      else if (condition.type == TRIT)
-        is_true = (condition.as.bit == 1);
-
-      if (is_true) {
+      if (var_truthy(condition)) {
         vm->ip += offset;
       }
       break;
@@ -740,187 +701,119 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
 #define c_lte(c) ((c) <= 0)
 #define c_gte(c) ((c) >= 0)
 
-#define CMP_PROMOTE()                                                           \
-  if (a.type == NUM16 && b.type == NUM64) {                                      \
-    a.as.number64 = num16tonum64(a.as.number16);                                 \
-    a.type = NUM64;                                                              \
-  } else if (a.type == NUM64 && b.type == NUM16) {                               \
-    b.as.number64 = num16tonum64(b.as.number16);                                 \
-    b.type = NUM64;                                                              \
-  }
+#define CMP_NUMBERS(chose)                                                    \
+  do {                                                                        \
+    int c;                                                                    \
+    if (ta == NUM64 || tb == NUM64)                                           \
+      c = cmp_num64(var_num_as64(a), var_num_as64(b));                        \
+    else                                                                      \
+      c = cmp_num16(var_num16_get(a), var_num16_get(b));                      \
+    result_bool = chose(c);                                                   \
+  } while (0)
 
-#define CMP_OP_CASES(chose)                                                   \
-  case NUM16: {                                                               \
-    int c = cmp_num16(a.as.number16, b.as.number16);                          \
-    res.as.truebool = chose(c);                                              \
-    break;                                                                    \
-  }                                                                           \
-  case NUM64: {                                                               \
-    int c = cmp_num64(a.as.number64, b.as.number64);                          \
-    res.as.truebool = chose(c);                                              \
-    break;                                                                    \
-  }
+#define CMP_BOTH(same_kind, expr)                                             \
+  do {                                                                        \
+    if (ta == tb && ta == same_kind)                                          \
+      result_bool = (expr);                                                   \
+  } while (0)
 
     case OP_EQ: {
       PaxoVar b = deque_pop_back(stack);
       PaxoVar a = deque_pop_back(stack);
-      CMP_PROMOTE()
-      PaxoVar res = {0};
-      res.type = BOOL;
-      if (a.type != b.type) {
-        res.as.truebool = false;
+      enum type ta = var_type(a), tb = var_type(b);
+      bool result_bool = false;
+      if (var_is_num_type(ta) && var_is_num_type(tb)) {
+        CMP_NUMBERS(c_eq);
       } else {
-        switch (a.type) {
-          CMP_OP_CASES(c_eq)
-        case BOOL:
-          res.as.truebool = (a.as.truebool == b.as.truebool);
-          break;
-        case TRIT:
-          res.as.truebool = (a.as.bit == b.as.bit);
-          break;
-        case CHAR:
-          res.as.truebool = (a.as.chara == b.as.chara);
-          break;
-        case POINT:
-          res.as.truebool = (a.as.puntero == b.as.puntero);
-          break;
-        case STRING:
-          res.as.truebool = (strcmp((const char *)a.as.puntero, (const char *)b.as.puntero) == 0);
-          break;
-        default:
-          res.as.truebool = false;
-          break;
-        }
+        CMP_BOTH(BOOL, var_bool_get(a) == var_bool_get(b));
+        CMP_BOTH(TRIT, var_trit_get(a) == var_trit_get(b));
+        CMP_BOTH(CHAR, var_char_get(a) == var_char_get(b));
+        CMP_BOTH(POINT, var_pin_get(a) == var_pin_get(b));
+        CMP_BOTH(STRING,
+                 strcmp(var_string_get(a), var_string_get(b)) == 0);
       }
-      deque_push_back(stack, res);
+      deque_push_back(stack, var_bool(result_bool));
       break;
     }
 
     case OP_NEQ: {
       PaxoVar b = deque_pop_back(stack);
       PaxoVar a = deque_pop_back(stack);
-      CMP_PROMOTE()
-      PaxoVar res = {0};
-      res.type = BOOL;
-      if (a.type != b.type) {
-        res.as.truebool = true;
-      } else {
-        switch (a.type) {
-          CMP_OP_CASES(c_neq)
-        case BOOL:
-          res.as.truebool = (a.as.truebool != b.as.truebool);
-          break;
-        case TRIT:
-          res.as.truebool = (a.as.bit != b.as.bit);
-          break;
-        case CHAR:
-          res.as.truebool = (a.as.chara != b.as.chara);
-          break;
-        case POINT:
-          res.as.truebool = (a.as.puntero != b.as.puntero);
-          break;
-        default:
-          res.as.truebool = true;
-          break;
-        }
+      enum type ta = var_type(a), tb = var_type(b);
+      bool result_bool = true;
+      if (var_is_num_type(ta) && var_is_num_type(tb)) {
+        CMP_NUMBERS(c_neq);
+      } else if (ta == tb) {
+        result_bool = false;
+        CMP_BOTH(BOOL, var_bool_get(a) != var_bool_get(b));
+        CMP_BOTH(TRIT, var_trit_get(a) != var_trit_get(b));
+        CMP_BOTH(CHAR, var_char_get(a) != var_char_get(b));
+        CMP_BOTH(POINT, var_pin_get(a) != var_pin_get(b));
+        CMP_BOTH(STRING,
+                 strcmp(var_string_get(a), var_string_get(b)) != 0);
       }
-      deque_push_back(stack, res);
+      deque_push_back(stack, var_bool(result_bool));
       break;
     }
 
     case OP_LT: {
       PaxoVar b = deque_pop_back(stack);
       PaxoVar a = deque_pop_back(stack);
-      CMP_PROMOTE()
-      PaxoVar res = {0};
-      res.type = BOOL;
-      if (a.type != b.type) {
-        res.as.truebool = false;
+      enum type ta = var_type(a), tb = var_type(b);
+      bool result_bool = false;
+      if (var_is_num_type(ta) && var_is_num_type(tb)) {
+        CMP_NUMBERS(c_lt);
       } else {
-        switch (a.type) {
-          CMP_OP_CASES(c_lt)
-        case CHAR:
-          res.as.truebool = (a.as.chara < b.as.chara);
-          break;
-        default:
-          res.as.truebool = false;
-          break;
-        }
+        CMP_BOTH(CHAR, var_char_get(a) < var_char_get(b));
       }
-      deque_push_back(stack, res);
+      deque_push_back(stack, var_bool(result_bool));
       break;
     }
 
     case OP_GT: {
       PaxoVar b = deque_pop_back(stack);
       PaxoVar a = deque_pop_back(stack);
-      CMP_PROMOTE()
-      PaxoVar res = {0};
-      res.type = BOOL;
-      if (a.type != b.type) {
-        res.as.truebool = false;
+      enum type ta = var_type(a), tb = var_type(b);
+      bool result_bool = false;
+      if (var_is_num_type(ta) && var_is_num_type(tb)) {
+        CMP_NUMBERS(c_gt);
       } else {
-        switch (a.type) {
-          CMP_OP_CASES(c_gt)
-        case CHAR:
-          res.as.truebool = (a.as.chara > b.as.chara);
-          break;
-        default:
-          res.as.truebool = false;
-          break;
-        }
+        CMP_BOTH(CHAR, var_char_get(a) > var_char_get(b));
       }
-      deque_push_back(stack, res);
+      deque_push_back(stack, var_bool(result_bool));
       break;
     }
 
     case OP_LTE: {
       PaxoVar b = deque_pop_back(stack);
       PaxoVar a = deque_pop_back(stack);
-      CMP_PROMOTE()
-      PaxoVar res = {0};
-      res.type = BOOL;
-      if (a.type != b.type) {
-        res.as.truebool = false;
+      enum type ta = var_type(a), tb = var_type(b);
+      bool result_bool = false;
+      if (var_is_num_type(ta) && var_is_num_type(tb)) {
+        CMP_NUMBERS(c_lte);
       } else {
-        switch (a.type) {
-          CMP_OP_CASES(c_lte)
-        case CHAR:
-          res.as.truebool = (a.as.chara <= b.as.chara);
-          break;
-        default:
-          res.as.truebool = false;
-          break;
-        }
+        CMP_BOTH(CHAR, var_char_get(a) <= var_char_get(b));
       }
-      deque_push_back(stack, res);
+      deque_push_back(stack, var_bool(result_bool));
       break;
     }
 
     case OP_GTE: {
       PaxoVar b = deque_pop_back(stack);
       PaxoVar a = deque_pop_back(stack);
-      CMP_PROMOTE()
-      PaxoVar res = {0};
-      res.type = BOOL;
-      if (a.type != b.type) {
-        res.as.truebool = false;
+      enum type ta = var_type(a), tb = var_type(b);
+      bool result_bool = false;
+      if (var_is_num_type(ta) && var_is_num_type(tb)) {
+        CMP_NUMBERS(c_gte);
       } else {
-        switch (a.type) {
-          CMP_OP_CASES(c_gte)
-        case CHAR:
-          res.as.truebool = (a.as.chara >= b.as.chara);
-          break;
-        default:
-          res.as.truebool = false;
-          break;
-        }
+        CMP_BOTH(CHAR, var_char_get(a) >= var_char_get(b));
       }
-      deque_push_back(stack, res);
+      deque_push_back(stack, var_bool(result_bool));
       break;
     }
 
-#undef CMP_OP_CASES
+#undef CMP_BOTH
+#undef CMP_NUMBERS
 #undef c_eq
 #undef c_neq
 #undef c_lt
@@ -934,44 +827,26 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     case OP_AND: {
       PaxoVar b = deque_pop_back(stack);
       PaxoVar a = deque_pop_back(stack);
-      PaxoVar res = {0};
-      res.type = BOOL;
-      bool va = false, vb = false;
-      if (a.type == BOOL) va = a.as.truebool;
-      else if (a.type == TRIT) va = (a.as.bit == 1);
-      if (b.type == BOOL) vb = b.as.truebool;
-      else if (b.type == TRIT) vb = (b.as.bit == 1);
-      res.as.truebool = va && vb;
-      deque_push_back(stack, res);
+      deque_push_back(stack, var_bool(var_truthy(a) && var_truthy(b)));
       break;
     }
 
     case OP_OR: {
       PaxoVar b = deque_pop_back(stack);
       PaxoVar a = deque_pop_back(stack);
-      PaxoVar res = {0};
-      res.type = BOOL;
-      bool va = false, vb = false;
-      if (a.type == BOOL) va = a.as.truebool;
-      else if (a.type == TRIT) va = (a.as.bit == 1);
-      if (b.type == BOOL) vb = b.as.truebool;
-      else if (b.type == TRIT) vb = (b.as.bit == 1);
-      res.as.truebool = va || vb;
-      deque_push_back(stack, res);
+      deque_push_back(stack, var_bool(var_truthy(a) || var_truthy(b)));
       break;
     }
 
     case OP_NOT: {
       PaxoVar a = deque_pop_back(stack);
-      PaxoVar res = {0};
-      res.type = BOOL;
-      if (a.type == BOOL)
-        res.as.truebool = !a.as.truebool;
-      else if (a.type == TRIT)
-        res.as.truebool = (a.as.bit == 0);
-      else
-        res.as.truebool = true;
-      deque_push_back(stack, res);
+      enum type ta = var_type(a);
+      bool result_bool = true;
+      if (ta == BOOL)
+        result_bool = !var_bool_get(a);
+      else if (ta == TRIT)
+        result_bool = (var_trit_get(a) == 0);
+      deque_push_back(stack, var_bool(result_bool));
       break;
     }
 
@@ -981,13 +856,11 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     case OP_BIT_AND: {
       PaxoVar b = deque_pop_back(stack);
       PaxoVar a = deque_pop_back(stack);
-      PaxoVar res = {0};
-      if (a.type == BOOL && b.type == BOOL) {
-        res.type = BOOL;
-        res.as.truebool = a.as.truebool & b.as.truebool;
-      } else if (a.type == TRIT && b.type == TRIT) {
-        res.type = TRIT;
-        res.as.bit = a.as.bit & b.as.bit;
+      PaxoVar res = 0;
+      if (var_type(a) == BOOL && var_type(b) == BOOL) {
+        res = var_bool((int)var_bool_get(a) & (int)var_bool_get(b));
+      } else if (var_type(a) == TRIT && var_type(b) == TRIT) {
+        res = var_trit(var_trit_get(a) & var_trit_get(b));
       }
       deque_push_back(stack, res);
       break;
@@ -996,13 +869,11 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     case OP_BIT_OR: {
       PaxoVar b = deque_pop_back(stack);
       PaxoVar a = deque_pop_back(stack);
-      PaxoVar res = {0};
-      if (a.type == BOOL && b.type == BOOL) {
-        res.type = BOOL;
-        res.as.truebool = a.as.truebool | b.as.truebool;
-      } else if (a.type == TRIT && b.type == TRIT) {
-        res.type = TRIT;
-        res.as.bit = a.as.bit | b.as.bit;
+      PaxoVar res = 0;
+      if (var_type(a) == BOOL && var_type(b) == BOOL) {
+        res = var_bool((int)var_bool_get(a) | (int)var_bool_get(b));
+      } else if (var_type(a) == TRIT && var_type(b) == TRIT) {
+        res = var_trit(var_trit_get(a) | var_trit_get(b));
       }
       deque_push_back(stack, res);
       break;
@@ -1010,16 +881,19 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
 
     case OP_BIT_NOT: {
       PaxoVar a = deque_pop_back(stack);
-      PaxoVar res = {0};
-      if (a.type == BOOL) {
-        res.type = BOOL;
-        res.as.truebool = !a.as.truebool;
-      } else if (a.type == TRIT) {
-        res.type = TRIT;
-        res.as.bit = ~a.as.bit;
-      } else if (a.type == CHAR) {
-        res.type = CHAR;
-        res.as.chara = ~a.as.chara;
+      PaxoVar res = 0;
+      switch (var_type(a)) {
+      case BOOL:
+        res = var_bool(!var_bool_get(a));
+        break;
+      case TRIT:
+        res = var_trit(~var_trit_get(a) & 0x3u);
+        break;
+      case CHAR:
+        res = var_char(~var_char_get(a) & 0xFFFFFFFFu);
+        break;
+      default:
+        break;
       }
       deque_push_back(stack, res);
       break;
@@ -1028,13 +902,11 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     case OP_BIT_XOR: {
       PaxoVar b = deque_pop_back(stack);
       PaxoVar a = deque_pop_back(stack);
-      PaxoVar res = {0};
-      if (a.type == BOOL && b.type == BOOL) {
-        res.type = BOOL;
-        res.as.truebool = a.as.truebool ^ b.as.truebool;
-      } else if (a.type == TRIT && b.type == TRIT) {
-        res.type = TRIT;
-        res.as.bit = a.as.bit ^ b.as.bit;
+      PaxoVar res = 0;
+      if (var_type(a) == BOOL && var_type(b) == BOOL) {
+        res = var_bool(var_bool_get(a) ^ var_bool_get(b));
+      } else if (var_type(a) == TRIT && var_type(b) == TRIT) {
+        res = var_trit(var_trit_get(a) ^ var_trit_get(b));
       }
       deque_push_back(stack, res);
       break;
@@ -1043,16 +915,17 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     case OP_BIT_SHL: {
       PaxoVar b = deque_pop_back(stack);
       PaxoVar a = deque_pop_back(stack);
-      PaxoVar res = {0};
-      if (a.type == CHAR && b.type == CHAR) {
-        res.type = CHAR;
-        res.as.chara = a.as.chara << b.as.chara;
-      } else if (a.type == NUM64 && b.type == NUM64) {
-        res.type = NUM64;
-        res.as.number64.bc = a.as.number64.bc << b.as.number64.bc;
-      } else if (a.type == NUM16 && b.type == NUM16) {
-        res.type = NUM16;
-        res.as.number16.bc = a.as.number16.bc << b.as.number16.bc;
+      PaxoVar res = 0;
+      if (var_type(a) == CHAR && var_type(b) == CHAR) {
+        res = var_char(var_char_get(a) << var_char_get(b));
+      } else if (var_type(a) == NUM64 && var_type(b) == NUM64) {
+        Num64 r = var_num64_get(a);
+        r.bc = var_num64_get(a).bc << var_num64_get(b).bc;
+        res = var_num64(r);
+      } else if (var_type(a) == NUM16 && var_type(b) == NUM16) {
+        Num16 r = var_num16_get(a);
+        r.bc = var_num16_get(a).bc << var_num16_get(b).bc;
+        res = var_num16(r);
       }
       deque_push_back(stack, res);
       break;
@@ -1061,16 +934,17 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     case OP_BIT_SHR: {
       PaxoVar b = deque_pop_back(stack);
       PaxoVar a = deque_pop_back(stack);
-      PaxoVar res = {0};
-      if (a.type == CHAR && b.type == CHAR) {
-        res.type = CHAR;
-        res.as.chara = a.as.chara >> b.as.chara;
-      } else if (a.type == NUM64 && b.type == NUM64) {
-        res.type = NUM64;
-        res.as.number64.bc = a.as.number64.bc >> b.as.number64.bc;
-      } else if (a.type == NUM16 && b.type == NUM16) {
-        res.type = NUM16;
-        res.as.number16.bc = a.as.number16.bc >> b.as.number16.bc;
+      PaxoVar res = 0;
+      if (var_type(a) == CHAR && var_type(b) == CHAR) {
+        res = var_char(var_char_get(a) >> var_char_get(b));
+      } else if (var_type(a) == NUM64 && var_type(b) == NUM64) {
+        Num64 r = var_num64_get(a);
+        r.bc = var_num64_get(a).bc >> var_num64_get(b).bc;
+        res = var_num64(r);
+      } else if (var_type(a) == NUM16 && var_type(b) == NUM16) {
+        Num16 r = var_num16_get(a);
+        r.bc = var_num16_get(a).bc >> var_num16_get(b).bc;
+        res = var_num16(r);
       }
       deque_push_back(stack, res);
       break;
@@ -1081,18 +955,22 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     // ==========================================
     case OP_INC: {
       PaxoVar a = deque_pop_back(stack);
-      PaxoVar one = {0};
-      one.type = a.type;
-      switch (a.type) {
-      case NUM16:
-        one.as.number16.bc = 1;
-        one.as.number16.exp = 1; // Bias Num16 = 1
-        a.as.number16 = add_num16(a.as.number16, one.as.number16);
+      switch (var_type(a)) {
+      case NUM16: {
+        Num16 one = {0};
+        one.bc = 1;
+        one.exp = BIAS16;
+        a = var_num16(add_num16(var_num16_get(a), one));
         break;
-      case NUM64:
-        one.as.number64.bc = 1;
-        one.as.number64.exp = 511; // Bias Num64 = 511
-        a.as.number64 = add_num64(a.as.number64, one.as.number64);
+      }
+      case NUM64: {
+        Num64 one = {0};
+        one.bc = 1;
+        one.exp = BIAS64;
+        a = var_num64(add_num64(var_num64_get(a), one));
+        break;
+      }
+      default:
         break;
       }
       deque_push_back(stack, a);
@@ -1101,18 +979,22 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
 
     case OP_DEC: {
       PaxoVar a = deque_pop_back(stack);
-      PaxoVar one = {0};
-      one.type = a.type;
-      switch (a.type) {
-      case NUM16:
-        one.as.number16.bc = 1;
-        one.as.number16.exp = 1; // Bias Num16 = 1
-        a.as.number16 = sub_num16(a.as.number16, one.as.number16);
+      switch (var_type(a)) {
+      case NUM16: {
+        Num16 one = {0};
+        one.bc = 1;
+        one.exp = BIAS16;
+        a = var_num16(sub_num16(var_num16_get(a), one));
         break;
-      case NUM64:
-        one.as.number64.bc = 1;
-        one.as.number64.exp = 511; // Bias Num64 = 511
-        a.as.number64 = sub_num64(a.as.number64, one.as.number64);
+      }
+      case NUM64: {
+        Num64 one = {0};
+        one.bc = 1;
+        one.exp = BIAS64;
+        a = var_num64(sub_num64(var_num64_get(a), one));
+        break;
+      }
+      default:
         break;
       }
       deque_push_back(stack, a);

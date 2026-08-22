@@ -464,6 +464,13 @@ npm run test:bcg    # Tests del compilador (Go)
 ### Literales numéricos (corregido)
 - Los literales enteros siempre se empaquetan como num64 para evitar pérdida de precisión del formato base-20
 
+### NaN-boxing (nuevo)
+- Los valores de la VM ahora son palabras de 64 bits NaN-boxed (`PaxoVar = uint64_t`)
+- Formato num64 según especificación: `[s | 8e | 25bc(50b) | p5]`, bias 127
+- Marcador `11010` en los 5 bits bajos para valores boxeados; tags en bits [63:62]: bit, trit, char utf32, ref
+- num16 embebido via marcador reservado `11011`: `(raw16 << 5) | 27`
+- Referencias (string/array/package/func/pin) con subtag en aux16 y tabla global de objetos para punteros reales
+
 ### Dark backgrounds (nuevo)
 - `bg_color()` soporta variantes oscuras: `"dark red"`, `"dark cyan"`, etc.
 

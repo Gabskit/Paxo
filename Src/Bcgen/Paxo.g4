@@ -123,7 +123,7 @@ arrayLiteral
 // 2. REGLAS DEL LEXER (Tokens con Aliases Móvil/ASCII)
 // ==========================================
 
-VAR_TYPE: 'var' | '📥' ;
+VAR_TYPE: 'var' | '📥' | 'svar' | 's📥' ;
 NUM_TYPE: 'n' | 'sn' ;
 CHARA_TYPE: 'abc' ;
 TRIT_TYPE: 'trit' ;

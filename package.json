@@ -5,11 +5,11 @@
 	"scripts": {
 		"antlr": "antlr-ng -Dlanguage=Go -o ./Src/Bcgen ./Src/Bcgen/Paxo.g4",
 		"build:bcg": "mkdir -p ./Build && go build -o ./Build/Bcg ./Src/Bcgen/cmd/paxocc/",
-		"build:vm": "mkdir -p ./Build && clang -Wall -Wextra -O3 -std=gnu23 ./Src/Vm/Src/Main.c -o ./Build/Lepvm -lm",
+		"build:vm": "mkdir -p ./Build && gcc -Wall -Wextra -O3 -std=gnu23 ./Src/Vm/Src/Main.c -o ./Build/Lepvm -lm",
 		"build": "npm run antlr && npm run build:bcg && npm run build:vm && npm run gen:lep",
 		"gen:lep": "bash sh/gen_lep.sh",
-		"test:vm": "npm run gen:lep && mkdir -p ./Build && clang -Wall -Wextra -std=gnu23 -I./Build -o ./Build/test_vm_full ./Src/Test/test_vm_full.c -lm && ./Build/test_vm_full",
-		"test:vm:old": "npm run gen:lep && mkdir -p ./Build && clang -Wall -Wextra -std=gnu23 -I./Build -o ./Build/test_lep ./Src/Test/test_lep.c -lm && ./Build/test_lep",
+		"test:vm": "npm run gen:lep && mkdir -p ./Build && gcc -Wall -Wextra -std=gnu23 -I./Build -o ./Build/test_vm_full ./Src/Test/test_vm_full.c -lm && ./Build/test_vm_full",
+		"test:vm:old": "npm run gen:lep && mkdir -p ./Build && gcc -Wall -Wextra -std=gnu23 -I./Build -o ./Build/test_lep ./Src/Test/test_lep.c -lm && ./Build/test_lep",
 		"test:bcg": "go test -v ./Src/Bcgen/",
 		"test": "npm run test:vm && npm run test:bcg"
 	},

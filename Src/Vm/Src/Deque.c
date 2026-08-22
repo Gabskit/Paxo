@@ -47,7 +47,7 @@ bool deque_push_back(Deque *dq, PaxoVar var) {
 
 // Extracción del final (LIFO - Operación Pop de la VM)
 PaxoVar deque_pop_back(Deque *dq) {
-  if (!dq || !dq->tail) return (PaxoVar){0};
+  if (!dq || !dq->tail) return PAXO_ZERO;
 
   Node *temp = dq->tail;
   PaxoVar val = temp->data;
@@ -65,7 +65,7 @@ PaxoVar deque_pop_back(Deque *dq) {
 
 // Inspección del elemento superior sin extraerlo
 PaxoVar deque_peek_back(const Deque *dq) {
-  if (!dq || !dq->tail) return (PaxoVar){0};
+  if (!dq || !dq->tail) return PAXO_ZERO;
   return dq->tail->data;
 }
 
@@ -91,7 +91,7 @@ bool deque_push_front(Deque *dq, PaxoVar var) {
 
 // Extracción del inicio
 PaxoVar deque_pop_front(Deque *dq) {
-  if (!dq || !dq->head) return (PaxoVar){0};
+  if (!dq || !dq->head) return PAXO_ZERO;
 
   Node *temp = dq->head;
   PaxoVar val = temp->data;

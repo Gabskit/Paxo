@@ -27,73 +27,70 @@ typedef enum {
 // Funciones nativas
 // ==========================================
 
+static void print_var_inline(PaxoVar elem) {
+  switch (var_type(elem)) {
+  case NUM16:
+    printf("%s", (const char *)readnum16(var_num16_get(elem), 1));
+    break;
+  case NUM64:
+    printf("%s", (const char *)readnum64(var_num64_get(elem), 1));
+    break;
+  case BOOL:
+    printf("%s", var_bool_get(elem) ? "true" : "false");
+    break;
+  case TRIT:
+    printf("%s", (const char *)readtrit(var_trit_get(elem)));
+    break;
+  case CHAR:
+    printf("'%s'", (const char *)readchar32(var_char_get(elem)));
+    break;
+  case STRING:
+    printf("\"%s\"", var_string_get(elem));
+    break;
+  case ARRAY:
+    printf("«...»");
+    break;
+  case PACKAGE:
+    printf("{...}");
+    break;
+  default:
+    break;
+  }
+}
+
 static PaxoVar native_print(PaxoVar *args, uint8_t argc) {
   if (argc < 1)
-    return (PaxoVar){0};
+    return PAXO_ZERO;
 
   for (uint8_t i = 0; i < argc; i++) {
     PaxoVar val = args[i];
 
-    switch (val.type) {
-    case NUM16: {
-      const char *s = (const char *)readnum16(val.as.number16, 1);
-      printf("%s", s);
+    switch (var_type(val)) {
+    case NUM16:
+      printf("%s", (const char *)readnum16(var_num16_get(val), 1));
       break;
-    }
-    case NUM64: {
-      const char *s = (const char *)readnum64(val.as.number64, 1);
-      printf("%s", s);
+    case NUM64:
+      printf("%s", (const char *)readnum64(var_num64_get(val), 1));
       break;
-    }
     case BOOL:
-      printf("%s", val.as.truebool ? "true" : "false");
+      printf("%s", var_bool_get(val) ? "true" : "false");
       break;
-    case TRIT: {
-      const char *s = (const char *)readtrit(val.as.bit);
-      printf("%s", s);
+    case TRIT:
+      printf("%s", (const char *)readtrit(var_trit_get(val)));
       break;
-    }
     case CHAR:
-      printf("%c", val.as.chara);
+      printf("%s", (const char *)readchar32(var_char_get(val)));
       break;
     case STRING:
-      printf("%s", (const char *)val.as.puntero);
+      printf("%s", var_string_get(val));
       break;
     case ARRAY: {
       printf("«");
-      PaxoArray *arr = val.as.array;
+      PaxoArray *arr = var_array_get(val);
       for (size_t i = 0; i < arr->len; i++) {
         if (i > 0)
           printf(", ");
-        PaxoVar elem = arr->items[i];
-        switch (elem.type) {
-        case NUM16:
-          printf("%s", (const char *)readnum16(elem.as.number16, 1));
-          break;
-        case NUM64:
-          printf("%s", (const char *)readnum64(elem.as.number64, 1));
-          break;
-        case BOOL:
-          printf("%s", elem.as.truebool ? "true" : "false");
-          break;
-        case TRIT:
-          printf("%s", (const char *)readtrit(elem.as.bit));
-          break;
-        case CHAR:
-          printf("'%c'", elem.as.chara);
-          break;
-        case STRING:
-          printf("\"%s\"", (const char *)elem.as.puntero);
-          break;
-        case ARRAY:
-          printf("«...»");
-          break;
-        case PACKAGE:
-          printf("{...}");
-          break;
-        default:
-          break;
-        }
+        print_var_inline(arr->items[i]);
       }
       printf("»");
       break;
@@ -106,20 +103,20 @@ static PaxoVar native_print(PaxoVar *args, uint8_t argc) {
     }
   }
 
-  return (PaxoVar){0};
+  return PAXO_ZERO;
 }
 
 static PaxoVar native_println(PaxoVar *args, uint8_t argc) {
   native_print(args, argc);
   putchar('\n');
-  return (PaxoVar){0};
+  return PAXO_ZERO;
 }
 
 static PaxoVar native_typeof(PaxoVar *args, uint8_t argc) {
   if (argc < 1)
-    return (PaxoVar){0};
+    return PAXO_ZERO;
   const char *type_name = "unknown";
-  switch (args[0].type) {
+  switch (var_type(args[0])) {
   case NUM16:
     type_name = "num16";
     break;
@@ -152,17 +149,14 @@ static PaxoVar native_typeof(PaxoVar *args, uint8_t argc) {
     break;
   }
 
-  PaxoVar result = {0};
-  result.type = STRING;
-  result.as.puntero = (void *)type_name;
-  return result;
+  return var_string(type_name);
 }
 
 static PaxoVar native_set_text_color(PaxoVar *args, uint8_t argc) {
-  if (argc < 1) {
-    return (PaxoVar){0};
+  if (argc < 1 || var_type(args[0]) != STRING) {
+    return PAXO_ZERO;
   }
-  const char *color = (const char *)args[0].as.puntero;
+  const char *color = var_string_get(args[0]);
   if (strcmp(color, "red") == 0) {
     text_red(stdout);
   } else if (strcmp(color, "yellow") == 0) {
@@ -206,19 +200,21 @@ static PaxoVar native_set_text_color(PaxoVar *args, uint8_t argc) {
     text_dark(stdout);
     text_gray(stdout);
   }
-  return (PaxoVar){0};
+  return PAXO_ZERO;
 }
 
 static PaxoVar native_reset_color(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
   reset_colors(stdout);
-  return (PaxoVar){0};
+  return PAXO_ZERO;
 }
 
 static PaxoVar native_set_bg_color(PaxoVar *args, uint8_t argc) {
-  if (argc < 1) {
-    return (PaxoVar){0};
+  if (argc < 1 || var_type(args[0]) != STRING) {
+    return PAXO_ZERO;
   }
-  const char *color = (const char *)args[0].as.puntero;
+  const char *color = var_string_get(args[0]);
   if (strcmp(color, "red") == 0) {
     background_red(stdout);
   } else if (strcmp(color, "green") == 0) {
@@ -253,10 +249,12 @@ static PaxoVar native_set_bg_color(PaxoVar *args, uint8_t argc) {
              strcmp(color, "dark grey") == 0) {
     background_dark_gray(stdout);
   }
-  return (PaxoVar){0};
+  return PAXO_ZERO;
 }
 
 static PaxoVar native_scan(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
   static char buf[1024];
   if (!fgets(buf, sizeof(buf), stdin)) {
     buf[0] = '\0';
@@ -265,42 +263,36 @@ static PaxoVar native_scan(PaxoVar *args, uint8_t argc) {
   if (len > 0 && buf[len - 1] == '\n') {
     buf[len - 1] = '\0';
   }
-  PaxoVar result = {0};
-  result.type = STRING;
-  result.as.puntero = (void *)buf;
-  return result;
+  return var_string(buf);
 }
 
 static PaxoVar native_array_len(PaxoVar *args, uint8_t argc) {
-  if (argc < 1 || args[0].type != ARRAY)
-    return (PaxoVar){0};
-  PaxoVar result = {0};
-  result.type = NUM64;
-  size_t len = args[0].as.array->len;
-  result.as.number64.bc = len;
-  result.as.number64.exp = 511;
-  result.as.number64.signo = 0;
-  result.as.number64.p = 0;
-  return result;
+  if (argc < 1 || var_type(args[0]) != ARRAY)
+    return PAXO_ZERO;
+  size_t len = var_array_get(args[0])->len;
+  Num64 result = {0};
+  result.exp = BIAS64;
+  result.bc = (uint64_t)len;
+  return var_num64(result);
 }
 
 static PaxoVar native_array_push(PaxoVar *args, uint8_t argc) {
-  if (argc < 2 || args[0].type != ARRAY)
-    return (PaxoVar){0};
-  PaxoArray *arr = args[0].as.array;
+  if (argc < 2 || var_type(args[0]) != ARRAY)
+    return PAXO_ZERO;
+  PaxoArray *arr = var_array_get(args[0]);
   if (arr->len >= arr->capacity) {
     arr->capacity *= 2;
     arr->items = realloc(arr->items, sizeof(PaxoVar) * arr->capacity);
   }
   arr->items[arr->len++] = args[1];
-  return (PaxoVar){0};
+  return PAXO_ZERO;
 }
 
 static PaxoVar native_set_text_type(PaxoVar *args, uint8_t argc) {
-  if (argc < 1) {
-    return (PaxoVar){0};
+  if (argc < 1 || var_type(args[0]) != STRING) {
+    return PAXO_ZERO;
   }
-  const char *type = (const char *)args[0].as.puntero;
+  const char *type = var_string_get(args[0]);
   if (strcmp(type, "bold") == 0) {
     text_bold(stdout);
   } else if (strcmp(type, "dark") == 0) {
@@ -314,7 +306,7 @@ static PaxoVar native_set_text_type(PaxoVar *args, uint8_t argc) {
   } else if (strcmp(type, "concealed") == 0) {
     text_concealed(stdout);
   }
-  return (PaxoVar){0};
+  return PAXO_ZERO;
 }
 
 // ==========================================
@@ -346,6 +338,5 @@ PaxoVar native_call(uint16_t id, PaxoVar *args, uint8_t argc) {
   default:
     break;
   }
-  // Retorno sentinel: type = 0xFF indica sin retorno
-  return (PaxoVar){.type = 0xFF};
+  return PAXO_NO_VALUE;
 }

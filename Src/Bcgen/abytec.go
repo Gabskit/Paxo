@@ -142,40 +142,74 @@ func (e *Emitter) pushString(val string) {
 	e.emit(0) // null terminator
 }
 
+// Codifica un valor en el formato MP16 radix mixto: v = bc·2^(-2p)·10^(s)
+// con s = exp-BIAS. Busca ajuste EXACTO probando la década menor y dentro
+// de ella la celda más dividida (p desc); si no existe toma el más
+// cercano (menor error por comparación cruzada, empate lejos de cero).
+func (e *Emitter) emitRaw16(val uint64, signo uint16) {
+	pow4 := [6]uint64{1, 4, 16, 64, 256, 1024}
+	pow10 := [3]uint64{1, 10, 100}
+
+	bc, p, s := val, uint64(0), uint64(0)
+	ok := false
+	for si := uint64(0); si <= 2 && !ok; si++ {
+		for pi := uint64(5); ; pi-- {
+			num := val * pow4[pi]
+			if num%pow10[si] == 0 {
+				b := num / pow10[si]
+				if b >= 1 && b <= 1023 {
+					bc, p, s, ok = b, pi, si, true
+					break
+				}
+			}
+			if pi == 0 {
+				break
+			}
+		}
+	}
+	if !ok {
+		// el más cercano: mínimo error relativo a su década
+		bestErr := uint64(1) << 62
+		for si := uint64(0); si <= 2; si++ {
+			for pi := uint64(0); pi <= 5; pi++ {
+				num := val * pow4[pi]
+				den := pow10[si]
+				q := num / den
+				r := num % den
+				if q < 1 || q > 1023 {
+					continue
+				}
+				err := r
+				if den-r < err {
+					err = den - r
+				}
+				l, rr := err*pow10[s], bestErr*pow10[si]
+				if l < rr || (l == rr && q > bc) {
+					bestErr, bc, p, s = err, q, pi, si
+				}
+			}
+		}
+	}
+	raw := (uint16(p) << 13) | (uint16(bc) << 3) | (uint16(s+1) << 1) | signo
+	e.emit(byte(raw))
+	e.emit(byte(raw >> 8))
+}
+
 func (e *Emitter) pushNum16(val uint16) {
 	e.emit(OP_PUSH)
 	e.emit(TYPE_NUM16)
-	var p uint16
-	var signo uint16
-	exp := uint16(1) // bias de Num16 = 1
-	bc := val
-	for bc > 1023 {
-		bc /= 10
-		exp++
-	}
-	raw := (p << 13) | (bc << 3) | (exp << 1) | signo
-	e.emit(byte(raw))
-	e.emit(byte(raw >> 8))
+	e.emitRaw16(uint64(val), 0)
 }
 
 func (e *Emitter) pushNum16Signed(val int64) {
 	e.emit(OP_PUSH)
 	e.emit(TYPE_NUM16)
-	var p uint16
 	signo := uint16(0)
 	if val < 0 {
 		signo = 1
 		val = -val
 	}
-	exp := uint16(1) // bias de Num16 = 1
-	bc := uint16(val)
-	for bc > 1023 {
-		bc /= 10
-		exp++
-	}
-	raw := (p << 13) | (bc << 3) | (exp << 1) | signo
-	e.emit(byte(raw))
-	e.emit(byte(raw >> 8))
+	e.emitRaw16(uint64(uint16(val)), signo)
 }
 
 func (e *Emitter) pushNum64(val uint64) {
@@ -183,13 +217,13 @@ func (e *Emitter) pushNum64(val uint64) {
 	e.emit(TYPE_NUM64)
 	var p uint64
 	var signo uint64
-	exp := uint64(511) // bias de Num64 = 511
+	exp := uint64(127) // bias de Num64 = 127
 	bc := val
-	for bc > 281474976710655 {
+	for bc > 1125899906842623 { // 2^50 - 1
 		bc /= 10
 		exp++
 	}
-	raw := (p << 59) | (bc << 11) | (exp << 1) | signo
+	raw := (p << 59) | (bc << 9) | (exp << 1) | signo
 	e.emit(byte(raw))
 	e.emit(byte(raw >> 8))
 	e.emit(byte(raw >> 16))
@@ -209,13 +243,13 @@ func (e *Emitter) pushNum64Signed(val int64) {
 		signo = 1
 		val = -val
 	}
-	exp := uint64(511) // bias de Num64 = 511
+	exp := uint64(127) // bias de Num64 = 127
 	bc := uint64(val)
-	for bc > 281474976710655 {
+	for bc > 1125899906842623 { // 2^50 - 1
 		bc /= 10
 		exp++
 	}
-	raw := (p << 59) | (bc << 11) | (exp << 1) | signo
+	raw := (p << 59) | (bc << 9) | (exp << 1) | signo
 	e.emit(byte(raw))
 	e.emit(byte(raw >> 8))
 	e.emit(byte(raw >> 16))
@@ -234,8 +268,8 @@ func (e *Emitter) pushNum64Float(val float64) {
 		signo = 1
 		val = -val
 	}
-	exp := uint64(511) // bias de Num64 = 511
-	// Convertir a representación base-10: val = bc * 10^(exp - bias - p)
+	exp := uint64(127) // bias de Num64 = 127
+	// Convertir a representación base-10: val = bc × 10^(exp - bias - p)
 	// Usamos p=4 como precisión fraccionaria para decimales
 	const fracDigits = 4
 	bcFloat := val
@@ -243,11 +277,11 @@ func (e *Emitter) pushNum64Float(val float64) {
 		bcFloat *= 10.0
 	}
 	bc := uint64(bcFloat)
-	for bc > 281474976710655 {
+	for bc > 1125899906842623 { // 2^50 - 1
 		bc /= 10
 		exp++
 	}
-	raw := (uint64(fracDigits) << 59) | (bc << 11) | (exp << 1) | signo
+	raw := (uint64(fracDigits) << 59) | (bc << 9) | (exp << 1) | signo
 	e.emit(byte(raw))
 	e.emit(byte(raw >> 8))
 	e.emit(byte(raw >> 16))
