@@ -579,6 +579,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         PaxoPackageField *field = malloc(sizeof(PaxoPackageField));
         field->key = name;
         field->value = val;
+        field->hidden = vm->bytecode[vm->ip++] != 0; // flag de visibilidad
         field->next = head;
         head = field;
       }
@@ -602,11 +603,18 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       bool found = false;
       while (f) {
         if (strcmp(f->key, name) == 0) {
-          deque_push_back(stack, f->value);
           found = true;
           break;
         }
         f = f->next;
+      }
+      if (found) {
+        if (f->hidden) {
+          vm_error(vm, "campo privado");
+          running = false;
+          break;
+        }
+        deque_push_back(stack, f->value);
       }
       if (!found) {
         vm_error(vm, "campo no encontrado");
@@ -632,6 +640,11 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       PaxoPackageField *f = var_pkg_get(pkg_val);
       while (f) {
         if (strcmp(f->key, name) == 0) {
+          if (f->hidden) {
+            vm_error(vm, "campo privado");
+            running = false;
+            break;
+          }
           f->value = value;
           break;
         }

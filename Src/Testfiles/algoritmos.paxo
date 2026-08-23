@@ -1,0 +1,151 @@
+// ============================================================
+// algoritmos.paxo - pruebas del lenguaje con algoritmos clásicos
+// Compilar: ./Build/Bcg Src/Testfiles/algoritmos.paxo
+// Ejecutar: ./Build/Lepvm Src/Testfiles/algoritmos.pbc
+// ============================================================
+
+// ----- 1. Fibonacci recursivo -----
+// (se declara la variable antes para que la función pueda llamarse a sí misma)
+📥 fib = 0
+fib = (n k) : n {
+    (k < 2) ? .✓ -> {
+        return k;
+    } : _ -> {
+        return fib(k - 1) + fib(k - 2);
+    };
+}
+
+print("Fibonacci: ");
+n fidx = 0
+(fidx <= 12) : |> |: {
+    print(fib(fidx), " ");
+    fidx++;
+}:|
+println("");
+
+// ----- 2. Factorial iterativo -----
+n fact = 1
+n fj = 2
+(fj <= 10) : |> |: {
+    fact = fact × fj;
+    fj++;
+}:|
+println("10! = ", fact);
+
+// ----- 3. MCD por restas (Euclides) -----
+n ga = 48
+n gb = 18
+(ga != gb) : |> |: {
+    (ga > gb) ? .✓ -> {
+        ga = ga - gb;
+    } : _ -> {
+        gb = gb - ga;
+    };
+}:|
+println("MCD(48, 18) = ", ga);
+
+// ----- 4. Números primos hasta 30 -----
+// (sin operador %: el resto se calcula restando)
+print("Primos <= 30: ");
+n pc = 2
+(pc <= 30) : |> |: {
+    n pdivs = 0
+    n pd = 1
+    (pd <= pc) : |> |: {
+        n prem = pc
+        (prem >= pd) : |> |: {
+            prem = prem - pd;
+        }:|
+        (prem == 0) ? .✓ -> {
+            pdivs++;
+        } : _ -> {};
+        pd++;
+    }:|
+    (pdivs == 2) ? .✓ -> {
+        print(pc, " ");
+    } : _ -> {};
+    pc++;
+}:|
+println("");
+
+// ----- 5. Bubble sort -----
+var nums = «5, 3, 8, 1, 9, 2»
+n blen = array_len(nums)
+n bpass = 0
+(bpass < blen - 1) : |> |: {
+    n bi = 0
+    (bi < blen - 1 - bpass) : |> |: {
+        (nums[bi] > nums[bi + 1]) ? .✓ -> {
+            n btmp = nums[bi];
+            nums[bi] = nums[bi + 1];
+            nums[bi + 1] = btmp;
+        } : _ -> {};
+        bi++;
+    }:|
+    bpass++;
+}:|
+println("Bubble sort: ", nums);
+
+// ----- 6. Búsqueda lineal (condición compuesta con .&) -----
+n objetivo = 8
+n hallado = -1
+n lidx = 0
+(lidx < blen .& hallado == -1) : |> |: {
+    (nums[lidx] == objetivo) ? .✓ -> {
+        hallado = lidx;
+    } : _ -> {};
+    lidx++;
+}:|
+(hallado == -1) ? .✓ -> {
+    println(objetivo, " no está en el array");
+} : _ -> {
+    println(objetivo, " está en el índice ", hallado);
+};
+
+// ----- 7. Secuencia de Collatz -----
+n cz = 7
+n ctmp = 0
+print("Collatz(7): ");
+(cz != 1) : |> |: {
+    print(cz, " ");
+    ctmp = cz;
+    (ctmp >= 2) : |> |: {
+        ctmp = ctmp - 2;
+    }:|
+    (ctmp == 0) ? .✓ -> {
+        cz = cz ÷ 2;
+    } : _ -> {
+        cz = 3 × cz + 1;
+    };
+}:|
+println("");
+
+// ----- 8. Paquetes con encapsulamiento -----
+var rectangulo = {
+    pub n base = 6
+    pub n altura = 4
+    local n area_secreta = 999
+}
+println("Área del rectángulo: ", rectangulo.base × rectangulo.altura);
+println("Tipo: ", typeof(rectangulo));
+// println(rectangulo.area_secreta);   // descomentar => error VM: campo privado
+
+// ----- 9. Manejo de errores -----
+try {
+    throw "división por cero simulada";
+} catch (e) {
+    println("Error capturado");
+}
+
+// ----- 10. Trits, bools y arrays mixtos -----
+trit t9 = •
+bool bandera = .✓
+println("trit=", t9, " bool=", bandera, " not=", !bandera);
+
+var mixto = «"uno", 2, .×, 'C'»
+println("Mixto: ", mixto[0], ", ", mixto[1], ", ", mixto[2], ", ", mixto[3]);
+
+var anidado = ««1, 2», «3, 4»»
+println("Anidado[0]: ", anidado[0], " Anidado[1][1]: ", anidado[1][1]);
+
+println("Fin de las pruebas");

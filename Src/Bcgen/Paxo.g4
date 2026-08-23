@@ -22,9 +22,9 @@ statement
     ;
 
 varDeclaration
-    : scope type IDENTIFIER '=' expression
-    | scope type IDENTIFIER '[' INT_LITERAL? ']' '=' arrayLiteral
-    | scope type IDENTIFIER
+    : scope? type IDENTIFIER '=' expression
+    | scope? type IDENTIFIER '[' INT_LITERAL? ']' '=' arrayLiteral
+    | scope? type IDENTIFIER
     ;
 
 type
@@ -131,6 +131,8 @@ TRIT_TYPE: 'trit' ;
 BOOLEAN_TYPE: 'bool' ;
 POINTER_TYPE: 'pin' ;
 
+// DEPRECADOS: no cambian el comportamiento (todo vive en un array flat de
+// globals). Se aceptan por retrocompatibilidad; el compilador emite warning.
 GLOBAL: 'pub' | '🌎' ;
 LOCAL: 'local';
 

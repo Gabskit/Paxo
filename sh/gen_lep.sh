@@ -60,7 +60,7 @@ done
   # Types y declaraciones siempre visibles
   for f in "${FILES[@]}"; do
     echo "/* --- $(basename "$f") --- */"
-    sed -E '/^#pragma once$/d; /^[[:space:]]*#include[[:space:]]+"[^"]+"$/d; s/inline /static inline /g; s/static static inline/static inline/g' "$f"
+    sed -E '/^#pragma once$/d; /^[[:space:]]*#[[:space:]]*include[[:space:]]+"[^"]+".*$/d; s/inline /static inline /g; s/static static inline/static inline/g' "$f"
     echo ""
   done
 

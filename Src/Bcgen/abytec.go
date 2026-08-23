@@ -96,23 +96,210 @@ const (
 	NATIVE_FILE_APPEND uint16 = 15
 	NATIVE_FILE_EXISTS uint16 = 16
 	NATIVE_FILE_DELETE uint16 = 17
+
+	// Imágenes (stb)
+	NATIVE_IMG_LOAD     uint16 = 18
+	NATIVE_IMG_INFO     uint16 = 19
+	NATIVE_IMG_SAVE_PNG uint16 = 20
+	NATIVE_IMG_SAVE_JPG uint16 = 21
+	NATIVE_IMG_SAVE_BMP uint16 = 22
+	NATIVE_IMG_RESIZE   uint16 = 23
+
+	// Fuentes (stb_truetype)
+	NATIVE_FONT_LOAD    uint16 = 24
+	NATIVE_FONT_GLYPH   uint16 = 25
+	NATIVE_FONT_METRICS uint16 = 26
+	NATIVE_FONT_FREE    uint16 = 27
+
+	// Audio (miniaudio)
+	NATIVE_AUDIO_INIT    uint16 = 28
+	NATIVE_AUDIO_QUIT    uint16 = 29
+	NATIVE_AUDIO_PLAY    uint16 = 30
+	NATIVE_AUDIO_PAUSE   uint16 = 31
+	NATIVE_AUDIO_RESUME  uint16 = 32
+	NATIVE_AUDIO_STOP    uint16 = 33
+	NATIVE_AUDIO_VOLUME  uint16 = 34
+	NATIVE_AUDIO_PLAYING uint16 = 35
+
+	// Física (Chipmunk2D)
+	NATIVE_PHYS_SPACE       uint16 = 36
+	NATIVE_PHYS_GRAVITY     uint16 = 37
+	NATIVE_PHYS_STEP        uint16 = 38
+	NATIVE_PHYS_BODY        uint16 = 39
+	NATIVE_PHYS_BODY_STATIC uint16 = 40
+	NATIVE_PHYS_POS         uint16 = 41
+	NATIVE_PHYS_VEL         uint16 = 42
+	NATIVE_PHYS_SET_POS     uint16 = 43
+	NATIVE_PHYS_SET_VEL     uint16 = 44
+	NATIVE_PHYS_ANGLE       uint16 = 45
+	NATIVE_PHYS_SET_ANGLE   uint16 = 46
+	NATIVE_PHYS_FORCE       uint16 = 47
+	NATIVE_PHYS_IMPULSE     uint16 = 48
+	NATIVE_PHYS_CIRCLE      uint16 = 49
+	NATIVE_PHYS_BOX         uint16 = 50
+	NATIVE_PHYS_SEGMENT     uint16 = 51
+	NATIVE_PHYS_ELASTICITY  uint16 = 52
+	NATIVE_PHYS_FRICTION    uint16 = 53
+	NATIVE_PHYS_COLLIDE     uint16 = 54
+	NATIVE_PHYS_FREE_SHAPE  uint16 = 55
+	NATIVE_PHYS_FREE_BODY   uint16 = 56
+	NATIVE_PHYS_FREE_SPACE  uint16 = 57
+
+	// Ventana/gráficos (SDL3, opcional)
+	NATIVE_WIN_OPEN      uint16 = 58
+	NATIVE_WIN_CLOSE     uint16 = 59
+	NATIVE_WIN_COLOR     uint16 = 60
+	NATIVE_WIN_CLEAR     uint16 = 61
+	NATIVE_WIN_RECT      uint16 = 62
+	NATIVE_WIN_LINE      uint16 = 63
+	NATIVE_WIN_CIRCLE    uint16 = 64
+	NATIVE_WIN_TEXT      uint16 = 65
+	NATIVE_TEX_LOAD      uint16 = 66
+	NATIVE_TEX_DRAW      uint16 = 67
+	NATIVE_TEX_FREE      uint16 = 68
+	NATIVE_WIN_SHOW      uint16 = 69
+	NATIVE_WIN_POLL      uint16 = 70
+	NATIVE_WIN_KEY       uint16 = 71
+	NATIVE_WIN_MOUSE     uint16 = 72
+	NATIVE_WIN_MOUSEDOWN uint16 = 73
+	NATIVE_WIN_TIME      uint16 = 74
+	NATIVE_WIN_DELAY     uint16 = 75
+
+	// PDF (pdfio)
+	NATIVE_PDF_OPEN       uint16 = 76
+	NATIVE_PDF_NEW        uint16 = 77
+	NATIVE_PDF_PAGES      uint16 = 78
+	NATIVE_PDF_PAGE_SIZE  uint16 = 79
+	NATIVE_PDF_TEXT       uint16 = 80
+	NATIVE_PDF_FONT       uint16 = 81
+	NATIVE_PDF_PAGE_BEGIN uint16 = 82
+	NATIVE_PDF_COLOR      uint16 = 83
+	NATIVE_PDF_WRITE_RECT uint16 = 84
+	NATIVE_PDF_WRITE_LINE uint16 = 85
+	NATIVE_PDF_WRITE_TEXT uint16 = 86
+	NATIVE_PDF_CLOSE      uint16 = 87
 )
+
+// nativeNames mapea los nombres de funciones nativas del lenguaje a su ID.
+// Debe mantenerse en sincronía con el enum NativeId de Functions.c (VM).
+var nativeNames = map[string]uint16{
+	"print":        NATIVE_PRINT,
+	"println":      NATIVE_PRINTLN,
+	"typeof":       NATIVE_TYPEOF,
+	"text_color":   NATIVE_SET_COLOR_TEXT,
+	"text_type":    NATIVE_SET_TYPE_TEXT,
+	"bg_color":     NATIVE_SET_COLOR_BACK,
+	"reset_color":  NATIVE_RESET_COLOR,
+	"scan":         NATIVE_SCAN,
+	"array_len":    NATIVE_ARRAY_LEN,
+	"array_push":   NATIVE_ARRAY_PUSH,
+	"init_window":  NATIVE_INIT_WINDOW,
+	"clear_screen": NATIVE_CLEAR_SCREEN,
+	"draw_rect":    NATIVE_DRAW_RECT,
+	"file_read":    NATIVE_FILE_READ,
+	"file_write":   NATIVE_FILE_WRITE,
+	"file_append":  NATIVE_FILE_APPEND,
+	"file_exists":  NATIVE_FILE_EXISTS,
+	"file_delete":  NATIVE_FILE_DELETE,
+
+	"img_load":     NATIVE_IMG_LOAD,
+	"img_info":     NATIVE_IMG_INFO,
+	"img_save_png": NATIVE_IMG_SAVE_PNG,
+	"img_save_jpg": NATIVE_IMG_SAVE_JPG,
+	"img_save_bmp": NATIVE_IMG_SAVE_BMP,
+	"img_resize":   NATIVE_IMG_RESIZE,
+
+	"font_load":    NATIVE_FONT_LOAD,
+	"font_glyph":   NATIVE_FONT_GLYPH,
+	"font_metrics": NATIVE_FONT_METRICS,
+	"font_free":    NATIVE_FONT_FREE,
+
+	"audio_init":    NATIVE_AUDIO_INIT,
+	"audio_quit":    NATIVE_AUDIO_QUIT,
+	"audio_play":    NATIVE_AUDIO_PLAY,
+	"audio_pause":   NATIVE_AUDIO_PAUSE,
+	"audio_resume":  NATIVE_AUDIO_RESUME,
+	"audio_stop":    NATIVE_AUDIO_STOP,
+	"audio_volume":  NATIVE_AUDIO_VOLUME,
+	"audio_playing": NATIVE_AUDIO_PLAYING,
+
+	"phys_space":       NATIVE_PHYS_SPACE,
+	"phys_gravity":     NATIVE_PHYS_GRAVITY,
+	"phys_step":        NATIVE_PHYS_STEP,
+	"phys_body":        NATIVE_PHYS_BODY,
+	"phys_body_static": NATIVE_PHYS_BODY_STATIC,
+	"phys_pos":         NATIVE_PHYS_POS,
+	"phys_vel":         NATIVE_PHYS_VEL,
+	"phys_set_pos":     NATIVE_PHYS_SET_POS,
+	"phys_set_vel":     NATIVE_PHYS_SET_VEL,
+	"phys_angle":       NATIVE_PHYS_ANGLE,
+	"phys_set_angle":   NATIVE_PHYS_SET_ANGLE,
+	"phys_force":       NATIVE_PHYS_FORCE,
+	"phys_impulse":     NATIVE_PHYS_IMPULSE,
+	"phys_circle":      NATIVE_PHYS_CIRCLE,
+	"phys_box":         NATIVE_PHYS_BOX,
+	"phys_segment":     NATIVE_PHYS_SEGMENT,
+	"phys_elasticity":  NATIVE_PHYS_ELASTICITY,
+	"phys_friction":    NATIVE_PHYS_FRICTION,
+	"phys_collide":     NATIVE_PHYS_COLLIDE,
+	"phys_free_shape":  NATIVE_PHYS_FREE_SHAPE,
+	"phys_free_body":   NATIVE_PHYS_FREE_BODY,
+	"phys_free_space":  NATIVE_PHYS_FREE_SPACE,
+
+	"win_open":      NATIVE_WIN_OPEN,
+	"win_close":     NATIVE_WIN_CLOSE,
+	"win_color":     NATIVE_WIN_COLOR,
+	"win_clear":     NATIVE_WIN_CLEAR,
+	"win_rect":      NATIVE_WIN_RECT,
+	"win_line":      NATIVE_WIN_LINE,
+	"win_circle":    NATIVE_WIN_CIRCLE,
+	"win_text":      NATIVE_WIN_TEXT,
+	"tex_load":      NATIVE_TEX_LOAD,
+	"tex_draw":      NATIVE_TEX_DRAW,
+	"tex_free":      NATIVE_TEX_FREE,
+	"win_show":      NATIVE_WIN_SHOW,
+	"win_poll":      NATIVE_WIN_POLL,
+	"win_key":       NATIVE_WIN_KEY,
+	"win_mouse":     NATIVE_WIN_MOUSE,
+	"win_mousedown": NATIVE_WIN_MOUSEDOWN,
+	"win_time":      NATIVE_WIN_TIME,
+	"win_delay":     NATIVE_WIN_DELAY,
+
+	"pdf_open":       NATIVE_PDF_OPEN,
+	"pdf_new":        NATIVE_PDF_NEW,
+	"pdf_pages":      NATIVE_PDF_PAGES,
+	"pdf_page_size":  NATIVE_PDF_PAGE_SIZE,
+	"pdf_text":       NATIVE_PDF_TEXT,
+	"pdf_font":       NATIVE_PDF_FONT,
+	"pdf_page_begin": NATIVE_PDF_PAGE_BEGIN,
+	"pdf_color":      NATIVE_PDF_COLOR,
+	"pdf_write_rect": NATIVE_PDF_WRITE_RECT,
+	"pdf_write_line": NATIVE_PDF_WRITE_LINE,
+	"pdf_write_text": NATIVE_PDF_WRITE_TEXT,
+	"pdf_close":      NATIVE_PDF_CLOSE,
+}
 
 // ==========================================
 // EMITTER
 // ==========================================
 type Emitter struct {
-	code         []byte
-	deferred     bool
-	deferredBuf  []byte
-	deferredList [][]byte
-	condStart    int
-	inControl    bool
+	code []byte
+	caps [][]byte
+}
+
+// cur retorna el stream de salida activo (código principal o el buffer
+// de captura más reciente). Las posiciones y parches de saltos siempre
+// son consistentes dentro del mismo stream.
+func (e *Emitter) cur() *[]byte {
+	if n := len(e.caps); n > 0 {
+		return &e.caps[n-1]
+	}
+	return &e.code
 }
 
 func (e *Emitter) emit(b byte) {
-	if e.deferred {
-		e.deferredBuf = append(e.deferredBuf, b)
+	if n := len(e.caps); n > 0 {
+		e.caps[n-1] = append(e.caps[n-1], b)
 	} else {
 		e.code = append(e.code, b)
 	}
@@ -120,10 +307,11 @@ func (e *Emitter) emit(b byte) {
 func (e *Emitter) emit16(v uint16) { e.emit(byte(v)); e.emit(byte(v >> 8)) }
 func (e *Emitter) emitI16(v int16) { e.emit(byte(v)); e.emit(byte(v >> 8)) }
 func (e *Emitter) patchI16(off int, val int16) {
-	e.code[off] = byte(val)
-	e.code[off+1] = byte(val >> 8)
+	buf := *e.cur()
+	buf[off] = byte(val)
+	buf[off+1] = byte(val >> 8)
 }
-func (e *Emitter) pos() int { return len(e.code) }
+func (e *Emitter) pos() int { return len(*e.cur()) }
 
 func (e *Emitter) pushBool(val bool) {
 	e.emit(OP_PUSH)
@@ -328,15 +516,23 @@ func childTokText(ctx antlr.ParserRuleContext, idx int) string {
 // ==========================================
 // CODE GENERATOR
 // ==========================================
+// pkgField es un campo de package: 'local' lo marca privado (encapsulamiento),
+// sin modificador o con 'pub' queda público.
+type pkgField struct {
+	name    string
+	private bool
+}
+
 type CodeGen struct {
 	*BasePaxoListener
 	Emitter
 	locals    map[string]uint16
 	nextLocal uint16
 	errors    []string
+	warnings  []string
 
-	varTypes      map[string]byte
-	funcVarTypes  map[string]byte
+	varTypes     map[string]byte
+	funcVarTypes map[string]byte
 
 	inFunction         bool
 	savedCode          []byte
@@ -349,11 +545,20 @@ type CodeGen struct {
 	savedFuncLocals map[string]uint16
 	savedFuncNext   uint16
 
-	inCond        bool
-	condCodeStart int
+	// Condicionales (x ? v -> {} : ...): cada frame guarda el inicio del
+	// statement en el stream activo, su variable temporal y los bloques
+	// capturados por caso. caseOwner mapea cada bloque-caso a su frame.
+	conds     []*condFrame
+	caseOwner map[*BlockContext]*condFrame
+
+	// Bucles anidados: cada frame guarda el inicio de su condición y el
+	// parche del salto al final. pendingLoopBody marca que el próximo
+	// bloque abierto es el cuerpo del bucle recién iniciado.
+	loops           []loopFrame
+	pendingLoopBody bool
 
 	inPkg     bool
-	pkgFields []string
+	pkgFields []pkgField
 
 	inTryCatch       bool
 	tryBlockCount    int
@@ -369,12 +574,17 @@ func NewCodeGen() *CodeGen {
 		locals:           make(map[string]uint16),
 		varTypes:         make(map[string]byte),
 		funcVarTypes:     make(map[string]byte),
+		caseOwner:        make(map[*BlockContext]*condFrame),
 	}
 }
 
 func (cg *CodeGen) reportError(msg string) { cg.errors = append(cg.errors, msg) }
-func (cg *CodeGen) Code() []byte           { return cg.code }
-func (cg *CodeGen) Errors() []string       { return cg.errors }
+func (cg *CodeGen) reportWarning(msg string) {
+	cg.warnings = append(cg.warnings, msg)
+}
+func (cg *CodeGen) Code() []byte     { return cg.code }
+func (cg *CodeGen) Errors() []string { return cg.errors }
+func (cg *CodeGen) Warnings() []string { return cg.warnings }
 
 func (cg *CodeGen) resolveIdent(name string) (idx uint16, isLocal bool, found bool) {
 	if cg.inFunction {
@@ -444,6 +654,27 @@ func (cg *CodeGen) ExitProgram(ctx *ProgramContext) {
 func (cg *CodeGen) ExitVarDeclaration(ctx *VarDeclarationContext) {
 	name := ctx.IDENTIFIER().GetText()
 
+	if cg.inPkg {
+		private := false
+		if sc := ctx.Scope(); sc != nil && sc.GetStart().GetText() == "local" {
+			private = true
+		}
+		cg.pkgFields = append(cg.pkgFields, pkgField{name: name, private: private})
+		return
+	}
+
+	// Fuera de packages los modificadores de scope no hacen nada: deprecados.
+	if sc := ctx.Scope(); sc != nil {
+		token := sc.GetStart().GetText()
+		msg := fmt.Sprintf("línea %d: el modificador de scope '%s' está deprecado y se ignora",
+			sc.GetStart().GetLine(), token)
+		if ctx.Type_() != nil {
+			msg = fmt.Sprintf("línea %d: el modificador de scope '%s' está deprecado; escríbelo como '%s %s'",
+				sc.GetStart().GetLine(), token, ctx.Type_().GetText(), name)
+		}
+		cg.reportWarning(msg)
+	}
+
 	var varType byte = TYPE_NUM64
 	var isDynamic bool
 	if ctx.Type_() != nil {
@@ -452,11 +683,6 @@ func (cg *CodeGen) ExitVarDeclaration(ctx *VarDeclarationContext) {
 		isDynamic = (token == "var" || token == "📥")
 	} else {
 		isDynamic = true
-	}
-
-	if cg.inPkg {
-		cg.pkgFields = append(cg.pkgFields, name)
-		return
 	}
 
 	var idx uint16
@@ -582,91 +808,145 @@ func (cg *CodeGen) ExitAssignment(ctx *AssignmentContext) {
 // ==========================================
 // CondStatement
 // ==========================================
-func (cg *CodeGen) EnterCondStatement(ctx *CondStatementContext) {
-	cg.inCond = true
-	cg.condCodeStart = len(cg.code)
+// ==========================================
+// CondStatement
+// Layout por caso: [LOAD tmp][valor][EQ][JIF siguiente][bloque][JMP fin]
+// ==========================================
+
+type condFrame struct {
+	start    int // posición del statement en el stream activo
+	tmpVar   uint16
+	localTmp bool // true si el temporal vive en el frame de función (OP_*_LOCAL)
+	blocks   [][]byte // bytecode capturado de cada caso, en orden
 }
 
-func (cg *CodeGen) ExitCondStatement(ctx *CondStatementContext) {
-	cg.inCond = false
-
-	if len(cg.deferredBuf) > 0 {
-		cg.deferredList = append(cg.deferredList, cg.deferredBuf)
+func caseBlockOf(mc IMatchCaseContext) *BlockContext {
+	if blk := mc.Block(); blk != nil {
+		if c, ok := blk.(*BlockContext); ok {
+			return c
+		}
 	}
-	cg.deferredBuf = nil
+	return nil
+}
 
-	blocks := cg.deferredList
-	cg.deferredList = nil
+func (cg *CodeGen) EnterCondStatement(ctx *CondStatementContext) {
+	// La variable temporal se aloja al entrar (no al salir) para que los
+	// condicionales anidados usen slots distintos y no se pisen en runtime.
+	// Dentro de una función el temporal debe vivir en el frame local: si se
+	// usara un slot global pisaría variables del llamador (p. ej. un contador
+	// de bucle) en cuanto la función se invoque.
+	f := &condFrame{start: cg.pos()}
+	if cg.inFunction {
+		f.tmpVar = cg.funcNextLocal
+		f.localTmp = true
+		cg.funcNextLocal++
+	} else {
+		f.tmpVar = cg.nextLocal
+		cg.nextLocal++
+	}
+	for _, mc := range ctx.AllMatchCase() {
+		if blk := caseBlockOf(mc); blk != nil {
+			cg.caseOwner[blk] = f
+		}
+	}
+	cg.conds = append(cg.conds, f)
+}
 
-	cases := ctx.AllMatchCase()
-	if len(cases) == 0 {
+// Layout lineal por caso: [LOAD tmp][valor][EQ][JIF siguiente][bloque][JMP fin]
+// El wildcard (_) emite su bloque sin guard (siempre ejecuta).
+func (cg *CodeGen) ExitCondStatement(ctx *CondStatementContext) {
+	n := len(cg.conds)
+	if n == 0 {
 		return
 	}
+	f := cg.conds[n-1]
+	cg.conds = cg.conds[:n-1]
+	for _, mc := range ctx.AllMatchCase() {
+		if blk := caseBlockOf(mc); blk != nil {
+			delete(cg.caseOwner, blk)
+		}
+	}
 
-	cg.code = cg.code[:cg.condCodeStart]
-
-	condVar := cg.nextLocal
-	cg.nextLocal++
+	cases := ctx.AllMatchCase()
+	out := cg.cur()
+	*out = (*out)[:f.start]
 
 	cg.walkTree(ctx.Expression())
-	cg.emit(OP_STORE_VAR)
-	cg.emit16(condVar)
+	if f.localTmp {
+		cg.emit(OP_STORE_LOCAL)
+	} else {
+		cg.emit(OP_STORE_VAR)
+	}
+	cg.emit16(f.tmpVar)
 
 	var endPatches []int
 
 	for i, mc := range cases {
-		isWildcard := childTokText(mc, 0) == "_"
-
-		if isWildcard {
-			if i < len(blocks) {
-				cg.code = append(cg.code, blocks[i]...)
-			}
-		} else {
-			cg.walkTree(mc.Expression())
-			cg.emit(OP_JUMP_IF_FALSE)
-			skipPatch := cg.pos()
-			cg.emitI16(0)
-			if i < len(blocks) {
-				cg.code = append(cg.code, blocks[i]...)
-			}
-			cg.emit(OP_JUMP)
-			endPatch := cg.pos()
-			cg.emitI16(0)
-			cg.patchI16(skipPatch, int16(cg.pos()-skipPatch-2))
-			endPatches = append(endPatches, endPatch)
+		if i >= len(f.blocks) {
+			break
 		}
+		if childTokText(mc, 0) == "_" {
+			p := cg.cur()
+			*p = append(*p, f.blocks[i]...)
+			continue
+		}
+		if f.localTmp {
+			cg.emit(OP_LOAD_LOCAL)
+		} else {
+			cg.emit(OP_LOAD_VAR)
+		}
+		cg.emit16(f.tmpVar)
+		cg.walkTree(mc.Expression())
+		cg.emit(OP_EQ)
+		cg.emit(OP_JUMP_IF_FALSE)
+		skipPatch := cg.pos()
+		cg.emitI16(0)
+		p := cg.cur()
+		*p = append(*p, f.blocks[i]...)
+		cg.emit(OP_JUMP)
+		endPatch := cg.pos()
+		cg.emitI16(0)
+		cg.patchI16(skipPatch, int16(cg.pos()-skipPatch-2))
+		endPatches = append(endPatches, endPatch)
 	}
 
 	for _, ep := range endPatches {
 		cg.patchI16(ep, int16(cg.pos()-ep-2))
 	}
 
-	cg.nextLocal--
+	if f.localTmp {
+		cg.funcNextLocal--
+	} else {
+		cg.nextLocal--
+	}
 }
 
 // ==========================================
 // LoopStatement
+// Layout lineal: [cond][JIF fin][cuerpo][JMP cond]
 // ==========================================
+
+type loopFrame struct {
+	condStart int
+	jifEnd    int
+	bodyBlock *BlockContext // bloque que abrió el cuerpo; su cierre cierra el bucle
+}
+
 func (cg *CodeGen) EnterLoopStatement(ctx *LoopStatementContext) {
-	cg.condStart = cg.pos()
-	cg.inControl = true
+	cg.loops = append(cg.loops, loopFrame{condStart: cg.pos()})
+	cg.pendingLoopBody = true
 }
 
 func (cg *CodeGen) ExitLoopStatement(ctx *LoopStatementContext) {
-	blockCode := cg.deferredBuf
-	cg.deferredBuf = nil
-	condStart := cg.condStart
-	cg.inControl = false
-
-	cg.emit(OP_JUMP_IF_FALSE)
-	jumpEndPatch := cg.pos()
-	cg.emitI16(0)
-	cg.code = append(cg.code, blockCode...)
-	cg.emit(OP_JUMP)
-	jumpBackPatch := cg.pos()
-	cg.emitI16(int16(condStart - cg.pos()))
-	cg.patchI16(jumpBackPatch, int16(condStart-cg.pos()))
-	cg.patchI16(jumpEndPatch, int16(cg.pos()-jumpEndPatch-2))
+	// El cierre real ocurre en ExitBlock al cerrar el cuerpo; esto es
+	// una red de seguridad por si el cuerpo nunca se abrió.
+	if len(cg.loops) > 0 && !cg.pendingLoopBody {
+		return
+	}
+	if len(cg.loops) > 0 {
+		cg.loops = cg.loops[:len(cg.loops)-1]
+	}
+	cg.pendingLoopBody = false
 }
 
 // ==========================================
@@ -843,79 +1123,14 @@ func (cg *CodeGen) ExitCallExpr(ctx *CallExprContext) {
 		}
 	}
 
+	if id, ok := nativeNames[name]; ok {
+		cg.emit(OP_CALL_NATIVE)
+		cg.emit16(id)
+		cg.emit(byte(argCount))
+		return
+	}
+
 	switch name {
-	case "print":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_PRINT)
-		cg.emit(byte(argCount))
-	case "println":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_PRINTLN)
-		cg.emit(byte(argCount))
-	case "typeof":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_TYPEOF)
-		cg.emit(byte(argCount))
-	case "text_color":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_SET_COLOR_TEXT)
-		cg.emit(byte(argCount))
-	case "text_type":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_SET_TYPE_TEXT)
-		cg.emit(byte(argCount))
-	case "bg_color":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_SET_COLOR_BACK)
-		cg.emit(byte(argCount))
-	case "reset_color":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_RESET_COLOR)
-		cg.emit(byte(argCount))
-	case "scan":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_SCAN)
-		cg.emit(byte(argCount))
-	case "array_len":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_ARRAY_LEN)
-		cg.emit(byte(argCount))
-	case "array_push":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_ARRAY_PUSH)
-		cg.emit(byte(argCount))
-	case "init_window":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_INIT_WINDOW)
-		cg.emit(byte(argCount))
-	case "clear_screen":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_CLEAR_SCREEN)
-		cg.emit(byte(argCount))
-	case "draw_rect":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_DRAW_RECT)
-		cg.emit(byte(argCount))
-	case "file_read":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_FILE_READ)
-		cg.emit(byte(argCount))
-	case "file_write":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_FILE_WRITE)
-		cg.emit(byte(argCount))
-	case "file_append":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_FILE_APPEND)
-		cg.emit(byte(argCount))
-	case "file_exists":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_FILE_EXISTS)
-		cg.emit(byte(argCount))
-	case "file_delete":
-		cg.emit(OP_CALL_NATIVE)
-		cg.emit16(NATIVE_FILE_DELETE)
-		cg.emit(byte(argCount))
 	default:
 		idx, ok := cg.locals[name]
 		if !ok {
@@ -941,12 +1156,21 @@ func (cg *CodeGen) EnterBlock(ctx *BlockContext) {
 		}
 		return
 	}
-	if cg.inControl || cg.inCond {
-		if cg.deferred && len(cg.deferredBuf) > 0 {
-			cg.deferredList = append(cg.deferredList, cg.deferredBuf)
-		}
-		cg.deferred = true
-		cg.deferredBuf = make([]byte, 0)
+	// Bloque-caso de un condicional: se captura en un buffer propio.
+	if _, ok := cg.caseOwner[ctx]; ok {
+		cg.caps = append(cg.caps, nil)
+		return
+	}
+	// El primer bloque tras iniciar un bucle es su cuerpo: se emite el
+	// salto condicional al final y se marca el frame como abierto.
+	if cg.pendingLoopBody {
+		f := &cg.loops[len(cg.loops)-1]
+		cg.emit(OP_JUMP_IF_FALSE)
+		f.jifEnd = cg.pos()
+		cg.emitI16(0)
+		f.bodyBlock = ctx
+		cg.pendingLoopBody = false
+		return
 	}
 }
 
@@ -955,12 +1179,22 @@ func (cg *CodeGen) ExitBlock(ctx *BlockContext) {
 		cg.tryBlockCount++
 		return
 	}
-	if cg.deferred {
-		if cg.inCond {
-			cg.deferredList = append(cg.deferredList, cg.deferredBuf)
-			cg.deferredBuf = nil
-		}
-		cg.deferred = false
+	// Cierre de bloque-caso: el buffer capturado pasa a su frame.
+	if f, ok := cg.caseOwner[ctx]; ok {
+		n := len(cg.caps)
+		f.blocks = append(f.blocks, cg.caps[n-1])
+		cg.caps = cg.caps[:n-1]
+		return
+	}
+	// Cierre del cuerpo de un bucle (identificado por bloque, no por
+	// profundidad, para no confundirlo con bloques anidados).
+	if len(cg.loops) > 0 && cg.loops[len(cg.loops)-1].bodyBlock == ctx {
+		f := cg.loops[len(cg.loops)-1]
+		cg.loops = cg.loops[:len(cg.loops)-1]
+		cg.emit(OP_JUMP)
+		back := int16(f.condStart - (cg.pos() + 2))
+		cg.emitI16(back)
+		cg.patchI16(f.jifEnd, int16(cg.pos()-f.jifEnd-2))
 	}
 }
 func (cg *CodeGen) ExitMatchCase(ctx *MatchCaseContext) {}
@@ -1103,10 +1337,15 @@ func (cg *CodeGen) emitPackage(ctx IPkgDeclarationContext) {
 	cg.emit(OP_PKG_NEW)
 	cg.emit16(count)
 	for i := len(fields) - 1; i >= 0; i-- {
-		name := fields[i]
-		cg.emit16(uint16(len(name)))
-		for _, b := range []byte(name) {
+		f := fields[i]
+		cg.emit16(uint16(len(f.name)))
+		for _, b := range []byte(f.name) {
 			cg.emit(b)
+		}
+		if f.private {
+			cg.emit(1) // campo privado: OP_PKG_GET/SET lo rechazan desde fuera
+		} else {
+			cg.emit(0)
 		}
 	}
 }
@@ -1127,6 +1366,10 @@ func Compile(inputFile, outputFile string, dump bool) error {
 
 	cg := NewCodeGen()
 	antlr.ParseTreeWalkerDefault.Walk(cg, tree)
+
+	for _, w := range cg.warnings {
+		fmt.Fprintf(os.Stderr, "Warning: %s\n", w)
+	}
 
 	if len(cg.errors) > 0 {
 		for _, e := range cg.errors {

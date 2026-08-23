@@ -374,6 +374,167 @@ reset_color()
 
 > Estas funciones dibujan en la terminal con códigos de escape ANSI (no requieren SDL ni OpenGL).
 
+### Imágenes (stb_image)
+
+Siempre disponibles (header-only, sin dependencias). Los píxeles son arrays de números 0..255.
+
+```
+img_load(ruta)                          // -> [w, h, canales, byte0, byte1, ...] ([] si falla)
+img_info(ruta)                          // -> [w, h, canales] sin decodificar ([] si falla)
+img_save_png(ruta, w, h, ch, datos)     // datos = array de píxeles; retorna .✓/.×
+img_save_jpg(ruta, w, h, ch, datos)     // calidad fija 90; retorna .✓/.×
+img_save_bmp(ruta, w, h, ch, datos)     // retorna .✓/.×
+img_resize(datos, w, h, nw, nh, ch)     // -> array de píxeles reescalado ([] si falla)
+```
+
+**Ejemplo:**
+
+```
+local var px = «255,0,0, 0,255,0, 0,0,255, 255,255,0»;
+img_save_png("test.png", 2, 2, 3, px);
+local var img = img_load("test.png");
+println(img[0], "x", img[1]);           // 2 x 2
+local var mini = img_resize(px, 2, 2, 1, 1, 3);
+```
+
+### Fuentes (stb_truetype)
+
+Siempre disponibles. Carga archivos `.ttf` y rasteriza glifos a bitmaps.
+
+```
+font_load(ruta)                     // -> handle (>0) o 0 si falla
+font_glyph(font, codigo, tam_px)    // -> [w, h, off_x, off_y, avance, byte0, ...]
+font_metrics(font, tam_px)          // -> [ascendente, descendente, linegap]
+font_free(font)                     // libera la fuente
+```
+
+**Ejemplo:**
+
+```
+local var f = font_load("DejaVuSans.ttf");
+local var m = font_metrics(f, 32);
+local var g = font_glyph(f, 'A', 32);   // bitmap de cobertura 0..255
+println(g[0], "x", g[1]);               // ancho x alto del glifo
+font_free(f);
+```
+
+### Audio (miniaudio)
+
+Siempre disponible. Reproduce MP3/WAV/FLAC/OGG, etc.
+
+```
+audio_init()                  // inicializa el motor, .✓/.× (idempotente)
+audio_play(ruta, en_loop)     // -> handle (>0) o 0 si falla; inicia sonando
+audio_pause(handle)           // pausa, .✓/.×
+audio_resume(handle)          // reanuda, .✓/.×
+audio_stop(handle)            // detiene y libera, .✓/.×
+audio_volume(handle, vol)     // volumen 0..1+ , .✓/.×
+audio_playing(handle)         // ¿sigue sonando?, .✓/.×
+audio_quit()                  // detiene todo y libera el motor
+```
+
+**Ejemplo:**
+
+```
+local var s = audio_play("musica.ogg", .✓);
+audio_volume(s, 80);
+// ...
+audio_stop(s);
+```
+
+### Física 2D (Chipmunk2D)
+
+Siempre disponible: las fuentes oficiales se venden en
+`Src/Vm/Src/third_party/chipmunk` y se compilan junto a la VM.
+Espacios, cuerpos y formas se referencian por handles numéricos.
+
+```
+phys_space()                        // nuevo espacio -> handle
+phys_gravity(space, gx, gy)
+phys_step(space, dt)                // avanza la simulación un paso
+phys_body(space, masa, inercia)     // cuerpo dinámico -> handle
+phys_body_static(space)             // cuerpo estático -> handle
+phys_pos(body)                      // -> [x, y]
+phys_vel(body)                      // -> [vx, vy]
+phys_set_pos(body, x, y)
+phys_set_vel(body, vx, vy)
+phys_angle(body)                    // ángulo en radianes
+phys_set_angle(body, radianes)
+phys_force(body, fx, fy)            // fuerza acumulada este paso
+phys_impulse(body, ix, iy)          // impulso instantáneo
+phys_circle(space, body, ox, oy, r) // forma círculo -> handle
+phys_box(space, body, w, h)         // caja centrada en el cuerpo -> handle
+phys_segment(space, body, ax, ay, bx, by, r)  // segmento -> handle
+phys_elasticity(shape, e)           // rebote
+phys_friction(shape, f)             // rozamiento
+phys_collide(shape_a, shape_b)      // ¿están colisionando?, .✓/.×
+phys_free_shape(shape) / phys_free_body(body)
+phys_free_space(space)              // libera espacio + cuerpos + formas
+```
+
+**Ejemplo:** ver `Src/Testfiles/libs_phys.paxo`.
+
+### Ventana y gráficos (SDL3, opcional)
+
+Requieren SDL3 instalada en el sistema (`pkg-config --exists sdl3`);
+el script de build las detecta solas. Si no está, `win_open` retorna `.×`
+y el resto no hace nada.
+
+```
+win_open(titulo, w, h)      // abre ventana+renderer, .✓/.×
+win_close()
+win_color(r, g, b)          // color de dibujo 0..255
+win_clear()                 // limpia con el color actual
+win_rect(x, y, w, h)        // rectángulo relleno
+win_line(x1, y1, x2, y2)
+win_circle(cx, cy, radio)   // círculo relleno
+win_text(x, y, texto)       // texto rápido (fuente interna 8x8)
+tex_load(datos, w, h, ch)   // textura desde píxeles RGB/RGBA -> handle
+tex_draw(tex, x, y [,w, h])
+tex_free(tex)
+win_show()                  // presenta el frame
+win_poll()                  // procesa eventos -> array de strings:
+                            //   "quit", "keydown:<tecla>", "keyup:<tecla>",
+                            //   "mousedown", "mouseup"
+win_key("A" | "Space" | ...)  // ¿tecla presionada?, .✓/.×
+win_mouse()                 // -> [x, y]
+win_mousedown()             // ¿botón izquierdo?, .✓/.×
+win_time()                  // ms desde el inicio
+win_delay(ms)
+```
+
+**Ejemplo:** ver `Src/Testfiles/libs_win.paxo`.
+
+### PDF (pdfio)
+
+Siempre disponible: las fuentes oficiales se venden en
+`Src/Vm/Src/third_party/pdfio` (+ zlib en `third_party/zlib`) y se
+compilan junto a la VM. Coordenadas en puntos desde la esquina
+inferior izquierda.
+
+```
+pdf_open(ruta)                    // abre para lectura -> handle o 0
+pdf_new(ruta [, ancho, alto])     // crea para escritura -> handle o 0
+                                  // (tamaño por defecto: carta 612x792)
+pdf_pages(doc)                    // cantidad de páginas (lectura)
+pdf_page_size(doc, pagina)        // -> [ancho, alto]
+pdf_text(doc, pagina)             // extrae el texto plano de una página
+pdf_font(doc, "Helvetica")        // registra fuente base14 ("Courier",
+                                  //  "Times-Roman", ...); retorna índice
+pdf_page_begin(doc)               // comienza una página (escritura)
+pdf_color(doc, r, g, b)           // color relleno/trazo 0..255
+pdf_write_rect(doc, x, y, w, h)   // rectángulo relleno
+pdf_write_line(doc, x1, y1, x2, y2)
+pdf_write_text(doc, x, y, tam, texto)
+pdf_close(doc)                    // guarda (escritura) o libera (lectura)
+```
+
+**Ejemplo:** ver `Src/Testfiles/libs_pdf.paxo`.
+
+> Los handles retornados por física/audio/fuentes/texturas/PDF son números;
+> usar un handle inválido (0 o liberado) hace que la función retorne `.×`,
+> 0 o un array vacío según corresponda, sin romper la VM.
+
 ### Información de tipos
 
 ```
@@ -480,6 +641,29 @@ npm run test:bcg    # Tests del compilador (Go)
 ```
 
 ## Changelog reciente
+
+### Funciones nativas de librerías (nuevo)
+- Nuevas familias de funciones nativas: imágenes (`img_*`), fuentes
+  (`font_*`), audio (`audio_*`), física 2D (`phys_*`), ventana/gráficos
+  SDL3 (`win_*`, `tex_*`) y PDF (`pdf_*`). Ver sección "Funciones nativas"
+- Chipmunk2D, pdfio y zlib se venden como **fuentes completas** en
+  `Src/Vm/Src/third_party/` y se compilan junto a la VM (`sh/build_vm.sh`);
+  no requieren instalación
+- stb_image / stb_truetype / miniaudio siguen siendo header-only
+- SDL3 es opcional: si `pkg-config` la detecta, el build habilita las
+  funciones de ventana con `-DPAXO_ENABLE_SDL3`; si no, degradan sin romper
+
+### Condicionales anidados (corregido)
+- `(x) ? caso -> {...}` comparaba mal: saltaba según la veracidad del
+  valor del caso en vez de compararlo con la condición; ahora emite
+  `LOAD tmp; valor; EQ; JIF` correctamente
+- Los condicionales son reentrantes: cada instancia usa su propio frame
+  (variable temporal y bloques capturados), así que anidarlos dentro de
+  otros condicionales o bucles ya no corrompe el bytecode
+
+### Bucles anidados (corregido)
+- El cierre del cuerpo del bucle se identifica por bloque exacto
+  (no por profundidad), evitando cierres prematuros con bloques anidados
 
 ### Paquetes con dot-access (nuevo)
 - `{ var campo = valor; }` crea objetos PACKAGE con campos propios

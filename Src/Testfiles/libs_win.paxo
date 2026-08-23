@@ -1,0 +1,31 @@
+// Prueba de ventana/graficos SDL3 (win_*, tex_*).
+// Sin SDL3 instalada: win_open retorna .x y todo degrada sin romper la VM.
+
+local var w = win_open("Paxo", 320, 240);
+println(w);
+
+(w) ? 1 -> {
+    win_color(30, 30, 60);
+    win_clear();
+    win_color(255, 200, 0);
+    win_rect(10, 10, 50, 40);
+    win_line(0, 0, 100, 80);
+    win_circle(160, 120, 30);
+    win_text(5, 5, "hola paxo");
+
+    local var px = «255, 0, 0, 255, 0, 255, 0, 255, 255, 255, 255, 255, 0, 0, 255, 255»;
+    local var tex = tex_load(px, 2, 2, 4);
+    tex_draw(tex, 100, 100);
+    tex_free(tex);
+
+    win_show();
+    local var evs = win_poll();
+    println("eventos: ", array_len(evs));
+    println(win_key("A"));
+    println(win_mousedown());
+    println(win_time());
+    win_delay(500);
+    win_close();
+} : _ -> {
+    println("SDL3 no disponible: sin ventanas");
+};

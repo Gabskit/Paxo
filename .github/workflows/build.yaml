@@ -42,4 +42,3 @@ jobs:
             Build/Lepvm
             Build/Bcg
             Build/lep.h
-            Build/libpaxo_vm.a

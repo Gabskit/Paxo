@@ -86,21 +86,22 @@ func TestEmitterEmit16(t *testing.T) {
 }
 
 func TestEmitterDeferred(t *testing.T) {
-	e := Emitter{code: make([]byte, 0), deferred: true, deferredBuf: make([]byte, 0)}
+	e := Emitter{code: make([]byte, 0)}
+	e.caps = append(e.caps, nil) // activar captura
 	e.emit(OP_ADD)
 	if len(e.code) != 0 {
-		t.Error("deferred emit should not write to code")
+		t.Error("captured emit should not write to code")
 	}
-	if len(e.deferredBuf) != 1 {
-		t.Fatal("deferred emit should write to deferredBuf")
+	if len(e.caps[0]) != 1 {
+		t.Fatal("captured emit should write to the capture buffer")
 	}
-	if e.deferredBuf[0] != OP_ADD {
-		t.Errorf("deferred: expected OP_ADD, got %d", e.deferredBuf[0])
+	if e.caps[0][0] != OP_ADD {
+		t.Errorf("captured: expected OP_ADD, got %d", e.caps[0][0])
 	}
-	e.deferred = false
+	e.caps = e.caps[:len(e.caps)-1] // cerrar captura
 	e.emit(OP_SUB)
 	if len(e.code) != 1 || e.code[0] != OP_SUB {
-		t.Error("after un-deferred, emit should write to code")
+		t.Error("after capture closed, emit should write to code")
 	}
 }
 

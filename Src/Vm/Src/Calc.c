@@ -79,6 +79,7 @@ typedef struct PaxoPackageField {
   char *key;
   struct PaxoPackageField *next;
   PaxoVar value;
+  bool hidden; // campo privado (declarado con 'local' dentro del pkg)
 } PaxoPackageField;
 
 

@@ -1,0 +1,27 @@
+// Prueba de imágenes: guardar PNG/JPG/BMP desde un array, info sin
+// decodificar, cargar de vuelta y reescalar. Los archivos temporales se
+// crean en Src/Testfiles y se borran al final con file_delete.
+
+var px = «255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 0»; // 2x2 RGB
+
+var ok = img_save_png("Src/Testfiles/paxo_test.png", 2, 2, 3, px);
+println("png guardado: ", ok);
+var okj = img_save_jpg("Src/Testfiles/paxo_test.jpg", 2, 2, 3, px);
+println("jpg guardado: ", okj);
+var okb = img_save_bmp("Src/Testfiles/paxo_test.bmp", 2, 2, 3, px);
+println("bmp guardado: ", okb);
+
+var info = img_info("Src/Testfiles/paxo_test.png");
+println("info: ", info[0], "x", info[1], "x", info[2]);
+
+var img = img_load("Src/Testfiles/paxo_test.png");
+println("cargada: ", img[0], "x", img[1], "x", img[2], ", ", array_len(img) - 3, " bytes de pixeles");
+
+// reescalar 2x2 -> 1x1: debe promediar (rojo, verde, azul, blanco)
+var small = img_resize(px, 2, 2, 1, 1, 3);
+println("reescalada: ", small[0], ",", small[1], ",", small[2]);
+
+// limpieza
+file_delete("Src/Testfiles/paxo_test.png");
+file_delete("Src/Testfiles/paxo_test.jpg");
+file_delete("Src/Testfiles/paxo_test.bmp");
