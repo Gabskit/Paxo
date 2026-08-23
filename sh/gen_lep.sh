@@ -5,6 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 VM_SRC="$ROOT_DIR/Src/Vm/Src"
+
 OUT="$ROOT_DIR/Build/lep.h" #se guarda en /Build junto con los binarios de vm y compilador
 
 # Archivos en orden de dependencia (sin Main.c ni Jit.c)

@@ -5,7 +5,7 @@
 	"scripts": {
 		"antlr": "antlr-ng -Dlanguage=Go -o ./Src/Bcgen ./Src/Bcgen/Paxo.g4",
 		"build:bcg": "mkdir -p ./Build && go build -o ./Build/Bcg ./Src/Bcgen/cmd/paxocc/",
-		"build:vm": "mkdir -p ./Build && gcc -Wall -Wextra -O3 -std=gnu23 ./Src/Vm/Src/Main.c -o ./Build/Lepvm -lm",
+		"build:vm": "mkdir -p ./Build && gcc -Wall -Wextra -O3 -std=gnu23 -I./Src/Vm/Src ./Src/Vm/Src/Main.c -o ./Build/Lepvm -lm",
 		"build": "npm run antlr && npm run build:bcg && npm run build:vm && npm run gen:lep",
 		"gen:lep": "bash sh/gen_lep.sh",
 		"test:vm": "npm run gen:lep && mkdir -p ./Build && gcc -Wall -Wextra -std=gnu23 -I./Build -o ./Build/test_vm_full ./Src/Test/test_vm_full.c -lm && ./Build/test_vm_full",

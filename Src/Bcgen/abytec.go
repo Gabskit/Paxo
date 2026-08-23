@@ -84,6 +84,18 @@ const (
 	NATIVE_SCAN           uint16 = 7
 	NATIVE_ARRAY_LEN      uint16 = 8
 	NATIVE_ARRAY_PUSH     uint16 = 9
+
+	// Nuevas funciones gráficas
+	NATIVE_INIT_WINDOW  uint16 = 10
+	NATIVE_CLEAR_SCREEN uint16 = 11
+	NATIVE_DRAW_RECT    uint16 = 12
+
+	// Manejo de archivos
+	NATIVE_FILE_READ   uint16 = 13
+	NATIVE_FILE_WRITE  uint16 = 14
+	NATIVE_FILE_APPEND uint16 = 15
+	NATIVE_FILE_EXISTS uint16 = 16
+	NATIVE_FILE_DELETE uint16 = 17
 )
 
 // ==========================================
@@ -871,6 +883,38 @@ func (cg *CodeGen) ExitCallExpr(ctx *CallExprContext) {
 	case "array_push":
 		cg.emit(OP_CALL_NATIVE)
 		cg.emit16(NATIVE_ARRAY_PUSH)
+		cg.emit(byte(argCount))
+	case "init_window":
+		cg.emit(OP_CALL_NATIVE)
+		cg.emit16(NATIVE_INIT_WINDOW)
+		cg.emit(byte(argCount))
+	case "clear_screen":
+		cg.emit(OP_CALL_NATIVE)
+		cg.emit16(NATIVE_CLEAR_SCREEN)
+		cg.emit(byte(argCount))
+	case "draw_rect":
+		cg.emit(OP_CALL_NATIVE)
+		cg.emit16(NATIVE_DRAW_RECT)
+		cg.emit(byte(argCount))
+	case "file_read":
+		cg.emit(OP_CALL_NATIVE)
+		cg.emit16(NATIVE_FILE_READ)
+		cg.emit(byte(argCount))
+	case "file_write":
+		cg.emit(OP_CALL_NATIVE)
+		cg.emit16(NATIVE_FILE_WRITE)
+		cg.emit(byte(argCount))
+	case "file_append":
+		cg.emit(OP_CALL_NATIVE)
+		cg.emit16(NATIVE_FILE_APPEND)
+		cg.emit(byte(argCount))
+	case "file_exists":
+		cg.emit(OP_CALL_NATIVE)
+		cg.emit16(NATIVE_FILE_EXISTS)
+		cg.emit(byte(argCount))
+	case "file_delete":
+		cg.emit(OP_CALL_NATIVE)
+		cg.emit16(NATIVE_FILE_DELETE)
 		cg.emit(byte(argCount))
 	default:
 		idx, ok := cg.locals[name]

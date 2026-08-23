@@ -328,6 +328,52 @@ array_len(arr)          // retorna la cantidad de elementos
 array_push(arr, valor)  // agrega un elemento al final del array
 ```
 
+### Archivos
+
+```
+file_read(ruta)              // lee todo el archivo como string ("" si falla)
+file_write(ruta, texto)      // escribe/sobrescribe, retorna .✓/.×
+file_append(ruta, texto)     // agrega al final del archivo, retorna .✓/.×
+file_exists(ruta)            // retorna .✓ si el archivo existe
+file_delete(ruta)            // borra el archivo, retorna .✓/.×
+```
+
+**Ejemplo:**
+
+```
+file_write("datos.txt", "línea 1");
+file_append("datos.txt", "línea 2");
+println(file_read("datos.txt"));     // línea 1línea 2
+println(file_exists("datos.txt"));   // true
+file_delete("datos.txt");
+```
+
+> Las rutas son relativas al directorio desde donde se ejecuta la VM.
+
+### Gráficos (terminal ANSI)
+
+El lienzo se define con `init_window(ancho, alto)` y se dibuja con caracteres de bloque. Coordenadas **0-based** desde la esquina superior izquierda; lo que sale del lienzo se recorta.
+
+```
+init_window(ancho, alto)      // define el tamaño del lienzo, retorna .✓/.×
+clear_screen()                // limpia la terminal
+draw_rect(x, y, ancho, alto)  // rectángulo relleno con el color de texto actual
+```
+
+**Ejemplo:**
+
+```
+init_window(40, 12)
+clear_screen()
+text_color("red")
+draw_rect(2, 1, 10, 4);
+text_color("blue")
+draw_rect(8, 3, 10, 4);
+reset_color()
+```
+
+> Estas funciones dibujan en la terminal con códigos de escape ANSI (no requieren SDL ni OpenGL).
+
 ### Información de tipos
 
 ```
@@ -480,10 +526,10 @@ ISC
 
 ## dependencias usadas
 
-[termcolor][https://github.com/ararslan/termcolor-c.git]
-[simple2d][https://github.com/simple2d/simple2d.git]
-[NanoVG][https://github.com/memononen/nanovg.git]
-[stb image, trutype][https://github.com/nothings/stb.git]
-[PDF io][https://github.com/michaelrsweet/pdfio.git]
-[miniaudio][https://miniaud.io/]
-[Chipmunk2D][https://codeberg.org/slembcke/Chipmunk2D]
+[termcolor] [https://github.com/ararslan/termcolor-c.git]
+[simple2d] [https://github.com/simple2d/simple2d.git]
+[NanoVG] [https://github.com/memononen/nanovg.git]
+[stb image, trutype] [https://github.com/nothings/stb.git]
+[PDF io] [https://github.com/michaelrsweet/pdfio.git]
+[miniaudio] [https://miniaud.io/]
+[Chipmunk2D] [https://codeberg.org/slembcke/Chipmunk2D]
