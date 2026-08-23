@@ -520,16 +520,30 @@ npm run test:bcg    # Tests del compilador (Go)
 ### Dark backgrounds (nuevo)
 - `bg_color()` soporta variantes oscuras: `"dark red"`, `"dark cyan"`, etc.
 
+### Dependencias vendidas (nuevo)
+- Headers de Chipmunk2D (`chipmunk*.h`, `cp*.h`), NanoVG (`nanovg.h`) y SDL3
+  (`SDL3/`, `SDL3_image/`, `SDL3_mixer/`, `SDL3_ttf/`) ahora viven en `Src/Vm/Src/`
+- Los includes de librerías externas se activan solos con `__has_include`
+  cuando sus dependencias están disponibles; la VM compila con o sin ellas
+- Para usar las funciones reales de estas libs hace falta linkear los `.so`
+  (p. ej. `-lSDL3 -lchipmunk -lnanovg`); hoy solo se usan sus declaraciones
+
 ## Licencia
 
 ISC
 
 ## dependencias usadas
 
+Vendidas como headers en `Src/Vm/Src/`:
+
 [termcolor] [https://github.com/ararslan/termcolor-c.git]
-[simple2d] [https://github.com/simple2d/simple2d.git]
 [NanoVG] [https://github.com/memononen/nanovg.git]
-[stb image, trutype] [https://github.com/nothings/stb.git]
-[PDF io] [https://github.com/michaelrsweet/pdfio.git]
+[stb image, truetype, image_write, image_resize2] [https://github.com/nothings/stb.git]
 [miniaudio] [https://miniaud.io/]
-[Chipmunk2D] [https://codeberg.org/slembcke/Chipmunk2D]
+[Chipmunk2D headers] [https://codeberg.org/slembcke/Chipmunk2D]
+[SDL3 / SDL3_image / SDL3_mixer / SDL3_ttf headers] [https://github.com/libsdl-org]
+[PDF io header] [https://github.com/michaelrsweet/pdfio.git]
+
+Externa (opcional, requiere SDL3 instalada para linkear):
+
+[simple2d] [https://github.com/simple2d/simple2d.git]
