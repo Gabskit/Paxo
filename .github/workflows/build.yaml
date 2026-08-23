@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ["main", "master"]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build & Test
@@ -20,16 +24,15 @@ jobs:
         with:
           go-version: "1.23"
 
-      - name: Install Clang
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang make binutils
-
+      # El runner ya trae gcc (sh/pick_cc.sh lo prefiere) y Node para npm.
       - name: Build VM
         run: npm run build:vm
 
       - name: Build Compiler
         run: npm run build:bcg
+
+      - name: Test Compiler
+        run: npm run test:bcg
 
       - name: Generate lep.h
         run: npm run gen:lep
