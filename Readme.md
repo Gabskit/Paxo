@@ -477,3 +477,13 @@ npm run test:bcg    # Tests del compilador (Go)
 ## Licencia
 
 ISC
+
+## dependencias usadas
+
+[termcolor][https://github.com/ararslan/termcolor-c.git]
+[simple2d][https://github.com/simple2d/simple2d.git]
+[NanoVG][https://github.com/memononen/nanovg.git]
+[stb image, trutype][https://github.com/nothings/stb.git]
+[PDF io][https://github.com/michaelrsweet/pdfio.git]
+[miniaudio][https://miniaud.io/]
+[Chipmunk2D][https://codeberg.org/slembcke/Chipmunk2D]

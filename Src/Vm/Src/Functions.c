@@ -1,6 +1,14 @@
 #pragma once
 #include "Calc.c"
 #include "Typecast_and_read.c"
+#include "chipmunk.h"
+#include "miniaudio.h"
+#include "nanovg_gl3.h"
+#include "simple2d.h"
+#include "stb_image.h"
+#include "stb_image_resize2.h"
+#include "stb_image_write.h"
+#include "stb_truetype.h"
 #include "termcolor-c.h"
 #include <stdint.h>
 #include <stdio.h>
