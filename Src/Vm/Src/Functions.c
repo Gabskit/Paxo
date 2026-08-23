@@ -7,9 +7,8 @@
 #include "chipmunk.h" // Chipmunk2D
 #endif
 #include "miniaudio.h"
-#if __has_include("nanovg.h") && __has_include(<GL/gl.h>)
-#define GL_GLEXT_PROTOTYPES
-#include <GL/gl.h>
+#if __has_include("nanovg.h")
+#include "gl3_compat.h"
 #include "nanovg_gl3.h" // NanoVG (requiere nanovg.h + headers GL)
 #endif
 #if __has_include(<SDL3/SDL.h>)
