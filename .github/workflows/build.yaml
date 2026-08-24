@@ -35,7 +35,7 @@ jobs:
 
       - name: Build VM
         run: npm run build:vm
-aml
+
       - name: Build Compiler
         run: npm run build:bcg
 
