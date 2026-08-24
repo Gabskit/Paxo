@@ -25,14 +25,14 @@ jobs:
           go-version: "1.23"
 
       # El runner ya trae gcc (sh/pick_cc.sh lo prefiere) y Node para npm.
-			name: Install GCC 14
+      - name: Install GCC 14
         run: |
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt-get update
           sudo apt-get install -y gcc-14 g++-14
           echo "CC=gcc-14" >> $GITHUB_ENV
           echo "CXX=g++-14" >> $GITHUB_ENV
-					
+
       - name: Build VM
         run: npm run build:vm
 aml
