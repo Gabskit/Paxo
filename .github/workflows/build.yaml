@@ -32,6 +32,7 @@ jobs:
           sudo apt-get install -y gcc-14 g++-14
           echo "CC=gcc-14" >> $GITHUB_ENV
           echo "CXX=g++-14" >> $GITHUB_ENV
+          npm i -D shx
 
       - name: Build VM
         run: npm run build:vm

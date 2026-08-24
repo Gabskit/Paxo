@@ -1,9 +1,9 @@
 #pragma once
 #include <stdint.h>
 #include <stdlib.h>
-#include <uchar.h>
 
 typedef unsigned char char8_t;
+typedef uint32_t char32_t;
 typedef unsigned _BitInt(2) PaxoBool;
 
 // ==========================================
@@ -82,7 +82,6 @@ typedef struct PaxoPackageField {
   bool hidden; // campo privado (declarado con 'local' dentro del pkg)
 } PaxoPackageField;
 
-
 typedef struct {
   PaxoVar *items;
   size_t len;
@@ -142,8 +141,8 @@ static inline Num64 var_num64_get(PaxoVar v) {
 static inline uint16_t num16_pack(Num16 n) {
   if (n.p > 5)
     n.p = 5;
-  return (uint16_t)((n.signo) | ((uint16_t)n.exp << 1) |
-                    ((uint16_t)n.bc << 3) | ((uint16_t)n.p << 13));
+  return (uint16_t)((n.signo) | ((uint16_t)n.exp << 1) | ((uint16_t)n.bc << 3) |
+                    ((uint16_t)n.p << 13));
 }
 
 static inline Num16 num16_unpack(uint16_t raw) {
@@ -168,9 +167,7 @@ static inline PaxoVar var_bool(bool b) {
          ((PaxoVar)(b ? 1u : 0u) << PAXO_VAL_SHIFT);
 }
 
-static inline bool var_bool_get(PaxoVar v) {
-  return (v >> PAXO_VAL_SHIFT) & 1;
-}
+static inline bool var_bool_get(PaxoVar v) { return (v >> PAXO_VAL_SHIFT) & 1; }
 
 static inline PaxoVar var_trit(uint8_t t) {
   return (PAXO_TAG_TRIT << 62) | PAXO_MARK_BOX |
@@ -182,8 +179,7 @@ static inline uint8_t var_trit_get(PaxoVar v) {
 }
 
 static inline PaxoVar var_char(char32_t c) {
-  return (PAXO_TAG_CHAR << 62) | PAXO_MARK_BOX |
-         ((PaxoVar)c << PAXO_VAL_SHIFT);
+  return (PAXO_TAG_CHAR << 62) | PAXO_MARK_BOX | ((PaxoVar)c << PAXO_VAL_SHIFT);
 }
 
 static inline char32_t var_char_get(PaxoVar v) {
@@ -191,10 +187,8 @@ static inline char32_t var_char_get(PaxoVar v) {
 }
 
 static inline PaxoVar var_ref(uint32_t sub, uint32_t punt, uint16_t aux13) {
-  return (PAXO_TAG_REF << 62) | PAXO_MARK_BOX |
-         ((PaxoVar)(sub & 0x7u) << 18) |
-         ((PaxoVar)(aux13 & 0x1FFFu) << PAXO_VAL_SHIFT) |
-         ((PaxoVar)punt << 21);
+  return (PAXO_TAG_REF << 62) | PAXO_MARK_BOX | ((PaxoVar)(sub & 0x7u) << 18) |
+         ((PaxoVar)(aux13 & 0x1FFFu) << PAXO_VAL_SHIFT) | ((PaxoVar)punt << 21);
 }
 
 static inline uint32_t var_ref_sub_get(PaxoVar v) {
@@ -321,16 +315,17 @@ static inline int64_t num16_canon(Num16 n) {
 }
 
 // modos de redondeo del reempaquetado
-enum { MP16_MEDIO = 0,   // al más cercano, .5 lejos de cero
-       MP16_ARRIBA = 1 // hacia fuera: primer techo válido del escaneo
+enum {
+  MP16_MEDIO = 0, // al más cercano, .5 lejos de cero
+  MP16_ARRIBA = 1 // hacia fuera: primer techo válido del escaneo
 };
 
 // num/den = valor leído en la década s con la frontera p
-static inline void mp16_fraccion(uint64_t mag, int16_t e, int16_t s,
-                                 uint16_t p, unsigned _BitInt(128) *num,
-                                 unsigned _BitInt(128) *den) {
-  *den = (unsigned _BitInt(128))1 << 10; // 4^MP16_FRAC
-  *num = (unsigned _BitInt(128))mag * mp16_pow4(p);
+static inline void mp16_fraccion(uint64_t mag, int16_t e, int16_t s, uint16_t p,
+                                 unsigned __int128 *num,
+                                 unsigned __int128 *den) {
+  *den = (unsigned __int128)1 << 10; // 4^MP16_FRAC
+  *num = (unsigned __int128)mag * mp16_pow4(p);
   int16_t d = e - s;
   if (d >= 0)
     *num *= num16_pow10((uint16_t)d);
@@ -356,7 +351,7 @@ static inline Num16 num16_repack(uint8_t signo, int64_t V, int16_t e,
     e++;
   }
 
-  unsigned _BitInt(128) num, den;
+  unsigned __int128 num, den;
 
   // --- paso 1: ajuste exacto ---
   for (int16_t s = e_min; s <= e_max; s++) {
@@ -377,35 +372,32 @@ static inline Num16 num16_repack(uint8_t signo, int64_t V, int16_t e,
   // El error se mide en unidades canónicas de una década base común
   // (la más fina del escaneo) para que comparar décadas sea justo
   const int16_t base = e_min;
-  unsigned _BitInt(128) objetivo = (unsigned _BitInt(128))mag;
+  unsigned __int128 objetivo = (unsigned __int128)mag;
   for (int16_t i = 0; i < e - base; i++)
     objetivo *= 10;
 
   int have = 0;
   uint64_t b_bc = 0;
   int16_t b_s = 0, b_p = 0;
-  unsigned _BitInt(128) b_err = 0;
+  unsigned __int128 b_err = 0;
   for (int16_t s = e_min; s <= e_max; s++) {
     for (int16_t p = MP16_FRAC; p >= 0; p--) {
       mp16_fraccion(mag, e, s, (uint16_t)p, &num, &den);
-      uint64_t bc =
-          (modo == MP16_ARRIBA) ? (uint64_t)((num + den - 1) / den)
-                                : (uint64_t)((num + den / 2) / den);
+      uint64_t bc = (modo == MP16_ARRIBA) ? (uint64_t)((num + den - 1) / den)
+                                          : (uint64_t)((num + den / 2) / den);
       if (bc < 1 || bc > bc_max)
         continue;
       if (modo == MP16_ARRIBA)
         return (Num16){signo, (uint16_t)(s + BIAS16), (uint16_t)bc,
                        (uint16_t)p};
       // |objetivo − canon(bc,p)·10^(s−base)|
-      unsigned _BitInt(128) valc =
-          (unsigned _BitInt(128))bc << (2 * (MP16_FRAC - p));
+      unsigned __int128 valc = (unsigned __int128)bc << (2 * (MP16_FRAC - p));
       for (int16_t i = 0; i < s - base; i++)
         valc *= 10;
-      unsigned _BitInt(128) err =
+      unsigned __int128 err =
           (valc > objetivo) ? valc - objetivo : objetivo - valc;
       if (!have || err < b_err ||
-          (err == b_err &&
-           (s < b_s || (s == b_s && (p > b_p || bc > b_bc))))) {
+          (err == b_err && (s < b_s || (s == b_s && (p > b_p || bc > b_bc))))) {
         have = 1;
         b_bc = bc;
         b_s = s;
@@ -420,7 +412,7 @@ static inline Num16 num16_repack(uint8_t signo, int64_t V, int16_t e,
 
   // sin candidato: desborde -> saturación; subflujo -> cero
   mp16_fraccion(mag, e, e_max, 0, &num, &den);
-  return ((num + den / 2) > den * (unsigned _BitInt(128))bc_max)
+  return ((num + den / 2) > den * (unsigned __int128)bc_max)
              ? (Num16){signo, (uint16_t)(e_max + BIAS16), bc_max, 0}
              : (Num16){0, (uint16_t)BIAS16, 0, 0};
 }
@@ -541,11 +533,11 @@ Num64 add_num64(Num64 a, Num64 b) {
 
   int16_t diff_exp = exp_a - exp_b;
   if (diff_exp > 15)
-    return (Num64){.signo = a.signo, .exp = a.exp, .bc = a.bc,
-                   .p = PROPAGAR_P(a, b)};
+    return (Num64){
+        .signo = a.signo, .exp = a.exp, .bc = a.bc, .p = PROPAGAR_P(a, b)};
 
-  _BitInt(128) val_a = (_BitInt(128))a.bc;
-  _BitInt(128) val_b = (_BitInt(128))b.bc;
+  __int128 val_a = (__int128)a.bc;
+  __int128 val_b = (__int128)b.bc;
 
   for (int16_t i = 0; i < diff_exp; i++)
     val_a *= 10;
@@ -555,13 +547,13 @@ Num64 add_num64(Num64 a, Num64 b) {
   if (b.signo)
     val_b = -val_b;
 
-  _BitInt(128) suma = val_a + val_b;
+  __int128 suma = val_a + val_b;
 
   if (suma == 0)
     return (Num64){0, (uint64_t)sesgo, 0, PROPAGAR_P(a, b)};
 
   uint8_t signo_res = (suma < 0) ? 1 : 0;
-  unsigned _BitInt(128) abs_suma = (suma < 0) ? -suma : suma;
+  unsigned __int128 abs_suma = (suma < 0) ? -suma : suma;
   int16_t exp_res = exp_b;
 
   // Suavizado en el techo: la subida de década redondea con techo para que
@@ -610,7 +602,7 @@ static inline Num64 mul_num64(Num64 a, Num64 b) {
   int16_t exp_res = ((int16_t)a.exp - sesgo - (int16_t)a.p) +
                     ((int16_t)b.exp - sesgo - (int16_t)b.p);
 
-  unsigned _BitInt(128) mult = (unsigned _BitInt(128))a.bc * b.bc;
+  unsigned __int128 mult = (unsigned __int128)a.bc * b.bc;
 
   // Suavizado en el techo: la subida de década redondea con techo
   while (mult > bc_max) {
@@ -648,9 +640,9 @@ static inline Num64 div_num64(Num64 a, Num64 b) {
   int16_t exp_res = ((int16_t)a.exp - sesgo - (int16_t)a.p) -
                     ((int16_t)b.exp - sesgo - (int16_t)b.p) - escala;
 
-  unsigned _BitInt(128) num_a =
-      (unsigned _BitInt(128))a.bc * 1000000000000000ULL; // 10^15
-  unsigned _BitInt(128) div = num_a / b.bc;
+  unsigned __int128 num_a =
+      (unsigned __int128)a.bc * 1000000000000000ULL; // 10^15
+  unsigned __int128 div = num_a / b.bc;
 
   // Suavizado en el techo: la subida de década redondea con techo
   while (div > bc_max) {

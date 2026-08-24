@@ -4,9 +4,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <uchar.h>
 
 typedef unsigned char char8_t;
+typedef uint32_t char32_t;
 
 // ==========================================
 // SESGOS DE EXPONENTE (MP REVISIÓN)
@@ -212,7 +212,7 @@ static inline const char8_t *readnum64(Num64 num, PaxoBool rep) {
              num.signo ? "-" : "", (unsigned long long)num.bc, exp_real);
   } else if (rep == 1) {
     int total_exp = exp_real - (int)num.p;
-    unsigned _BitInt(128) val = num.bc;
+    unsigned __int128 val = num.bc;
     if (total_exp >= 0) {
       for (int i = 0; i < total_exp; i++)
         val *= 10;
