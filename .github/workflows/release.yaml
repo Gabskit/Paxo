@@ -77,7 +77,7 @@ jobs:
           7z a ${{ matrix.archive_name }} paxo-sdk/
 
       - name: Publish Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: ${{ matrix.archive_name }}
         env:
