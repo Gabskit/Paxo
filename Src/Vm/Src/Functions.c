@@ -63,7 +63,7 @@
 #if __has_include("SDL3/SDL.h") && !defined(PAXO_HAS_WIN)
 #define SDL_MAIN_HANDLED
 #include "simple2d.h" // Simple 2D (requiere SDL3)
-#undef main            // evita el rewrite de main de SDL_main.h
+#undef main           // evita el rewrite de main de SDL_main.h
 #endif
 #include "termcolor-c.h"
 #include <math.h>
@@ -477,7 +477,7 @@ static inline long native_arg_long(PaxoVar v) {
     return 0;
   Num64 n = (t == NUM16) ? num16tonum64(var_num16_get(v)) : var_num64_get(v);
   int e = (int)n.exp - BIAS64 - (int)n.p;
-  unsigned _BitInt(128) val = n.bc;
+  unsigned __int128 val = n.bc;
   if (e >= 0) {
     if (e > 18)
       e = 18; // saturación
@@ -485,7 +485,7 @@ static inline long native_arg_long(PaxoVar v) {
       val *= 10;
   } else {
     int k = -e;
-    unsigned _BitInt(128) d = 1;
+    unsigned __int128 d = 1;
     for (int i = 0; i < k && d <= val; i++)
       d *= 10;
     val /= d;
@@ -873,8 +873,7 @@ static PaxoVar img_save_generic(PaxoVar *args, int fmt) {
   }
   bool ok = false;
   if (fmt == 0)
-    ok = stbi_write_png(path, (int)w, (int)h, (int)ch, data,
-                        (int)w * (int)ch);
+    ok = stbi_write_png(path, (int)w, (int)h, (int)ch, data, (int)w * (int)ch);
   else if (fmt == 1)
     ok = stbi_write_jpg(path, (int)w, (int)h, (int)ch, data, 90);
   else
@@ -918,12 +917,12 @@ static PaxoVar native_img_resize(PaxoVar *args, uint8_t argc) {
     return var_array(arr_new(0));
   }
   uint8_t *dst = malloc((size_t)nw * nh * ch);
-  bool ok = dst && stbir_resize_uint8_linear(src, (int)w, (int)h, 0, dst,
-                                             (int)nw, (int)nh, 0,
-                                             (stbir_pixel_layout)ch);
+  bool ok =
+      dst && stbir_resize_uint8_linear(src, (int)w, (int)h, 0, dst, (int)nw,
+                                       (int)nh, 0, (stbir_pixel_layout)ch);
   free(src);
-  PaxoVar res = ok ? ret_bytes_array(dst, (size_t)nw * nh * ch)
-                   : var_array(arr_new(0));
+  PaxoVar res =
+      ok ? ret_bytes_array(dst, (size_t)nw * nh * ch) : var_array(arr_new(0));
   free(dst);
   return res;
 }
@@ -931,28 +930,34 @@ static PaxoVar native_img_resize(PaxoVar *args, uint8_t argc) {
 #else
 
 static PaxoVar native_img_load(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   fputs("[paxo] img_load: soporte de imagenes no compilado\n", stderr);
   return var_bool(false);
 }
 static PaxoVar native_img_info(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_array(arr_new(0));
 }
 static PaxoVar native_img_save_png(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_bool(false);
 }
 static PaxoVar native_img_save_jpg(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_bool(false);
 }
 static PaxoVar native_img_save_bmp(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_bool(false);
 }
 static PaxoVar native_img_resize(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_array(arr_new(0));
 }
 
@@ -1020,9 +1025,8 @@ static PaxoVar native_font_glyph(PaxoVar *args, uint8_t argc) {
   int adv = 0, lsb = 0;
   stbtt_GetCodepointHMetrics(&pf->info, (int)cp, &adv, &lsb);
   int w, h, ox, oy;
-  unsigned char *bmp =
-      stbtt_GetCodepointBitmap(&pf->info, scale, scale, (int)cp, &w, &h,
-                               &ox, &oy);
+  unsigned char *bmp = stbtt_GetCodepointBitmap(&pf->info, scale, scale,
+                                                (int)cp, &w, &h, &ox, &oy);
   PaxoArray *a = arr_new((size_t)(w > 0 ? w : 1) * (h > 0 ? h : 1) + 5);
   arr_push_num(a, w);
   arr_push_num(a, h);
@@ -1072,19 +1076,23 @@ static PaxoVar native_font_free(PaxoVar *args, uint8_t argc) {
 #else
 
 static PaxoVar native_font_load(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return num_from_i64(0);
 }
 static PaxoVar native_font_glyph(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_array(arr_new(0));
 }
 static PaxoVar native_font_metrics(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_array(arr_new(0));
 }
 static PaxoVar native_font_free(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 
@@ -1108,7 +1116,8 @@ static void snd_freer(void *p) {
 
 // Inicializa el motor de audio: audio_init() -> bool
 static PaxoVar native_audio_init(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   if (audio_up)
     return var_bool(true);
   if (ma_engine_init(NULL, &audio_engine) != MA_SUCCESS)
@@ -1119,7 +1128,8 @@ static PaxoVar native_audio_init(PaxoVar *args, uint8_t argc) {
 
 // Detiene todo y libera el motor: audio_quit()
 static PaxoVar native_audio_quit(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   if (!audio_up)
     return PAXO_ZERO;
   for (size_t i = 0; i < snd_reg.len; i++) {
@@ -1210,36 +1220,44 @@ static PaxoVar native_audio_playing(PaxoVar *args, uint8_t argc) {
 #else
 
 static PaxoVar native_audio_init(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   fputs("[paxo] audio: soporte no compilado\n", stderr);
   return var_bool(false);
 }
 static PaxoVar native_audio_quit(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_audio_play(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return num_from_i64(0);
 }
 static PaxoVar native_audio_pause(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_bool(false);
 }
 static PaxoVar native_audio_resume(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_bool(false);
 }
 static PaxoVar native_audio_stop(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_bool(false);
 }
 static PaxoVar native_audio_volume(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_bool(false);
 }
 static PaxoVar native_audio_playing(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_bool(false);
 }
 
@@ -1284,7 +1302,8 @@ static void ps_freer(void *p) {
 
 // Nuevo espacio: phys_space() -> handle
 static PaxoVar native_phys_space(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   if (space_reg.cap == 0) {
     reg_init(&space_reg);
     reg_init(&body_reg);
@@ -1316,9 +1335,9 @@ static PhysShapeRec *shape_from_args(PaxoVar v) {
 static PaxoVar native_phys_gravity(PaxoVar *args, uint8_t argc) {
   cpSpace *sp = argc >= 1 ? space_from_args(args[0]) : NULL;
   if (sp)
-    cpSpaceSetGravity(sp, cpv(native_arg_double(args[1]),
-                              native_arg_double(argc >= 3 ? args[2]
-                                                          : PAXO_ZERO)));
+    cpSpaceSetGravity(sp,
+                      cpv(native_arg_double(args[1]),
+                          native_arg_double(argc >= 3 ? args[2] : PAXO_ZERO)));
   return PAXO_ZERO;
 }
 
@@ -1386,8 +1405,7 @@ static PaxoVar native_phys_set_pos(PaxoVar *args, uint8_t argc) {
   if (r)
     cpBodySetPosition(r->body,
                       cpv(native_arg_double(args[1]),
-                          native_arg_double(argc >= 3 ? args[2]
-                                                      : PAXO_ZERO)));
+                          native_arg_double(argc >= 3 ? args[2] : PAXO_ZERO)));
   return PAXO_ZERO;
 }
 
@@ -1397,8 +1415,7 @@ static PaxoVar native_phys_set_vel(PaxoVar *args, uint8_t argc) {
   if (r)
     cpBodySetVelocity(r->body,
                       cpv(native_arg_double(args[1]),
-                          native_arg_double(argc >= 3 ? args[2]
-                                                      : PAXO_ZERO)));
+                          native_arg_double(argc >= 3 ? args[2] : PAXO_ZERO)));
   return PAXO_ZERO;
 }
 
@@ -1421,8 +1438,9 @@ static PaxoVar native_phys_force(PaxoVar *args, uint8_t argc) {
   PhysBodyRec *r = argc >= 1 ? body_from_args(args[0]) : NULL;
   if (r)
     cpBodyApplyForceAtLocalPoint(
-        r->body, cpv(native_arg_double(args[1]),
-                     native_arg_double(argc >= 3 ? args[2] : PAXO_ZERO)),
+        r->body,
+        cpv(native_arg_double(args[1]),
+            native_arg_double(argc >= 3 ? args[2] : PAXO_ZERO)),
         cpvzero);
   return PAXO_ZERO;
 }
@@ -1432,8 +1450,9 @@ static PaxoVar native_phys_impulse(PaxoVar *args, uint8_t argc) {
   PhysBodyRec *r = argc >= 1 ? body_from_args(args[0]) : NULL;
   if (r)
     cpBodyApplyImpulseAtLocalPoint(
-        r->body, cpv(native_arg_double(args[1]),
-                     native_arg_double(argc >= 3 ? args[2] : PAXO_ZERO)),
+        r->body,
+        cpv(native_arg_double(args[1]),
+            native_arg_double(argc >= 3 ? args[2] : PAXO_ZERO)),
         cpvzero);
   return PAXO_ZERO;
 }
@@ -1451,10 +1470,9 @@ static PaxoVar native_phys_circle(PaxoVar *args, uint8_t argc) {
   PhysBodyRec *b = argc >= 2 ? body_from_args(args[1]) : NULL;
   if (!sp || !b)
     return num_from_i64(0);
-  return shape_add(
-      sp, cpCircleShapeNew(
-              b->body, native_arg_double(args[4]),
-              cpv(native_arg_double(args[2]), native_arg_double(args[3]))));
+  return shape_add(sp, cpCircleShapeNew(b->body, native_arg_double(args[4]),
+                                        cpv(native_arg_double(args[2]),
+                                            native_arg_double(args[3]))));
 }
 
 // Caja centrada en el cuerpo: phys_box(space, body, w, h) -> shape
@@ -1473,13 +1491,12 @@ static PaxoVar native_phys_segment(PaxoVar *args, uint8_t argc) {
   PhysBodyRec *b = argc >= 2 ? body_from_args(args[1]) : NULL;
   if (!sp || !b)
     return num_from_i64(0);
-  return shape_add(sp,
-                   cpSegmentShapeNew(b->body,
-                                     cpv(native_arg_double(args[2]),
-                                         native_arg_double(args[3])),
-                                     cpv(native_arg_double(args[4]),
-                                         native_arg_double(args[5])),
-                                     native_arg_double(args[6])));
+  return shape_add(
+      sp,
+      cpSegmentShapeNew(
+          b->body, cpv(native_arg_double(args[2]), native_arg_double(args[3])),
+          cpv(native_arg_double(args[4]), native_arg_double(args[5])),
+          native_arg_double(args[6])));
 }
 
 // Rebote: phys_elasticity(shape, e)
@@ -1546,92 +1563,114 @@ static PaxoVar native_phys_free_space(PaxoVar *args, uint8_t argc) {
 #else
 
 static PaxoVar native_phys_space(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   fputs("[paxo] fisica: soporte no compilado\n", stderr);
   return num_from_i64(0);
 }
 static PaxoVar native_phys_gravity(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_phys_step(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_phys_body(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return num_from_i64(0);
 }
 static PaxoVar native_phys_body_static(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return num_from_i64(0);
 }
 static PaxoVar native_phys_pos(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return ret_xy(0, 0);
 }
 static PaxoVar native_phys_vel(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return ret_xy(0, 0);
 }
 static PaxoVar native_phys_set_pos(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_phys_set_vel(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_phys_angle(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_phys_set_angle(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_phys_force(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_phys_impulse(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_phys_circle(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return num_from_i64(0);
 }
 static PaxoVar native_phys_box(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return num_from_i64(0);
 }
 static PaxoVar native_phys_segment(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return num_from_i64(0);
 }
 static PaxoVar native_phys_elasticity(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_phys_friction(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_phys_collide(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_bool(false);
 }
 static PaxoVar native_phys_free_shape(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_phys_free_body(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_phys_free_space(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 
@@ -1666,8 +1705,7 @@ static PaxoVar native_win_open(PaxoVar *args, uint8_t argc) {
     fputs("[paxo] win_open: no se pudo iniciar SDL\n", stderr);
     return var_bool(false);
   }
-  if (!SDL_CreateWindowAndRenderer(title, (int)w, (int)h, 0, &g_win,
-                                   &g_ren)) {
+  if (!SDL_CreateWindowAndRenderer(title, (int)w, (int)h, 0, &g_win, &g_ren)) {
     SDL_Quit();
     return var_bool(false);
   }
@@ -1678,7 +1716,8 @@ static PaxoVar native_win_open(PaxoVar *args, uint8_t argc) {
 
 // Cierra la ventana: win_close()
 static PaxoVar native_win_close(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   if (!g_win)
     return PAXO_ZERO;
   if (tex_reg.cap != 0)
@@ -1705,7 +1744,8 @@ static PaxoVar native_win_color(PaxoVar *args, uint8_t argc) {
 
 // Limpia con el color actual: win_clear()
 static PaxoVar native_win_clear(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   if (!g_ren)
     return PAXO_ZERO;
   SDL_SetRenderDrawColor(g_ren, g_r, g_g, g_b, 255);
@@ -1717,10 +1757,9 @@ static PaxoVar native_win_clear(PaxoVar *args, uint8_t argc) {
 static PaxoVar native_win_rect(PaxoVar *args, uint8_t argc) {
   if (!g_ren || argc < 4)
     return PAXO_ZERO;
-  SDL_FRect rc = {(float)native_arg_double(args[0]),
-                  (float)native_arg_double(args[1]),
-                  (float)native_arg_double(args[2]),
-                  (float)native_arg_double(args[3])};
+  SDL_FRect rc = {
+      (float)native_arg_double(args[0]), (float)native_arg_double(args[1]),
+      (float)native_arg_double(args[2]), (float)native_arg_double(args[3])};
   SDL_SetRenderDrawColor(g_ren, g_r, g_g, g_b, 255);
   SDL_RenderFillRect(g_ren, &rc);
   return PAXO_ZERO;
@@ -1793,8 +1832,7 @@ static PaxoVar native_tex_load(PaxoVar *args, uint8_t argc) {
     free(data);
     return num_from_i64(0);
   }
-  SDL_Surface *sf = SDL_CreateSurface((int)w, (int)h,
-                                      SDL_PIXELFORMAT_RGBA32);
+  SDL_Surface *sf = SDL_CreateSurface((int)w, (int)h, SDL_PIXELFORMAT_RGBA32);
   if (!sf) {
     free(data);
     return num_from_i64(0);
@@ -1854,7 +1892,8 @@ static PaxoVar native_tex_free(PaxoVar *args, uint8_t argc) {
 
 // Presenta el frame: win_show()
 static PaxoVar native_win_show(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   if (g_ren)
     SDL_RenderPresent(g_ren);
   return PAXO_ZERO;
@@ -1862,7 +1901,8 @@ static PaxoVar native_win_show(PaxoVar *args, uint8_t argc) {
 
 // Procesa eventos: win_poll() -> ["quit", "keydown:32", "mousedown", ...]
 static PaxoVar native_win_poll(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   PaxoArray *a = arr_new(4);
   if (!g_win)
     return var_array(a);
@@ -1870,8 +1910,7 @@ static PaxoVar native_win_poll(PaxoVar *args, uint8_t argc) {
   while (SDL_PollEvent(&ev)) {
     if (ev.type == SDL_EVENT_QUIT) {
       arr_push_var(a, var_string("quit"));
-    } else if (ev.type == SDL_EVENT_KEY_DOWN ||
-               ev.type == SDL_EVENT_KEY_UP) {
+    } else if (ev.type == SDL_EVENT_KEY_DOWN || ev.type == SDL_EVENT_KEY_UP) {
       char buf[32];
       snprintf(buf, sizeof(buf), "%s:%lu",
                ev.type == SDL_EVENT_KEY_DOWN ? "keydown" : "keyup",
@@ -1899,7 +1938,8 @@ static PaxoVar native_win_key(PaxoVar *args, uint8_t argc) {
 
 // Posición del mouse: win_mouse() -> [x, y]
 static PaxoVar native_win_mouse(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   float mx = 0, my = 0;
   SDL_GetMouseState(&mx, &my);
   return ret_xy(mx, my);
@@ -1907,13 +1947,15 @@ static PaxoVar native_win_mouse(PaxoVar *args, uint8_t argc) {
 
 // ¿Botón izquierdo presionado?: win_mousedown() -> bool
 static PaxoVar native_win_mousedown(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_bool(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON_LMASK);
 }
 
 // Milisegundos desde el inicio: win_time() -> num
 static PaxoVar native_win_time(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return num_from_i64((int64_t)SDL_GetTicks());
 }
 
@@ -1928,77 +1970,96 @@ static PaxoVar native_win_delay(PaxoVar *args, uint8_t argc) {
 #else
 
 static PaxoVar native_win_open(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   fputs("[paxo] win_open: recompila la VM con SDL3 "
-        "(PAXO_ENABLE_SDL3) para usar ventanas\n", stderr);
+        "(PAXO_ENABLE_SDL3) para usar ventanas\n",
+        stderr);
   return var_bool(false);
 }
 static PaxoVar native_win_close(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_win_color(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_win_clear(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_win_rect(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_win_line(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_win_circle(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_win_text(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_tex_load(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return num_from_i64(0);
 }
 static PaxoVar native_tex_draw(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_tex_free(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_win_show(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_win_poll(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_array(arr_new(0));
 }
 static PaxoVar native_win_key(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_bool(false);
 }
 static PaxoVar native_win_mouse(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return ret_xy(0, 0);
 }
 static PaxoVar native_win_mousedown(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_bool(false);
 }
 static PaxoVar native_win_time(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return num_from_i64(0);
 }
 static PaxoVar native_win_delay(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 
@@ -2075,8 +2136,7 @@ static PaxoVar native_pdf_new(PaxoVar *args, uint8_t argc) {
 // Cantidad de páginas: pdf_pages(doc) -> num
 static PaxoVar native_pdf_pages(PaxoVar *args, uint8_t argc) {
   PaxoPdf *d = argc >= 1 ? pdf_from_args(args[0]) : NULL;
-  return num_from_i64(d && !d->writing ? (int64_t)pdfioFileGetNumPages(
-                                             d->file)
+  return num_from_i64(d && !d->writing ? (int64_t)pdfioFileGetNumPages(d->file)
                                        : 0);
 }
 
@@ -2085,8 +2145,8 @@ static PaxoVar native_pdf_page_size(PaxoVar *args, uint8_t argc) {
   PaxoPdf *d = argc >= 2 ? pdf_from_args(args[0]) : NULL;
   if (!d || d->writing)
     return ret_xy(0, 0);
-  pdfio_obj_t *page = pdfioFileGetPage(
-      d->file, (size_t)native_arg_long(args[1]) - 1);
+  pdfio_obj_t *page =
+      pdfioFileGetPage(d->file, (size_t)native_arg_long(args[1]) - 1);
   if (!page)
     return ret_xy(0, 0);
   pdfio_rect_t r = {0, 0, 612, 792};
@@ -2105,8 +2165,8 @@ static PaxoVar native_pdf_text(PaxoVar *args, uint8_t argc) {
   PaxoPdf *d = argc >= 2 ? pdf_from_args(args[0]) : NULL;
   if (!d || d->writing)
     return var_string("");
-  pdfio_obj_t *page = pdfioFileGetPage(
-      d->file, (size_t)native_arg_long(args[1]) - 1);
+  pdfio_obj_t *page =
+      pdfioFileGetPage(d->file, (size_t)native_arg_long(args[1]) - 1);
   if (!page || pdfioPageGetNumStreams(page) < 1)
     return var_string("");
   pdfio_stream_t *st = pdfioPageOpenStream(page, 0, true);
@@ -2150,8 +2210,7 @@ static PaxoVar native_pdf_font(PaxoVar *args, uint8_t argc) {
   pdfio_obj_t *fo = pdfioFileCreateFontObjFromBase(d->file, name);
   if (!fo)
     return num_from_i64(0);
-  snprintf(d->names[d->nfonts], sizeof(d->names[0]), "F%d",
-           d->nfonts + 1);
+  snprintf(d->names[d->nfonts], sizeof(d->names[0]), "F%d", d->nfonts + 1);
   d->fonts[d->nfonts] = fo;
   d->curfont = d->nfonts++;
   return num_from_i64(d->curfont + 1);
@@ -2202,8 +2261,7 @@ static PaxoVar native_pdf_write_rect(PaxoVar *args, uint8_t argc) {
   if (!d || !d->page)
     return PAXO_ZERO;
   pdfioContentPathRect(d->page, native_arg_double(args[1]),
-                       native_arg_double(args[2]),
-                       native_arg_double(args[3]),
+                       native_arg_double(args[2]), native_arg_double(args[3]),
                        native_arg_double(args[4]));
   pdfioContentFill(d->page, false);
   return PAXO_ZERO;
@@ -2257,58 +2315,68 @@ static PaxoVar native_pdf_close(PaxoVar *args, uint8_t argc) {
 #else
 
 static PaxoVar native_pdf_open(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   fputs("[paxo] pdf: soporte no compilado\n", stderr);
   return num_from_i64(0);
 }
 static PaxoVar native_pdf_new(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return num_from_i64(0);
 }
 static PaxoVar native_pdf_pages(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return num_from_i64(0);
 }
 static PaxoVar native_pdf_page_size(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return ret_xy(0, 0);
 }
 static PaxoVar native_pdf_text(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_string("");
 }
 static PaxoVar native_pdf_font(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return num_from_i64(0);
 }
 static PaxoVar native_pdf_page_begin(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return var_bool(false);
 }
 static PaxoVar native_pdf_color(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_pdf_write_rect(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_pdf_write_line(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_pdf_write_text(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 static PaxoVar native_pdf_close(PaxoVar *args, uint8_t argc) {
-  (void)args; (void)argc;
+  (void)args;
+  (void)argc;
   return PAXO_ZERO;
 }
 
 #endif // PAXO_HAS_PDF
-
-
 
 PaxoVar native_call(uint16_t id, PaxoVar *args, uint8_t argc) {
   switch (id) {

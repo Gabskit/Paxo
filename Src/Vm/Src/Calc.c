@@ -4,7 +4,7 @@
 
 typedef unsigned char char8_t;
 typedef uint32_t char32_t;
-typedef unsigned _BitInt(2) PaxoBool;
+typedef uint8_t PaxoBool;
 
 // ==========================================
 // 1. MOBILE POINT (REVISIÓN MP + NANBOX)
