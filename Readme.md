@@ -648,7 +648,9 @@ entrada = scan()
 
 ## Generación de lep.h
 
-El script `sh/gen_lep.sh` genera un single-header (`Build/lep.h`) que empaqueta toda la VM como librería C para uso externo:
+El script `sh/gen_lep.sh` genera dos single-headers de la VM como librería C para uso externo:
+- `Build/lep.h` — versión completa, incluye las librerías de terceros (miniaudio, nanovg, simple2d, gl3_compat).
+- `Build/lep_paxo.h` — versión reducida con solo los fuentes de Paxo, sin las librerías de terceros.
 
 ```bash
 npm run gen:lep

@@ -50,7 +50,7 @@ const sections = [
         code: `npm run build        # build completo (antlr + bcg + vm + lep.h)
 npm run build:bcg    # compilar compilador a bytecode (Go)
 npm run build:vm     # compilar la VM (C → Build/Lepvm)
-npm run gen:lep      # generar lep.h (single-header library)
+npm run gen:lep      # generar lep.h y lep_paxo.h (single-headers)
 npm run antlr        # regenerar el parser desde Paxo.g4
 npm run test:vm      # ejecutar la batería de pruebas de la VM
 npm run test:bcg     # ejecutar las pruebas del compilador`,
