@@ -81,9 +81,16 @@ pin goo = @foo
 
 var foo = .×            // booleano bit (.× = false, .✓ = true)
 bool foo = .×
+
+int foo = 45            // entero / punto fijo (nanbox 11011, t=0)
+pdec foo = 6.50         // decimal empaquetado (nanbox 11011, t=1)
+col foo = #FF8000       // color RGBA (nanbox 11010 + flag); #RRGGBB o #RRGGBBAA
 ```
 
-Los literales numéricos se empaquetan como **num64** por defecto. Los tamaños se removieron al no dar ahorro de memoria por el funcionamiento de la vm propiamente
+Los literales numéricos se empaquetan como **num64** por defecto. Los tipos
+`int`, `pdec` y `col` se empaquetan en el nanbox con su marcador propio (ver
+[Nanbox.md](Nanbox.md)) y no califican como "num relajado" para aritmética
+directa (uso `typeof(x)` para comprobarlo).
 
 ## Arrays
 
@@ -263,13 +270,28 @@ local 📥 dia = "lunes"
 ## Bucles
 
 ```
-(condicion): ⏸️ | ▶️ |:
+(condicion): ▶️ {
     //codigo
-:|
+}
 ```
 
 - `⏸️` | `||`: ejecuta hasta que la condición sea verdadera (while not)
 - `▶️` | `|>`: ejecuta mientras la condición sea verdadera (while)
+
+El cuerpo es un **bloque**: llaves `{ ... }` o el formato alternativo
+`:` ... `🏁`:
+
+```
+(condicion): ⏸️ :
+    //codigo
+🏁
+```
+
+> **Deprecado:** los delimitadores explícitos `|:` / `:|` (o sus variantes
+> `𝄆` / `𝄇`) ya no son la forma recomendada de abrir/cerrar el bucle. Todavía se
+> aceptan por retrocompatibilidad, pero el compilador emite un aviso
+> `el delimitador de bucle '|:' está deprecado; usa el nuevo formato de bloque`.
+> Usa la sintaxis de bloque (`{ ... }` o `: ... 🏁`) para código nuevo.
 
 ## Manejo de errores
 
@@ -711,6 +733,22 @@ npm run test:bcg    # Tests del compilador (Go)
   cuando sus dependencias están disponibles; la VM compila con o sin ellas
 - Para usar las funciones reales de estas libs hace falta linkear los `.so`
   (p. ej. `-lSDL3 -lchipmunk -lnanovg`); hoy solo se usan sus declaraciones
+
+## Changelog reciente
+
+### Tipos nuevos: `int`, `pdec`, `col`
+- Se añadieron los tipos `int` (entero / punto fijo) y `pdec` (decimal
+  empaquetado), ambos empaquetados en el marcador nanbox `11011` (0x1B), y `col`
+  (color RGBA), empaquetado en el marcador `11010` con el flag de color.
+- Literales de color: `#RRGGBB` o `#RRGGBBAA`.
+- El nanbox se actualizó según `Nanbox.md`: MP16 pasó del marcador `11011` al
+  `11100` (0x1C) para dejar `11011` a los nuevos tipos.
+
+### Deprecación de los delimitadores de bucle `|:` / `:|`
+- Los delimitadores `|:` / `:|` (y `𝄆` / `𝄇`) quedaron deprecados. Siguen
+  funcionando por retrocompatibilidad, pero el compilador emite un aviso y se
+  recomienda usar la sintaxis de bloque (`{ ... }` o `: ... 🏁`).
+- Esto libera el bloque `: ... 🏁` como forma alternativa de cuerpo de bucle.
 
 ## Licencia
 

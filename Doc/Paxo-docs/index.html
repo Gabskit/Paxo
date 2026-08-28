@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="es" data-theme="luxury">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Documentación de Paxo: lenguaje dinámico multiparadigma con VM propia y nanboxing."
+    />
+    <title>Paxo · Documentación</title>
+    <style>
+      [x-cloak] { display: none !important; }
+    </style>
+  </head>
+  <body x-cloak x-data="docs()" class="bg-base-200 text-base-content">
+    <!-- ===== NAVBAR ===== -->
+    <header
+      class="navbar sticky top-0 z-40 border-base-300 border-b bg-base-100 shadow-sm"
+      x-data="{ themeOpen: false }"
+      @click.outside="themeOpen=false"
+    >
+      <div class="navbar-start gap-3">
+        <!-- mobile hamburger -->
+        <button
+          class="btn btn-square btn-ghost lg:hidden"
+          @click="mobileOpen = !mobileOpen"
+          aria-label="Abrir menú"
+        >
+          <span class="icon-[tabler--menu-2] size-6"></span>
+        </button>
+        <a class="flex items-center gap-2" href="#inicio" @click.prevent="setActive('inicio')">
+          <span class="text-2xl font-black text-primary">Paxo</span>
+          <span class="badge badge-ghost hidden sm:inline-flex font-mono">: … 🏁</span>
+        </a>
+      </div>
+
+      <!-- search -->
+      <div class="navbar-center hidden md:flex">
+        <label class="input input-bordered flex items-center gap-2 w-72">
+          <span class="icon-[tabler--search] size-4 opacity-60"></span>
+          <input
+            type="text"
+            class="grow"
+            placeholder="Buscar en la doc…"
+            x-model="query"
+          />
+        </label>
+      </div>
+
+      <div class="navbar-end gap-3">
+        <!-- theme dropdown -->
+        <div class="relative">
+          <button class="btn btn-ghost btn-circle" @click="themeOpen = !themeOpen" aria-label="Tema">
+            <span class="icon-[tabler--sun] size-5"></span>
+          </button>
+          <div
+            x-show="themeOpen"
+            class="menu dropdown-content z-50 mt-2 w-44 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg"
+          >
+            <template x-for="name in ['dark','black','dracula','corporate','luxury']" :key="name">
+              <button
+                class="btn btn-ghost btn-sm justify-start"
+                :class="theme === name && 'btn-primary'"
+                @click="setTheme(name)"
+                x-text="name"
+              ></button>
+            </template>
+          </div>
+        </div>
+        <a
+          class="btn btn-ghost btn-sm hidden sm:inline-flex gap-2"
+          href="https://github.com"
+          target="_blank"
+          rel="noopener"
+        >
+          <span class="icon-[tabler--brand-github] size-4"></span> GitHub
+        </a>
+      </div>
+    </header>
+
+    <!-- ===== LAYOUT ===== -->
+    <div class="flex h-[calc(100vh-4rem)]">
+      <!-- ===== SIDEBAR ===== -->
+      <aside
+        class="sidebar-scroll z-30 w-64 shrink-0 overflow-y-auto border-base-300 border-r bg-base-100 transition-transform duration-200 lg:translate-x-0"
+        :class="mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+        @click.outside="mobileOpen = false"
+      >
+        <!-- mobile search -->
+        <div class="p-3 lg:hidden">
+          <label class="input input-bordered flex items-center gap-2">
+            <span class="icon-[tabler--search] size-4 opacity-60"></span>
+            <input type="text" class="grow" placeholder="Buscar…" x-model="query" />
+          </label>
+        </div>
+
+        <ul class="menu px-2 py-3 gap-1">
+          <li class="menu-title px-3 text-xs font-semibold">Documentación</li>
+          <template x-for="s in filteredNav" :key="s.id">
+            <li>
+              <a
+                @click="setActive(s.id)"
+                :class="active === s.id && 'active font-semibold'"
+                x-text="s.nav"
+              ></a>
+            </li>
+          </template>
+          <template x-if="!filteredNav.length">
+            <li class="text-base-content/40 px-3 text-sm">sin resultados</li>
+          </template>
+        </ul>
+      </aside>
+
+      <!-- mobile overlay -->
+      <div
+        x-show="mobileOpen"
+        class="fixed inset-0 z-20 bg-black/50 lg:hidden"
+        @click="mobileOpen = false"
+        x-transition.opacity
+      ></div>
+
+      <!-- ===== CONTENT ===== -->
+      <main id="main" class="content-scroll flex-1 overflow-y-auto">
+        <div class="mx-auto max-w-4xl px-4 py-10 md:px-10">
+          <template x-for="s in sections" :key="s.id">
+            <article
+              x-show="active === s.id"
+              x-html="renderSection(s)"
+              class="prose-paxo"
+            ></article>
+          </template>
+
+          <footer
+            class="mt-16 border-base-300 border-t pt-6 text-sm text-base-content/50"
+          >
+            Paxo · documento ISC · generado con Vite, Tailwind CSS, FlyonUI y Alpine.js.
+          </footer>
+        </div>
+      </main>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

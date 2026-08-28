@@ -16,6 +16,11 @@ FILES=(
   "$VM_SRC/Typecast_and_read.c"
   "$VM_SRC/Functions.c"
   "$VM_SRC/Vm.c"
+	"$VM_SRC/gl3_compat.h"
+	"$VM_SRC/miniaudio.h"
+	"$VM_SRC/nanovg.h"
+	"$VM_SRC/nanovg_gl3.h"
+	"$VM_SRC/simple2d.h"
 )
 
 # Verificar que existen

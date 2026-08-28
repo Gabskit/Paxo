@@ -6,3 +6,5 @@ Src/Bcgen/Build
 Build
 build
 Src/Testfilesvh
+Doc/Paxo-docs/node_modules/
+Doc/Paxo-docs/.gitignore

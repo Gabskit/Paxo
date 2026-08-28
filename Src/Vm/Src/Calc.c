@@ -42,25 +42,34 @@ enum type {
   FUNC,
   STRING,
   ARRAY,
-  PACKAGE
+  PACKAGE,
+  INT_FP,
+  PKDEC,
+  COLOR
 };
 
 // ==========================================
-// 2. NANBOX 64 BITS
+// 2. NANBOX 64 BITS (spec Nanbox.md)
 //    número : MP64 directo            (p != 26)
 //    bit    : 00 ················· x 11010
 //    trit   : 01 ················ xx 11010
 //    char   : 10 ··········[char32]·· 11010
 //    ref    : 11 ···[aux16][punt32]·· 11010
-//    num16  : MP16 embebido, marcador reservado 11011
+//    color  : 10 ·····[f][8r][8g][8b][8a] 11010
+//    int/pd : t pppp ·· s ··[13 bits]···· 11011
+//    MP16   : [43 padding][16 bits mp16]  11100
 // ==========================================
 
 typedef uint64_t PaxoVar;
 
-#define PAXO_MARK_BOX 0x1AULL
-#define PAXO_MARK_N16 0x1BULL
-#define PAXO_MARK_MASK 0x1FULL
-#define PAXO_VAL_SHIFT 5
+#define PAXO_MARK_BOX   0x1AULL // 11010
+#define PAXO_MARK_FXPKD 0x1BULL // 11011 (fixed point/int + packed decimal)
+#define PAXO_MARK_N16   0x1CULL // 11100 (MP16)
+#define PAXO_MARK_MASK  0x1FULL
+#define PAXO_VAL_SHIFT  5
+
+// refinamiento de color dentro del marcador BOX, tag CHAR (10)
+#define PAXO_COLOR_FLAG (1ULL << 37)
 
 #define PAXO_TAG_BIT 0x0ULL
 #define PAXO_TAG_TRIT 0x1ULL
@@ -186,6 +195,58 @@ static inline char32_t var_char_get(PaxoVar v) {
   return (char32_t)((v >> PAXO_VAL_SHIFT) & 0xFFFFFFFFULL);
 }
 
+// color: RGBA empaquetado en bits [5..36] + flag 11010 (mismo tag que char,
+// distinguido por PAXO_COLOR_FLAG en el bit 37; los codepoints utf32 <= 0x1FFFFF
+// nunca lo activan).
+static inline PaxoVar var_color(uint32_t rgba) {
+  return (PAXO_TAG_CHAR << 62) | PAXO_COLOR_FLAG | PAXO_MARK_BOX |
+         ((PaxoVar)rgba << PAXO_VAL_SHIFT);
+}
+
+static inline uint32_t var_color_get(PaxoVar v) {
+  return (uint32_t)((v >> PAXO_VAL_SHIFT) & 0xFFFFFFFFULL);
+}
+
+// fixed point / packed decimal (marcador 11011):
+//   t(1) pppp(4) ··(2 pad) s(1) xxxxxxxxxxxx(13) ···(30 pad+5 marcador)
+//   t=0 -> INT_FP (fixed point / int), t=1 -> PKDEC (packed decimal)
+//   value = entero escalado con signo en las 13 bits
+typedef struct {
+  int16_t value;  // entero escalado con signo
+  uint8_t scale;  // pppp (0..15) dígitos fraccionarios
+  bool pkdec;     // true = packed decimal, false = fixed point / int
+} PaxoFxp;
+
+static inline PaxoVar var_fxp(PaxoFxp f) {
+  if (f.scale > 15)
+    f.scale = 15;
+  int16_t v = f.value;
+  uint8_t sign = v < 0 ? 1 : 0;
+  uint16_t mag = v < 0 ? (uint16_t)(-(int32_t)v) : (uint16_t)v;
+  PaxoVar out = (f.pkdec ? 1ULL : 0ULL) << 63;
+  out |= (uint64_t)(f.scale & 0xF) << 59;
+  out |= (uint64_t)sign << 56;
+  out |= (uint64_t)(mag & 0x1FFFu) << 43;
+  return out | PAXO_MARK_FXPKD;
+}
+
+static inline PaxoFxp var_fxp_get(PaxoVar v) {
+  PaxoFxp f;
+  f.pkdec = (v >> 63) != 0;
+  f.scale = (uint8_t)((v >> 59) & 0xF);
+  int16_t mag = (int16_t)((v >> 43) & 0x1FFFu);
+  f.value = ((v >> 56) & 1) ? (int16_t)(-mag) : mag;
+  return f;
+}
+
+static inline PaxoVar var_int_fp(int16_t value, uint8_t scale) {
+  return var_fxp((PaxoFxp){.value = value, .scale = scale, .pkdec = false});
+}
+
+static inline PaxoVar var_pkdec(int16_t value, uint8_t scale) {
+  return var_fxp((PaxoFxp){.value = value, .scale = scale, .pkdec = true});
+}
+
 static inline PaxoVar var_ref(uint32_t sub, uint32_t punt, uint16_t aux13) {
   return (PAXO_TAG_REF << 62) | PAXO_MARK_BOX | ((PaxoVar)(sub & 0x7u) << 18) |
          ((PaxoVar)(aux13 & 0x1FFFu) << PAXO_VAL_SHIFT) | ((PaxoVar)punt << 21);
@@ -245,7 +306,8 @@ static inline uint32_t var_pin_get(PaxoVar v) { return var_ref_punt_get(v); }
 
 static inline bool var_is_num(PaxoVar v) {
   uint32_t mark = (uint32_t)(v & PAXO_MARK_MASK);
-  return mark != PAXO_MARK_BOX && mark != PAXO_MARK_N16;
+  return mark != PAXO_MARK_BOX && mark != PAXO_MARK_N16 &&
+         mark != PAXO_MARK_FXPKD;
 }
 
 static inline enum type var_type(PaxoVar v) {
@@ -257,6 +319,8 @@ static inline enum type var_type(PaxoVar v) {
     case PAXO_TAG_TRIT:
       return TRIT;
     case PAXO_TAG_CHAR:
+      if (v & PAXO_COLOR_FLAG)
+        return COLOR;
       return CHAR;
     default:
       switch (var_ref_sub_get(v)) {
@@ -272,6 +336,8 @@ static inline enum type var_type(PaxoVar v) {
         return POINT;
       }
     }
+  case PAXO_MARK_FXPKD:
+    return (v >> 63) ? PKDEC : INT_FP;
   case PAXO_MARK_N16:
     return NUM16;
   default:

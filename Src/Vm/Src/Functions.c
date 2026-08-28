@@ -181,6 +181,21 @@ typedef enum {
 // Funciones nativas
 // ==========================================
 
+static void print_fxp(PaxoFxp f) {
+  int32_t v = f.value;
+  uint8_t s = f.scale;
+  if (s == 0) {
+    printf("%d", v);
+    return;
+  }
+  int32_t div = 1;
+  for (uint8_t i = 0; i < s; i++)
+    div *= 10;
+  int32_t ip = v / div;
+  int32_t fp = (v < 0 ? -v : v) % div;
+  printf("%d.%0*d", ip, (int)s, fp);
+}
+
 static void print_var_inline(PaxoVar elem) {
   switch (var_type(elem)) {
   case NUM16:
@@ -197,6 +212,14 @@ static void print_var_inline(PaxoVar elem) {
     break;
   case CHAR:
     printf("'%s'", (const char *)readchar32(var_char_get(elem)));
+    break;
+  case INT_FP:
+  case PKDEC: {
+    print_fxp(var_fxp_get(elem));
+    break;
+  }
+  case COLOR:
+    printf("#%08X", var_color_get(elem));
     break;
   case STRING:
     printf("\"%s\"", var_string_get(elem));
@@ -234,6 +257,13 @@ static PaxoVar native_print(PaxoVar *args, uint8_t argc) {
       break;
     case CHAR:
       printf("%s", (const char *)readchar32(var_char_get(val)));
+      break;
+    case INT_FP:
+    case PKDEC:
+      print_fxp(var_fxp_get(val));
+      break;
+    case COLOR:
+      printf("#%08X", var_color_get(val));
       break;
     case STRING:
       printf("%s", var_string_get(val));
@@ -300,6 +330,15 @@ static PaxoVar native_typeof(PaxoVar *args, uint8_t argc) {
     break;
   case PACKAGE:
     type_name = "package";
+    break;
+  case INT_FP:
+    type_name = "int";
+    break;
+  case PKDEC:
+    type_name = "pdec";
+    break;
+  case COLOR:
+    type_name = "col";
     break;
   }
 

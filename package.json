@@ -1,10 +1,10 @@
 {
 	"name": "paxo",
-	"version": "1.0.3",
+	"version": "1.1.0",
 	"type": "module",
 	"scripts": {
 		"antlr": "antlr-ng -Dlanguage=Go -o ./Src/Bcgen ./Src/Bcgen/Paxo.g4",
-  "build:bcg": "npx shx mkdir -p ./Build && go build -o ./Build/Bcg ./Src/Bcgen/cmd/paxocc/",
+		"build:bcg": "npx shx mkdir -p ./Build && go build -o ./Build/Bcg ./Src/Bcgen/cmd/paxocc/",
 		"build:vm": "bash ./sh/build_vm.sh",
 		"build": "npm run antlr && npm run build:bcg && npm run build:vm && npm run gen:lep",
 		"gen:lep": "bash sh/gen_lep.sh",
@@ -17,7 +17,10 @@
 	"author": "",
 	"license": "ISC",
 	"description": "Ecosistema de lenguaje y VM con aritmética Mobile Point (MP)",
-	"dependencies": {},
+	"dependencies": {
+		"alpinejs": "^3.16.3",
+		"flyonui": "^2.4.1"
+	},
 	"devDependencies": {
 		"antlr-ng": "^1.0.10",
 		"antlr4": "^4.13.2"

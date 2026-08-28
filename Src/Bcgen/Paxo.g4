@@ -28,7 +28,7 @@ varDeclaration
     ;
 
 type
-		: VAR_TYPE | NUM_TYPE | CHARA_TYPE | POINTER_TYPE | TRIT_TYPE | BOOLEAN_TYPE ;
+		: VAR_TYPE | NUM_TYPE | CHARA_TYPE | POINTER_TYPE | TRIT_TYPE | BOOLEAN_TYPE | FUNC_TYPE | PKG_TYPE | INT_TYPE | PKDEC_TYPE | COLOR_TYPE ;
 
 scope
 	: GLOBAL | LOCAL ;
@@ -50,7 +50,7 @@ matchCase
     ;
 
 loopStatement
-    : '(' expression ')' ':' loopMode loopDelimiter block loopEndDelimiter
+    : '(' expression ')' ':' loopMode loopDelimiter? block loopEndDelimiter?
     ;
 
 loopMode
@@ -58,8 +58,10 @@ loopMode
     | PLAY_MODE  // ▶️
     ;
 
+		//Deprecados
 loopDelimiter    : '|:' | '𝄆' ;
 loopEndDelimiter : ':|' | '𝄇' ;
+
 
 tryCatchStatement
     : TRY block CATCH '(' IDENTIFIER ('.' IDENTIFIER)? ')' block
@@ -74,7 +76,8 @@ pkgDeclaration
     ;
 
 block
-    : '{' statement* '}'
+    : '{' statement* '}' 
+		| ':' statement* '🏁'
     ;
 
 parameterList
@@ -110,6 +113,7 @@ expression
     | BOOLEAN_BIT # boolBitExpr
     | BOOLEAN_TRIT # boolTritExpr
 		| POINTER_LITERAL # ptrLitExpr
+		| COLOR_LITERAL # colLitExpr
     | arrayLiteral # arrayLitExpr
     | IDENTIFIER # identExpr
 		| pkgDeclaration # pkgExpr
@@ -130,6 +134,11 @@ CHARA_TYPE: 'abc' ;
 TRIT_TYPE: 'trit' ;
 BOOLEAN_TYPE: 'bool' ;
 POINTER_TYPE: 'pin' ;
+FUNC_TYPE: 'fx' ;
+PKG_TYPE: '📦' | 'pkg' ;
+INT_TYPE: 'int' ;
+PKDEC_TYPE: 'pdec' ;
+COLOR_TYPE: 'col' ;
 
 // DEPRECADOS: no cambian el comportamiento (todo vive en un array flat de
 // globals). Se aceptan por retrocompatibilidad; el compilador emite warning.
@@ -152,6 +161,7 @@ DECIMAL_LITERAL : [+-]? [0-9]+ '.' [0-9]+ ;
 BOOLEAN_BIT			: '.×' | '.✓' ;
 BOOLEAN_TRIT    : '×' | '•' | '✓' ;
 POINTER_LITERAL : '@' IDENTIFIER ;
+COLOR_LITERAL : '#' ([0-9A-F])+ ;
 
 IDENTIFIER      : [a-zA-Z_\p{L}\p{Emoji}][a-zA-Z0-9_\p{L}\p{Emoji}]* ;
 STRING_LITERAL  : '"' (~["\r\n])* '"' ;

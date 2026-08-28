@@ -1,0 +1,55 @@
+@import "tailwindcss";
+@plugin "flyonui";
+@plugin "@iconify/tailwind4";
+@import "../node_modules/flyonui/variants.css";
+@source "../node_modules/flyonui/dist/index.js";
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Markdown-ish prose styling for content sections */
+.prose-paxo h2 {
+  @apply text-2xl font-bold mb-2 text-base-content;
+}
+.prose-paxo .lead {
+  @apply text-base-content/70 text-lg mb-4;
+}
+.prose-paxo p {
+  @apply my-3 text-base-content/90;
+}
+.prose-paxo ul {
+  @apply list-disc list-inside my-3 space-y-1 text-base-content/90;
+}
+.prose-paxo li {
+  @apply ml-2;
+}
+.prose-paxo .inline-code {
+  @apply font-mono text-[0.9em] px-1.5 py-0.5 rounded bg-base-200 text-accent;
+}
+.prose-paxo pre {
+  @apply text-left;
+}
+.prose-paxo table {
+  @apply w-full my-4 text-sm;
+}
+.prose-paxo th, .prose-paxo td {
+  @apply border border-base-300 px-3 py-2 text-left;
+}
+.prose-paxo th {
+  @apply bg-base-200 font-semibold;
+}
+
+/* sidebar scrollbar */
+.sidebar-scroll::-webkit-scrollbar { width: 8px; }
+.sidebar-scroll::-webkit-scrollbar-thumb { @apply bg-base-300 rounded; }
+.content-scroll::-webkit-scrollbar { width: 10px; }
+.content-scroll::-webkit-scrollbar-thumb { @apply bg-base-300 rounded; }

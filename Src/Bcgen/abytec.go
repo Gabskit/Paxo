@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
 )
@@ -71,6 +72,9 @@ const (
 	TYPE_STRING byte = 7
 	TYPE_ARRAY  byte = 8
 	TYPE_PKG    byte = 9
+	TYPE_INT    byte = 10
+	TYPE_PKDEC  byte = 11
+	TYPE_COLOR  byte = 12
 )
 
 const (
@@ -342,6 +346,76 @@ func (e *Emitter) pushString(val string) {
 	e.emit(0) // null terminator
 }
 
+// Emite un valor de punto fijo / decimal empaquetado (signo + escala + entero
+// escalado). comparte el mismo layout de bytecode, solo cambia el tipo.
+func (e *Emitter) pushScaled(typ byte, val string) {
+	neg := false
+	s := val
+	if strings.HasPrefix(s, "+") {
+		s = s[1:]
+	} else if strings.HasPrefix(s, "-") {
+		neg = true
+		s = s[1:]
+	}
+
+	parts := strings.SplitN(s, ".", 2)
+	intPart := parts[0]
+	fracPart := ""
+	if len(parts) > 1 {
+		fracPart = parts[1]
+	}
+
+	digits := intPart + fracPart
+	if digits == "" {
+		digits = "0"
+	}
+	num, err := strconv.ParseInt(digits, 10, 64)
+	if err != nil {
+		num = 0
+	}
+	if neg {
+		num = -num
+	}
+
+	e.emit(OP_PUSH)
+	e.emit(typ)
+	e.emit(byte(len(fracPart) & 0xFF)) // escala (dígitos fraccionarios)
+	v16 := int16(num)
+	e.emit(byte(v16))
+	e.emit(byte(v16 >> 8))
+}
+
+func (e *Emitter) pushInt(val string) { e.pushScaled(TYPE_INT, val) }
+func (e *Emitter) pushDec(val string) { e.pushScaled(TYPE_PKDEC, val) }
+
+// pushColor emite un literal de color '#RRGGBB' o '#RRGGBBAA'.
+func (e *Emitter) pushColor(hex string) {
+	r, g, b, a := 0, 0, 0, 255
+	h := strings.TrimPrefix(hex, "#")
+	if len(h) >= 6 {
+		if v, err := strconv.ParseUint(h[0:2], 16, 8); err == nil {
+			r = int(v)
+		}
+		if v, err := strconv.ParseUint(h[2:4], 16, 8); err == nil {
+			g = int(v)
+		}
+		if v, err := strconv.ParseUint(h[4:6], 16, 8); err == nil {
+			b = int(v)
+		}
+		if len(h) >= 8 {
+			if v, err := strconv.ParseUint(h[6:8], 16, 8); err == nil {
+				a = int(v)
+			}
+		}
+	}
+	e.emit(OP_PUSH)
+	e.emit(TYPE_COLOR)
+	e.emit(byte(r))
+	e.emit(byte(g))
+	e.emit(byte(b))
+	e.emit(byte(a))
+}
+
 // Codifica un valor en el formato MP16 radix mixto: v = bc·2^(-2p)·10^(s)
 // con s = exp-BIAS. Busca ajuste EXACTO probando la década menor y dentro
 // de ella la celda más dividida (p desc); si no existe toma el más
@@ -582,8 +656,8 @@ func (cg *CodeGen) reportError(msg string) { cg.errors = append(cg.errors, msg) 
 func (cg *CodeGen) reportWarning(msg string) {
 	cg.warnings = append(cg.warnings, msg)
 }
-func (cg *CodeGen) Code() []byte     { return cg.code }
-func (cg *CodeGen) Errors() []string { return cg.errors }
+func (cg *CodeGen) Code() []byte       { return cg.code }
+func (cg *CodeGen) Errors() []string   { return cg.errors }
 func (cg *CodeGen) Warnings() []string { return cg.warnings }
 
 func (cg *CodeGen) resolveIdent(name string) (idx uint16, isLocal bool, found bool) {
@@ -614,8 +688,16 @@ func (cg *CodeGen) resolveType(token string) byte {
 		return TYPE_BOOL
 	case "pin":
 		return TYPE_POINT
-	case "func":
+	case "fx":
 		return TYPE_FUNC
+	case "pkg", "📦":
+		return TYPE_PKG
+	case "int":
+		return TYPE_INT
+	case "pdec":
+		return TYPE_PKDEC
+	case "col":
+		return TYPE_COLOR
 	default:
 		cg.reportError("tipo desconocido: " + token)
 		return TYPE_NUM64
@@ -731,6 +813,12 @@ func (cg *CodeGen) ExitVarDeclaration(ctx *VarDeclarationContext) {
 			cg.pushChar(0)
 		case TYPE_FUNC:
 			cg.pushFunc(0, 0)
+		case TYPE_INT:
+			cg.pushInt("0")
+		case TYPE_PKDEC:
+			cg.pushDec("0.0")
+		case TYPE_COLOR:
+			cg.pushColor("#00000000")
 		default:
 			cg.pushNum64(0)
 		}
@@ -816,7 +904,7 @@ func (cg *CodeGen) ExitAssignment(ctx *AssignmentContext) {
 type condFrame struct {
 	start    int // posición del statement en el stream activo
 	tmpVar   uint16
-	localTmp bool // true si el temporal vive en el frame de función (OP_*_LOCAL)
+	localTmp bool     // true si el temporal vive en el frame de función (OP_*_LOCAL)
 	blocks   [][]byte // bytecode capturado de cada caso, en orden
 }
 
@@ -933,6 +1021,12 @@ type loopFrame struct {
 }
 
 func (cg *CodeGen) EnterLoopStatement(ctx *LoopStatementContext) {
+	if ld := ctx.LoopDelimiter(); ld != nil {
+		tok := ld.GetStart()
+		cg.reportWarning(fmt.Sprintf(
+			"línea %d: el delimitador de bucle '%s' está deprecado; usa el nuevo formato de bloque",
+			tok.GetLine(), tok.GetText()))
+	}
 	cg.loops = append(cg.loops, loopFrame{condStart: cg.pos()})
 	cg.pendingLoopBody = true
 }
@@ -1002,6 +1096,8 @@ func (cg *CodeGen) handleBaseExpression(ctx antlr.ParserRuleContext) {
 		} else {
 			cg.emit(0)
 		}
+	case *ColLitExprContext:
+		cg.pushColor(expr.COLOR_LITERAL().GetText())
 	case *StringLitExprContext:
 		cg.pushString(expr.STRING_LITERAL().GetText())
 	case *IdentExprContext:

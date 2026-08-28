@@ -184,6 +184,25 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       case CHAR:
         val = var_char((char32_t)vm->bytecode[vm->ip++]);
         break;
+      case COLOR: {
+        uint8_t r = vm->bytecode[vm->ip++];
+        uint8_t g = vm->bytecode[vm->ip++];
+        uint8_t b = vm->bytecode[vm->ip++];
+        uint8_t a = vm->bytecode[vm->ip++];
+        val = var_color(((uint32_t)r << 24) | ((uint32_t)g << 16) |
+                        ((uint32_t)b << 8) | a);
+        break;
+      }
+      case INT_FP:
+      case PKDEC: {
+        uint8_t scale = vm->bytecode[vm->ip++];
+        int16_t raw;
+        memcpy(&raw, vm->bytecode + vm->ip, sizeof(raw));
+        vm->ip += sizeof(raw);
+        val = (var_type_tag == INT_FP) ? var_int_fp(raw, scale)
+                                        : var_pkdec(raw, scale);
+        break;
+      }
       case POINT: {
         uint64_t raw;
         memcpy(&raw, vm->bytecode + vm->ip, sizeof(raw));
@@ -336,6 +355,17 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         case CHAR:
           res = var_char((char32_t)(n.bc > bc_max16() ? bc_max16() : n.bc));
           break;
+        case INT_FP:
+          res = var_int_fp((int16_t)n.bc, 0);
+          break;
+        case PKDEC:
+          res = var_pkdec((int16_t)n.bc, 0);
+          break;
+        case COLOR: {
+          uint32_t rgba = ((uint32_t)n.bc & 0xFFFFFFu);
+          res = var_color((rgba << 8) | 0xFFu);
+          break;
+        }
         default:
           break;
         }
@@ -356,6 +386,17 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         case CHAR:
           res = var_char((char32_t)(n.bc & 0xFF));
           break;
+        case INT_FP:
+          res = var_int_fp((int16_t)n.bc, 0);
+          break;
+        case PKDEC:
+          res = var_pkdec((int16_t)n.bc, 0);
+          break;
+        case COLOR: {
+          uint32_t rgba = (uint32_t)(n.bc & 0xFFFFFFFFULL);
+          res = var_color((rgba << 8) | 0xFFu);
+          break;
+        }
         default:
           break;
         }
@@ -429,6 +470,47 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         if (target_type == CHAR) {
           const char *s = var_string_get(val);
           res = var_char((s && s[0]) ? (char32_t)(uint8_t)s[0] : 0);
+        }
+        break;
+      }
+      case INT_FP:
+      case PKDEC: {
+        PaxoFxp f = var_fxp_get(val);
+        switch (target_type) {
+        case NUM64: {
+          Num64 conv = {0};
+          conv.bc = (uint64_t)f.value;
+          conv.exp = BIAS64;
+          conv.p = 0;
+          res = var_num64(conv);
+          break;
+        }
+        case NUM16: {
+          Num16 conv = {0};
+          conv.bc = (uint16_t)f.value;
+          conv.exp = BIAS16;
+          conv.p = 0;
+          res = var_num16(conv);
+          break;
+        }
+        default:
+          break;
+        }
+        break;
+      }
+      case COLOR: {
+        uint32_t rgba = var_color_get(val);
+        switch (target_type) {
+        case NUM64: {
+          Num64 conv = {0};
+          conv.bc = (uint64_t)rgba;
+          conv.exp = BIAS64;
+          conv.p = 0;
+          res = var_num64(conv);
+          break;
+        }
+        default:
+          break;
         }
         break;
       }
