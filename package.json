@@ -1,6 +1,6 @@
 {
 	"name": "paxo",
-	"version": "1.1.0",
+	"version": "3.14.16",
 	"type": "module",
 	"scripts": {
 		"antlr": "antlr-ng -Dlanguage=Go -o ./Src/Bcgen ./Src/Bcgen/Paxo.g4",
@@ -9,9 +9,10 @@
 		"build": "npm run antlr && npm run build:bcg && npm run build:vm && npm run gen:lep",
 		"gen:lep": "bash sh/gen_lep.sh",
 		"test:vm": "npm run gen:lep && mkdir -p ./Build && gcc -Wall -Wextra -std=gnu23 -I./Build -o ./Build/test_vm_full ./Src/Test/test_vm_full.c -lm && ./Build/test_vm_full",
+		"test:vm:fxp": "npm run gen:lep && mkdir -p ./Build && gcc -Wall -Wextra -std=gnu23 -I./Build -o ./Build/test_vm_fxp ./Src/Test/test_vm_fxp.c -lm && ./Build/test_vm_fxp",
 		"test:vm:old": "npm run gen:lep && mkdir -p ./Build && gcc -Wall -Wextra -std=gnu23 -I./Build -o ./Build/test_lep ./Src/Test/test_lep.c -lm && ./Build/test_lep",
 		"test:bcg": "go test -v ./Src/Bcgen/",
-		"test": "npm run test:vm && npm run test:bcg"
+		"test": "npm run test:vm && npm run test:vm:fxp && npm run test:bcg"
 	},
 	"keywords": [],
 	"author": "",

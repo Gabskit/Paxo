@@ -119,6 +119,11 @@ println(c, typeof(c));   // #A1B2C3DD col`,
       { kind: "warn", html: `El modificador de scope <code class="inline-code">local</code>
         está <b>deprecado</b>; el compilador avisa y recomienda declarar
         directamente el tipo (<code class="inline-code">n i = 0</code>).` },
+      { kind: "warn", html: `El tipo <code class="inline-code">pdec</code> (decimal
+        empaquetado) está <b>deprecado</b>: ya no garantiza números únicos sin
+        error. Sigue funcionando por retrocompatibilidad, pero el compilador avisa
+        y se recomienda usar <code class="inline-code">int</code> o
+        <code class="inline-code">var</code>.` },
     ],
   },
 
@@ -453,6 +458,16 @@ valor = magnitud · 10^(-escala)  (con signo)`,
 pdec: decimal empaquetado         (nanbox 11011, t=1)
 col : color RGBA                  (nanbox 11010 + flag de color)
 // literal de color: #RRGGBB o #RRGGBBAA`,
+      },
+      {
+        caption: "Deprecación del tipo pdec",
+        code: `// pdec (decimal empaquetado) está DEPRECADO:
+// ya no garantiza números únicos sin error.
+pdec d = 6.50   // compila pero con aviso del compilador
+
+// RECOMENDADO:
+int i = 6
+var v = 6.5`,
       },
       {
         caption: "Deprecación de |: :|",

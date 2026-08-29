@@ -32,7 +32,7 @@ static uint8_t *load_file(const char *path, size_t *out_size) {
 int main(int argc, char *argv[]) {
   if (argc < 2) {
     text_yellow(stderr);
-    fprintf(stderr, "LEP-VM v0.1\n");
+    fprintf(stderr, "LEP-VM v3.14\n");
     reset_colors(stderr);
     fprintf(stderr, "Uso: %s <archivo.pbc>\n", argv[0]);
     return 1;

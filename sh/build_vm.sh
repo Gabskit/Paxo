@@ -14,6 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 VM_SRC="$ROOT_DIR/Src/Vm/Src"
 TP="$VM_SRC/third_party"
+SDL="$VM_SRC/SDL3"
 
 # Compilador, estándar y libs de enlace según plataforma.
 eval "$(bash "$SCRIPT_DIR/pick_cc.sh")"
@@ -44,8 +45,12 @@ fi
   $SDL_CFLAGS \
   "$VM_SRC/Main.c" \
   "$TP"/chipmunk/src/*.c \
+  "$TP"/chipmunk/src/*.h \
   "$TP"/pdfio/*.c \
+  "$TP"/pdfio/*.h \
   "$TP"/zlib/*.c \
+  "$TP"/zlib/*.h \
+	"$SDL"/* .h \
   -o "$ROOT_DIR/Build/$OUT" \
   $SDL_LIBS $LIBS
 

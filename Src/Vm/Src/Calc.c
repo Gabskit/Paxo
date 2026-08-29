@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef unsigned char char8_t;
 typedef uint32_t char32_t;
@@ -45,7 +46,9 @@ enum type {
   PACKAGE,
   INT_FP,
   PKDEC,
-  COLOR
+  COLOR,
+  COMPLEX,   // ni: general (componentes MP64)
+  COMPLEX16  // sni: componentes num16
 };
 
 // ==========================================
@@ -61,6 +64,8 @@ enum type {
 // ==========================================
 
 typedef uint64_t PaxoVar;
+
+static inline enum type var_type(PaxoVar v);
 
 #define PAXO_MARK_BOX   0x1AULL // 11010
 #define PAXO_MARK_FXPKD 0x1BULL // 11011 (fixed point/int + packed decimal)
@@ -81,6 +86,7 @@ typedef uint64_t PaxoVar;
 #define REF_SUB_STRING 2u
 #define REF_SUB_FUNC 3u
 #define REF_SUB_PIN 4u
+#define REF_SUB_COMPLEX 5u
 
 #define PAXO_NO_VALUE UINT64_MAX
 
@@ -207,14 +213,12 @@ static inline uint32_t var_color_get(PaxoVar v) {
   return (uint32_t)((v >> PAXO_VAL_SHIFT) & 0xFFFFFFFFULL);
 }
 
-// fixed point / packed decimal (marcador 11011):
-//   t(1) pppp(4) ··(2 pad) s(1) xxxxxxxxxxxx(13) ···(30 pad+5 marcador)
-//   t=0 -> INT_FP (fixed point / int), t=1 -> PKDEC (packed decimal)
+// fixed point / int (marcador 11011, t=0): NO es decimal empaquetado.
+//   t(1)=0 pppp(4) ··(2 pad) s(1) xxxxx(13) ···(30 pad+5 marcador)
 //   value = entero escalado con signo en las 13 bits
 typedef struct {
   int16_t value;  // entero escalado con signo
   uint8_t scale;  // pppp (0..15) dígitos fraccionarios
-  bool pkdec;     // true = packed decimal, false = fixed point / int
 } PaxoFxp;
 
 static inline PaxoVar var_fxp(PaxoFxp f) {
@@ -223,8 +227,7 @@ static inline PaxoVar var_fxp(PaxoFxp f) {
   int16_t v = f.value;
   uint8_t sign = v < 0 ? 1 : 0;
   uint16_t mag = v < 0 ? (uint16_t)(-(int32_t)v) : (uint16_t)v;
-  PaxoVar out = (f.pkdec ? 1ULL : 0ULL) << 63;
-  out |= (uint64_t)(f.scale & 0xF) << 59;
+  PaxoVar out = (uint64_t)(f.scale & 0xF) << 59;
   out |= (uint64_t)sign << 56;
   out |= (uint64_t)(mag & 0x1FFFu) << 43;
   return out | PAXO_MARK_FXPKD;
@@ -232,7 +235,6 @@ static inline PaxoVar var_fxp(PaxoFxp f) {
 
 static inline PaxoFxp var_fxp_get(PaxoVar v) {
   PaxoFxp f;
-  f.pkdec = (v >> 63) != 0;
   f.scale = (uint8_t)((v >> 59) & 0xF);
   int16_t mag = (int16_t)((v >> 43) & 0x1FFFu);
   f.value = ((v >> 56) & 1) ? (int16_t)(-mag) : mag;
@@ -240,11 +242,97 @@ static inline PaxoFxp var_fxp_get(PaxoVar v) {
 }
 
 static inline PaxoVar var_int_fp(int16_t value, uint8_t scale) {
-  return var_fxp((PaxoFxp){.value = value, .scale = scale, .pkdec = false});
+  return var_fxp((PaxoFxp){.value = value, .scale = scale});
 }
 
+// decimal empaquetado (packed decimal) real — BCD, marcador 11011, t=1:
+// cada dígito decimal vive en un nibble; signo y escala por separado.
+//   t(1)=1 pppp(4) s(1) ·(1 pad) d12..d0 (52 bits = 13 dígitos BCD) 11011
+//   d0 (unidades) en bits 5..8, d12 (la más significativa) en bits 53..56.
+//   valor = (-1)^signo · Σ d_i·10^i · 10^(-pppp)
+#define PAXO_PDEC_DIGITS 13
+#define PAXO_PDEC_DIG_SHIFT 5
+#define PAXO_PDEC_SIGN_SHIFT 58
+#define PAXO_PDEC_MAX_MAG ((int64_t)9999999999999LL) // 13 dígitos
+
+typedef struct {
+  uint8_t digits[PAXO_PDEC_DIGITS]; // dígito BCD 0..9, d[0] = unidades
+  uint8_t signo;                    // 0 positivo, 1 negativo
+  uint8_t scale;                    // pppp (0..15) dígitos fraccionarios
+} PaxoPdec;
+
+// Empaca 13 dígitos BCD (magnitud) en un marmita nanbox de tipo PKDEC.
+static inline PaxoVar var_pkdec_pack(uint64_t mag, uint8_t signo, uint8_t scale) {
+  if (scale > 15)
+    scale = 15;
+  if (mag > (uint64_t)PAXO_PDEC_MAX_MAG)
+    mag = (uint64_t)PAXO_PDEC_MAX_MAG;
+  PaxoVar out = 1ULL << 63;
+  out |= (uint64_t)(scale & 0xF) << 59;
+  out |= (uint64_t)(signo & 1) << PAXO_PDEC_SIGN_SHIFT;
+  for (int i = 0; mag && i < PAXO_PDEC_DIGITS; i++) {
+    out |= (uint64_t)(mag % 10) << (PAXO_PDEC_DIG_SHIFT + 4 * i);
+    mag /= 10;
+  }
+  return out | PAXO_MARK_FXPKD;
+}
+
+// Literal / constructor: valor escalado con signo (int16, como lo emite el
+// bytecode) convertido a dígitos BCD.
 static inline PaxoVar var_pkdec(int16_t value, uint8_t scale) {
-  return var_fxp((PaxoFxp){.value = value, .scale = scale, .pkdec = true});
+  uint64_t mag = (value < 0) ? (uint64_t)(-(int32_t)value) : (uint64_t)value;
+  return var_pkdec_pack(mag, (value < 0) ? 1 : 0, scale);
+}
+
+static inline PaxoVar pdec_to_var(PaxoPdec d) {
+  uint64_t mag = 0, pow10 = 1;
+  for (int i = 0; i < PAXO_PDEC_DIGITS; i++) {
+    mag += (uint64_t)(d.digits[i] & 0xF) * pow10;
+    pow10 *= 10;
+  }
+  return var_pkdec_pack(mag, d.signo, d.scale);
+}
+
+static inline PaxoPdec var_pkdec_get(PaxoVar v) {
+  PaxoPdec d;
+  d.scale = (uint8_t)((v >> 59) & 0xF);
+  d.signo = (uint8_t)((v >> PAXO_PDEC_SIGN_SHIFT) & 1);
+  for (int i = 0; i < PAXO_PDEC_DIGITS; i++)
+    d.digits[i] = (uint8_t)((v >> (PAXO_PDEC_DIG_SHIFT + 4 * i)) & 0xF);
+  return d;
+}
+
+static inline int64_t pdec_magnitude(PaxoPdec d) {
+  int64_t m = 0, pow10 = 1;
+  for (int i = 0; i < PAXO_PDEC_DIGITS; i++) {
+    m += (int64_t)(d.digits[i] & 0xF) * pow10;
+    pow10 *= 10;
+  }
+  return m;
+}
+
+static inline int64_t pdec_value(PaxoPdec d) {
+  int64_t m = pdec_magnitude(d);
+  return d.signo ? -m : m;
+}
+
+static inline bool pdec_is_zero(PaxoPdec d) { return pdec_magnitude(d) == 0; }
+
+// Construye dígitos BCD desde un entero con signo (clampa a 13 dígitos).
+static inline PaxoPdec pdec_from_int64(int64_t v, uint8_t scale) {
+  PaxoPdec d = {0};
+  d.scale = scale > 15 ? 15 : scale;
+  if (v < 0) {
+    d.signo = 1;
+    v = -v;
+  }
+  if (v > PAXO_PDEC_MAX_MAG)
+    v = PAXO_PDEC_MAX_MAG;
+  for (int i = 0; v && i < PAXO_PDEC_DIGITS; i++) {
+    d.digits[i] = (uint8_t)(v % 10);
+    v /= 10;
+  }
+  return d;
 }
 
 static inline PaxoVar var_ref(uint32_t sub, uint32_t punt, uint16_t aux13) {
@@ -304,6 +392,85 @@ static inline PaxoVar var_pin(uint32_t id) {
 
 static inline uint32_t var_pin_get(PaxoVar v) { return var_ref_punt_get(v); }
 
+// ==========================================
+// 4. NÚMEROS COMPLEJOS (tipo ni / sni)
+//    Representación: ref a un objeto { re, im } donde cada componente es un
+//    nanbox numérico (num16, num64 o int). La aritmética sigue el sistema de
+//    los operandos: MP64 = ni, MP16 = sni. (El dominio BCD exacto / pdec fue
+//    eliminado al deprecarse el tipo pdec.)
+// ==========================================
+
+#define PAXO_COMPLEX_KIND_SNI 0u // componentes num16 (tipo sni)
+#define PAXO_COMPLEX_KIND_NI 1u  // componentes num64 (tipo ni)
+#define PAXO_COMPLEX_KIND_MASK 0x1FFFu
+
+typedef struct {
+  uint16_t kind; // PAXO_COMPLEX_KIND_*
+  PaxoVar re;
+  PaxoVar im;
+} PaxoComplex;
+
+static inline PaxoVar var_complex_of(PaxoComplex c) {
+  return var_ref(REF_SUB_COMPLEX, paxo_object_add(
+                                      (PaxoComplex *)memcpy(
+                                          malloc(sizeof(PaxoComplex)), &c,
+                                          sizeof(PaxoComplex)),
+                                      COMPLEX),
+                 c.kind);
+}
+
+static inline PaxoComplex var_complex_get(PaxoVar v) {
+  return *(PaxoComplex *)paxo_object_ptr(v);
+}
+
+static inline uint16_t var_complex_kind(PaxoVar v) {
+  return var_ref_aux_get(v) & PAXO_COMPLEX_KIND_MASK;
+}
+
+// construye según el tipo declarado: ni → MP64, sni → MP16
+static inline PaxoVar var_complex_ni(Num64 re, Num64 im) {
+  PaxoComplex c = {.kind = PAXO_COMPLEX_KIND_NI, .re = var_num64(re),
+                   .im = var_num64(im)};
+  return var_complex_of(c);
+}
+
+static inline PaxoVar var_complex_sni(Num16 re, Num16 im) {
+  PaxoComplex c = {.kind = PAXO_COMPLEX_KIND_SNI, .re = var_num16(re),
+                   .im = var_num16(im)};
+  return var_complex_of(c);
+}
+
+static inline PaxoVar var_complex_scalar(PaxoVar x) {
+  PaxoComplex c = {.re = x, .im = 0};
+  switch (var_type(x)) {
+  case INT_FP:
+    c.kind = PAXO_COMPLEX_KIND_NI;
+    c.im = var_num64((Num64){0, BIAS64, 0, 0});
+    break;
+  case PKDEC:
+    c.kind = PAXO_COMPLEX_KIND_NI;
+    c.im = var_num64((Num64){0, BIAS64, 0, 0});
+    break;
+  case NUM64:
+    c.kind = PAXO_COMPLEX_KIND_NI;
+    c.im = var_num64((Num64){0, BIAS64, 0, 0});
+    break;
+  default:
+    c.kind = PAXO_COMPLEX_KIND_SNI;
+    c.im = var_num16((Num16){0, BIAS16, 0, 0});
+    break;
+  }
+  return var_complex_of(c);
+}
+
+static inline PaxoVar var_complex_zero_ni(void) {
+  return var_complex_ni((Num64){0, BIAS64, 0, 0}, (Num64){0, BIAS64, 0, 0});
+}
+
+static inline PaxoVar var_complex_zero_sni(void) {
+  return var_complex_sni((Num16){0, BIAS16, 0, 0}, (Num16){0, BIAS16, 0, 0});
+}
+
 static inline bool var_is_num(PaxoVar v) {
   uint32_t mark = (uint32_t)(v & PAXO_MARK_MASK);
   return mark != PAXO_MARK_BOX && mark != PAXO_MARK_N16 &&
@@ -332,6 +499,9 @@ static inline enum type var_type(PaxoVar v) {
         return STRING;
       case REF_SUB_FUNC:
         return FUNC;
+      case REF_SUB_COMPLEX:
+        return (var_complex_kind(v) == PAXO_COMPLEX_KIND_SNI) ? COMPLEX16
+                                                              : COMPLEX;
       default:
         return POINT;
       }
@@ -791,6 +961,202 @@ static inline int cmp_num64(Num64 a, Num64 b) {
   if (val_a < val_b)
     return -1;
   if (val_a > val_b)
+    return 1;
+  return 0;
+}
+
+// ==========================================
+// 7. ARITMÉTICA DE PUNTO FIJO (INT_FP, PaxoFxp) Y DECIMAL EMPAQUETADO
+//    (PKDEC, PaxoPdec BCD). Son dos representaciones distintas (Nanbox.md §3.6):
+//    - int  = entero escalado con signo en 13 bits (real = value·10^(-scale)).
+//    - pdec = dígitos BCD en nibbles con signo y escala separados (real =
+//             Σ dígitos·10^i · 10^(-scale)); carry/borrow decimal exacto.
+// ==========================================
+
+#define FXP_SCALE_MAX 15
+#define FXP_MAG_MAX ((int64_t)0x1FFF) // 13 bits
+
+static inline int64_t fxp_div10_round(int64_t v) {
+  int64_t m = v < 0 ? -v : v;
+  m = (m + 5) / 10;
+  return v < 0 ? -m : m;
+}
+
+// Baja la escala (dividiendo y redondeando) hasta que la magnitud quepa en
+// 13 bits; si incluso en escala 0 desborda, satura al límite del formato.
+static inline PaxoFxp fxp_pack(int64_t r, uint8_t scale) {
+  while ((r > FXP_MAG_MAX || r < -FXP_MAG_MAX) && scale > 0) {
+    r = fxp_div10_round(r);
+    scale--;
+  }
+  if (r > FXP_MAG_MAX)
+    r = FXP_MAG_MAX;
+  if (r < -FXP_MAG_MAX)
+    r = -FXP_MAG_MAX;
+  return (PaxoFxp){.value = (int16_t)r, .scale = scale};
+}
+
+static inline PaxoFxp add_fxp(PaxoFxp a, PaxoFxp b) {
+  uint8_t s = (a.scale > b.scale) ? a.scale : b.scale;
+  int64_t av = (int64_t)a.value * num16_pow10((uint16_t)(s - a.scale));
+  int64_t bv = (int64_t)b.value * num16_pow10((uint16_t)(s - b.scale));
+  return fxp_pack(av + bv, s);
+}
+
+static inline PaxoFxp sub_fxp(PaxoFxp a, PaxoFxp b) {
+  b.value = (int16_t)-b.value;
+  return add_fxp(a, b);
+}
+
+static inline PaxoFxp mul_fxp(PaxoFxp a, PaxoFxp b) {
+  int64_t r = (int64_t)a.value * b.value;
+  int32_t s = (int32_t)a.scale + (int32_t)b.scale;
+  while (s > FXP_SCALE_MAX) {
+    r = fxp_div10_round(r);
+    s--;
+  }
+  return fxp_pack(r, (uint8_t)s);
+}
+
+static inline PaxoFxp div_fxp(PaxoFxp a, PaxoFxp b) {
+  if (a.value == 0 || b.value == 0)
+    return (PaxoFxp){.value = 0, .scale = 0};
+  // cociente con la mayor escala de los operandos, sin pasarse de 15
+  int32_t s = (a.scale > b.scale) ? a.scale : b.scale;
+  while (s > 0 && ((int32_t)b.scale - (int32_t)a.scale + s) > FXP_SCALE_MAX)
+    s--;
+  int32_t e = (int32_t)b.scale - (int32_t)a.scale + s;
+  int64_t num = a.value;
+  for (int32_t i = 0; i < e; i++)
+    num *= 10;
+  int64_t q = num / b.value;
+  int64_t rem = num % b.value;
+  int64_t rm = rem < 0 ? -rem : rem;
+  int64_t dm = b.value < 0 ? -(int64_t)b.value : (int64_t)b.value;
+  if (rm * 2 >= dm) // redondeo .5 lejos de cero
+    q += (q >= 0) ? 1 : -1;
+  return fxp_pack(q, (uint8_t)s);
+}
+
+// --- decimal empaquetado (BCD): PaxoPdec -------------------------------------
+// Álgebra decimal exacta: magnitudes alineadas en acumulador de 128 bits y
+// resultado repaqueteado a dígitos BCD (carry/borrow decimal sobre dígitos).
+
+// Lleva una magnitud (escala, signo) a dígitos BCD, saturado a 13 dígitos.
+// No baja la escala: la precisión decimal se conserva al máximo.
+static inline PaxoPdec pdec_from_mag128(unsigned __int128 m, uint8_t scale,
+                                        uint8_t signo) {
+  PaxoPdec r = {0};
+  r.scale = scale > 15 ? 15 : scale;
+  r.signo = signo & 1;
+  if (m > (unsigned __int128)PAXO_PDEC_MAX_MAG)
+    m = (unsigned __int128)PAXO_PDEC_MAX_MAG;
+  for (int i = 0; m && i < PAXO_PDEC_DIGITS; i++) {
+    r.digits[i] = (uint8_t)(m % 10);
+    m /= 10;
+  }
+  return r;
+}
+
+// Alinea la magnitud a la escala target multiplicando por 10.
+static inline unsigned __int128 pdec_mag_to_scale(PaxoPdec d, uint8_t target) {
+  unsigned __int128 m = (unsigned __int128)pdec_magnitude(d);
+  for (uint8_t i = d.scale; i < target; i++)
+    m *= 10;
+  return m;
+}
+
+// suma (o resta con signo opuesto) decimal exacta.
+static inline PaxoPdec pdec_add(PaxoPdec a, PaxoPdec b) {
+  uint8_t s = (a.scale > b.scale) ? a.scale : b.scale;
+  unsigned __int128 am = pdec_mag_to_scale(a, s);
+  unsigned __int128 bm = pdec_mag_to_scale(b, s);
+  if (a.signo == b.signo)
+    return pdec_from_mag128(am + bm, s, a.signo);
+  if (am >= bm)
+    return pdec_from_mag128(am - bm, s, a.signo);
+  return pdec_from_mag128(bm - am, s, b.signo);
+}
+
+static inline PaxoPdec pdec_sub(PaxoPdec a, PaxoPdec b) {
+  b.signo ^= 1;
+  return pdec_add(a, b);
+}
+
+// Compara dos valores decimales (exacto, sin pasar por num64).
+static inline int pdec_cmp(PaxoPdec a, PaxoPdec b) {
+  uint8_t s = (a.scale > b.scale) ? a.scale : b.scale;
+  unsigned __int128 av = pdec_mag_to_scale(a, s);
+  unsigned __int128 bv = pdec_mag_to_scale(b, s);
+  if (a.signo != b.signo)
+    return a.signo ? -1 : 1;
+  if (av == bv)
+    return 0;
+  return (av > bv) ? (a.signo ? -1 : 1) : (a.signo ? 1 : -1);
+}
+
+// multiplicación decimal: producto de magnitudes, escala sumada; baja la
+// escala solo si pasa de 15 (redondeando el dígito perdido).
+static inline PaxoPdec pdec_mul(PaxoPdec a, PaxoPdec b) {
+  unsigned __int128 m = (unsigned __int128)pdec_magnitude(a) *
+                        (unsigned __int128)pdec_magnitude(b);
+  int32_t s = (int32_t)a.scale + (int32_t)b.scale;
+  while (s > FXP_SCALE_MAX) {
+    m = (m + 5) / 10;
+    s--;
+  }
+  return pdec_from_mag128(m, (uint8_t)s, a.signo ^ b.signo);
+}
+
+// división decimal con redondeo .5 lejos de cero, a la mayor escala.
+static inline PaxoPdec pdec_div(PaxoPdec a, PaxoPdec b) {
+  uint8_t signo = a.signo ^ b.signo;
+  if (pdec_is_zero(a) || pdec_is_zero(b))
+    return pdec_from_int64(0, 0);
+  int32_t s = (a.scale > b.scale) ? a.scale : b.scale;
+  while (s > 0 && ((int32_t)b.scale - (int32_t)a.scale + s) > FXP_SCALE_MAX)
+    s--;
+  int32_t e = (int32_t)b.scale - (int32_t)a.scale + s;
+  unsigned __int128 num = (unsigned __int128)pdec_magnitude(a);
+  for (int32_t i = 0; i < e; i++)
+    num *= 10;
+  unsigned __int128 dm = (unsigned __int128)pdec_magnitude(b);
+  unsigned __int128 q = num / dm;
+  unsigned __int128 rem = num % dm;
+  if ((rem * 2) >= dm) // redondeo .5 lejos de cero
+    q++;
+  return pdec_from_mag128(q, (uint8_t)s, signo);
+}
+
+static inline PaxoPdec pdec_neg(PaxoPdec a) {
+  a.signo ^= 1;
+  return a;
+}
+
+static inline PaxoPdec pdec_abs(PaxoPdec a) {
+  a.signo = 0;
+  return a;
+}
+
+static inline PaxoFxp neg_fxp(PaxoFxp a) {
+  a.value = (int16_t)-a.value;
+  return a;
+}
+
+static inline PaxoFxp abs_fxp(PaxoFxp a) {
+  if (a.value < 0)
+    a.value = (int16_t)-a.value;
+  return a;
+}
+
+// Compara valores escalados llevando ambos a la mayor escala.
+static inline int cmp_fxp(PaxoFxp a, PaxoFxp b) {
+  uint8_t s = (a.scale > b.scale) ? a.scale : b.scale;
+  int64_t av = (int64_t)a.value * num16_pow10((uint16_t)(s - a.scale));
+  int64_t bv = (int64_t)b.value * num16_pow10((uint16_t)(s - b.scale));
+  if (av < bv)
+    return -1;
+  if (av > bv)
     return 1;
   return 0;
 }

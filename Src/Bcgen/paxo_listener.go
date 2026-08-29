@@ -98,6 +98,9 @@ type PaxoListener interface {
 	// EnterColLitExpr is called when entering the colLitExpr production.
 	EnterColLitExpr(c *ColLitExprContext)
 
+	// EnterComLitExpr is called when entering the comLitExpr production.
+	EnterComLitExpr(c *ComLitExprContext)
+
 	// EnterArrayLitExpr is called when entering the arrayLitExpr production.
 	EnterArrayLitExpr(c *ArrayLitExprContext)
 
@@ -223,6 +226,9 @@ type PaxoListener interface {
 
 	// ExitColLitExpr is called when exiting the colLitExpr production.
 	ExitColLitExpr(c *ColLitExprContext)
+
+	// ExitComLitExpr is called when exiting the comLitExpr production.
+	ExitComLitExpr(c *ComLitExprContext)
 
 	// ExitArrayLitExpr is called when exiting the arrayLitExpr production.
 	ExitArrayLitExpr(c *ArrayLitExprContext)

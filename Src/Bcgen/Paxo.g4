@@ -28,7 +28,7 @@ varDeclaration
     ;
 
 type
-		: VAR_TYPE | NUM_TYPE | CHARA_TYPE | POINTER_TYPE | TRIT_TYPE | BOOLEAN_TYPE | FUNC_TYPE | PKG_TYPE | INT_TYPE | PKDEC_TYPE | COLOR_TYPE ;
+		: VAR_TYPE | NUM_TYPE | CHARA_TYPE | POINTER_TYPE | TRIT_TYPE | BOOLEAN_TYPE | FUNC_TYPE | PKG_TYPE | INT_TYPE | PKDEC_TYPE | COLOR_TYPE | COMPLEX_TYPE ;
 
 scope
 	: GLOBAL | LOCAL ;
@@ -114,6 +114,7 @@ expression
     | BOOLEAN_TRIT # boolTritExpr
 		| POINTER_LITERAL # ptrLitExpr
 		| COLOR_LITERAL # colLitExpr
+		| COMPLEX_LITERAL # comLitExpr
     | arrayLiteral # arrayLitExpr
     | IDENTIFIER # identExpr
 		| pkgDeclaration # pkgExpr
@@ -130,6 +131,7 @@ arrayLiteral
 
 VAR_TYPE: 'var' | '📥' | 'svar' | 's📥' ;
 NUM_TYPE: 'n' | 'sn' ;
+COMPLEX_TYPE: 'ni' | 'sni' ;
 CHARA_TYPE: 'abc' ;
 TRIT_TYPE: 'trit' ;
 BOOLEAN_TYPE: 'bool' ;
@@ -158,6 +160,7 @@ PLAY_MODE  : '▶️' | 'go' | '|>' ;
 // Literales
 INT_LITERAL     : [+-]? [0-9]+ ;
 DECIMAL_LITERAL : [+-]? [0-9]+ '.' [0-9]+ ;
+COMPLEX_LITERAL: ([+-]? [0-9]+ ('.' [0-9]+)?)? [+-] [0-9]+ ('.' [0-9]+)? 'i' ;
 BOOLEAN_BIT			: '.×' | '.✓' ;
 BOOLEAN_TRIT    : '×' | '•' | '✓' ;
 POINTER_LITERAL : '@' IDENTIFIER ;

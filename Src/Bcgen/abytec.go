@@ -75,6 +75,8 @@ const (
 	TYPE_INT    byte = 10
 	TYPE_PKDEC  byte = 11
 	TYPE_COLOR  byte = 12
+	TYPE_COMPLEX  byte = 13
+	TYPE_COMPLEX16 byte = 14
 )
 
 const (
@@ -566,6 +568,81 @@ func (e *Emitter) pushNum64Float(val float64) {
 	e.emit(byte(raw >> 56))
 }
 
+// Codifica un float64 a los 8 bytes de un componente Num64 (MP64) en el
+// formato que espera la VM (mismo layout que pushNum64Float, sin op/tipo):
+// raw = (p<<59) | (bc<<9) | (exp<<1) | signo, con p=4 dígitos fraccionarios.
+func rawNum64(val float64) [8]byte {
+	var raw [8]byte
+	signo := uint64(0)
+	if val < 0 {
+		signo = 1
+		val = -val
+	}
+	exp := uint64(127)
+	const fracDigits = 4
+	bcFloat := val
+	for i := 0; i < fracDigits; i++ {
+		bcFloat *= 10.0
+	}
+	bc := uint64(bcFloat)
+	for bc > 1125899906842623 { // 2^50 - 1
+		bc /= 10
+		exp++
+	}
+	r := (uint64(fracDigits) << 59) | (bc << 9) | (exp << 1) | signo
+	for i := 0; i < 8; i++ {
+		raw[i] = byte(r >> (i * 8))
+	}
+	return raw
+}
+
+// Emite un literal complejo: OP_PUSH, TYPE_COMPLEX y dos componentes Num64
+// crudos (re, im). Cada número se interpreta con su signo propio.
+func (e *Emitter) pushComplex(re, im string) {
+	e.emit(OP_PUSH)
+	e.emit(TYPE_COMPLEX)
+	reV, err := strconv.ParseFloat(re, 64)
+	if err != nil {
+		reV = 0
+	}
+	imV, err := strconv.ParseFloat(im, 64)
+	if err != nil {
+		imV = 0
+	}
+	for _, b := range rawNum64(reV) {
+		e.emit(b)
+	}
+	for _, b := range rawNum64(imV) {
+		e.emit(b)
+	}
+}
+
+// Separa un literal complejo ("3+4i", "-2+3.5i", "+3i") en (real, imaginaria).
+// La parte imaginaria siempre lleva su propio signo y es la última: todo lo
+// anterior al último '+'/'-' es la parte real (puede faltar).
+func parseComplexLiteral(text string) (re, im string) {
+	s := strings.TrimSuffix(text, "i")
+	lastSign := -1
+	for i := len(s) - 1; i >= 0; i-- {
+		if s[i] == '+' || s[i] == '-' {
+			lastSign = i
+			break
+		}
+	}
+	if lastSign < 0 {
+		return "0", "0"
+	}
+	im = s[lastSign:]
+	if im == "" || im == "+" || im == "-" {
+		return "0", "0"
+	}
+	re = s[:lastSign]
+	if re == "" {
+		re = "0"
+	}
+	return re, im
+}
+
 // ==========================================
 // HELPERS
 // ==========================================
@@ -695,9 +772,16 @@ func (cg *CodeGen) resolveType(token string) byte {
 	case "int":
 		return TYPE_INT
 	case "pdec":
+		cg.reportWarning("el tipo 'pdec' (decimal empaquetado) está deprecado: " +
+			"ya no garantiza números únicos sin error y quedará sin soporte. " +
+			"Usa 'n' (mobile point) o 'var' en su lugar")
 		return TYPE_PKDEC
 	case "col":
 		return TYPE_COLOR
+	case "ni":
+		return TYPE_COMPLEX
+	case "sni":
+		return TYPE_COMPLEX16
 	default:
 		cg.reportError("tipo desconocido: " + token)
 		return TYPE_NUM64
@@ -819,6 +903,13 @@ func (cg *CodeGen) ExitVarDeclaration(ctx *VarDeclarationContext) {
 			cg.pushDec("0.0")
 		case TYPE_COLOR:
 			cg.pushColor("#00000000")
+		case TYPE_COMPLEX:
+			cg.pushComplex("0", "0")
+		case TYPE_COMPLEX16:
+			cg.emit(OP_PUSH)
+			cg.emit(TYPE_COMPLEX16)
+			cg.emit16(0)
+			cg.emit16(0)
 		default:
 			cg.pushNum64(0)
 		}
@@ -1098,6 +1189,9 @@ func (cg *CodeGen) handleBaseExpression(ctx antlr.ParserRuleContext) {
 		}
 	case *ColLitExprContext:
 		cg.pushColor(expr.COLOR_LITERAL().GetText())
+	case *ComLitExprContext:
+		re, im := parseComplexLiteral(expr.COMPLEX_LITERAL().GetText())
+		cg.pushComplex(re, im)
 	case *StringLitExprContext:
 		cg.pushString(expr.STRING_LITERAL().GetText())
 	case *IdentExprContext:

@@ -200,6 +200,12 @@ func (s *BasePaxoListener) EnterColLitExpr(ctx *ColLitExprContext) {}
 // ExitColLitExpr is called when production colLitExpr is exited.
 func (s *BasePaxoListener) ExitColLitExpr(ctx *ColLitExprContext) {}
 
+// EnterComLitExpr is called when production comLitExpr is entered.
+func (s *BasePaxoListener) EnterComLitExpr(ctx *ComLitExprContext) {}
+
+// ExitComLitExpr is called when production comLitExpr is exited.
+func (s *BasePaxoListener) ExitComLitExpr(ctx *ComLitExprContext) {}
+
 // EnterArrayLitExpr is called when production arrayLitExpr is entered.
 func (s *BasePaxoListener) EnterArrayLitExpr(ctx *ArrayLitExprContext) {}
 

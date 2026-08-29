@@ -163,22 +163,48 @@ Esto cubre: `pin` (puntero), arrays, packages, funciones y strings.
 
 ### 3.6 punto fijo / entero y decimal empaquetado — marcador `11011`
 
+Dos formatos con el mismo marcador bajo, distinguidos por `t` (bit 63).
+
+**Entero escalado (`int`, tipo `INT_FP`) — `t = 0`:**
+
 ```
  bits 63    bits 62..59  bits 58..57  bit 56    bits 55..43   bits 42..5   bits 4..0
  ┌────────┐ ┌───────────┐ ┌──────────┐ ┌───────┐ ┌────────────┐ ┌──────────┐ ┌────────┐
- │  t     │ │  pppp     │ │ padding  │ │  s    │ │  xxxx(13)  │ │ padding  │ │ 11011  │
+ │   0    │ │   pppp    │ │ padding  │ │  s    │ │  xxxx(13)  │ │ padding  │ │ 11011  │
  └────────┘ └───────────┘ └──────────┘ └───────┘ └────────────┘ └──────────┘ └────────┘
-   tipo             escala                                        valor escalado (con signo) 
+ └──tó 1──┘     escala                                        valor escalado (con signo)
 ```
 
-- `t` (1 bit): `0` = punto fijo / entero (`int`, tipo `INT_FP`), `1` = decimal
-  empaquetado (`pdec`, tipo `PKDEC`).
 - `pppp` (4 bits, 0..15): escala = cantidad de dígitos fraccionarios.
 - `s` (1 bit): signo.
-- `xxxx` (13 bits): **entero escalado con signo** (magnitud). El valor real es
-  `magnitud · 10^(-escala)`.
+- `xxxx` (13 bits): **magnitud entera escalada** con signo. Valor real =
+  `±magnitud · 10^(-escala)`. Rango de magnitud `0..8191` (limita la precisión
+  entera, no decimal).
 
-Constructores: `var_int_fp(valor, escala)` y `var_pkdec(valor, escala)`.
+**Decimal empaquetado BCD (`pdec`, tipo `PKDEC`) — `t = 1`:**
+
+```
+ bits 63    bits 62..59  bit 58   bit 57   bits 56..5 (13 nibbles, dígito d12 en los bits 53..56 … unidades d0 en los bits 5..8)   bits 4..0
+ ┌────────┐ ┌───────────┐ ┌──────┐ ┌──────┐ ┌───────────────────────────────────────────────────────────────────────────────────────┐ ┌────────┐
+ │   1    │ │   pppp    │ │  s   │ │ pad. │ │  d12 ··· d1 d0           (13 dígitos decimales, un nibble cada uno, d0 = unidades)    │ │ 11011  │
+ └────────┘ └───────────┘ └──────┘ └──────┘ └───────────────────────────────────────────────────────────────────────────────────────┘ └────────┘
+ └──tó 1──┘    escala      signo
+```
+
+- `pppp` (4 bits, 0..15): escala = dígitos fraccionarios (`pdec(6.50)` → 2).
+- `s` (1 bit): signo.
+- `d0..d12` (52 bits = 13 nibbles): **mantisa BCD genuina**, cada nibble es un
+  dígito decimal. El valor real es `(-1)^s · (Σ d_i·10^i) · 10^(-escala)` con
+  `i` desde las unidades (`d0`, bits 5..8) hasta `d12` (bits 53..56).
+- El cálculo suma/resta/compara alineando las magnitudes en `__int128`
+  (acarreo/borrow decimal real, portando entre nibbles); no hay saturación a
+  13 bits sino a 13 dígitos (`9999999999999`).
+
+Constructores: `var_int_fp(valor, escala)` (entero) y
+`var_pkdec(valor, escala)` (BCD). `int` y `pdec` son tipos distintos:
+`sac(int)→pdec` re-encodifica a BCD (exacto, conserva escala) y
+`sac(pdec)→int` redondea; las operaciones mixtas operan en el dominio `pdec`
+(si hay algún operando `pdec`) o en el dominio entero escalado.
 
 ### 3.7 MP16 embebido — marcador `11100`
 

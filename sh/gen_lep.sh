@@ -12,7 +12,6 @@ BUILD_DIR="$ROOT_DIR/Build"
 PAXO_FILES=(
   "$VM_SRC/Calc.c"
   "$VM_SRC/Deque.c"
-  "$VM_SRC/termcolor-c.h"
   "$VM_SRC/Typecast_and_read.c"
   "$VM_SRC/Functions.c"
   "$VM_SRC/Vm.c"
@@ -21,10 +20,16 @@ PAXO_FILES=(
 # Librerias de terceros (incluidas en la version completa)
 THIRD_PARTY_FILES=(
   "$VM_SRC/gl3_compat.h"
+  "$VM_SRC/termcolor-c.h"
   "$VM_SRC/miniaudio.h"
   "$VM_SRC/nanovg.h"
   "$VM_SRC/nanovg_gl3.h"
   "$VM_SRC/simple2d.h"
+	"$VM_SRC/stb_image.h"
+	"$VM_SRC/stb_image_resize2.h"
+	"$VM_SRC/stb_image_write.h"
+	"$VM_SRC/stb_truetype.h"
+	"$VM_SRC/SDL3"/*
 )
 
 ALL_FILES=("${PAXO_FILES[@]}" "${THIRD_PARTY_FILES[@]}")

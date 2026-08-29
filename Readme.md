@@ -738,6 +738,11 @@ npm run test:bcg    # Tests del compilador (Go)
 
 ## Changelog reciente
 
+### Deprecación del tipo `pdec`
+- El tipo `pdec` (decimal empaquetado) quedó deprecado: ya no garantiza números
+  únicos sin error. Sigue funcionando por retrocompatibilidad, pero el compilador
+  emite un aviso y se recomienda usar `int` (punto fijo) o `var` en su lugar.
+
 ### Tipos nuevos: `int`, `pdec`, `col`
 - Se añadieron los tipos `int` (entero / punto fijo) y `pdec` (decimal
   empaquetado), ambos empaquetados en el marcador nanbox `11011` (0x1B), y `col`
@@ -765,9 +770,5 @@ Vendidas como headers en `Src/Vm/Src/`:
 [stb image, truetype, image_write, image_resize2] [https://github.com/nothings/stb.git]
 [miniaudio] [https://miniaud.io/]
 [Chipmunk2D headers] [https://codeberg.org/slembcke/Chipmunk2D]
-[SDL3 / SDL3_image / SDL3_mixer / SDL3_ttf headers] [https://github.com/libsdl-org]
 [PDF io header] [https://github.com/michaelrsweet/pdfio.git]
-
-Externa (opcional, requiere SDL3 instalada para linkear):
-
-[simple2d] [https://github.com/simple2d/simple2d.git]
+[sokol] [https://github.com/floooh/sokol/tree/master]

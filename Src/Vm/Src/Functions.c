@@ -7,64 +7,66 @@
 // Las de cabecera única (stb_* y miniaudio) se implementan aquí mismo y
 // siempre están disponibles en el build normal. Chipmunk2D y pdfio se
 // compilan desde third_party/. La ventana gráfica requiere SDL3 instalada
-// en el sistema y se activa definiendo PAXO_ENABLE_SDL3.
+// en el sistema y se activa definiendo LEP_ENABLE_SDL3.
 // En lep.h (single-header) los #include "..." se eliminan, por lo que las
 // guardas __has_include desactivan los nativos correspondientes solos.
 // ==========================================
 
 // --- Imágenes (stb_image / write / resize2) ---
-#if __has_include("stb_image.h") && !defined(PAXO_NO_STB)
+#if __has_include("stb_image.h") && !defined(LEP_NO_STB)
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #define STB_IMAGE_RESIZE2_IMPLEMENTATION
 #include "stb_image_resize2.h"
-#define PAXO_HAS_IMG 1
+#define LEP_HAS_IMG 1
 #endif
 
 // --- Fuentes (stb_truetype) ---
-#if __has_include("stb_truetype.h") && !defined(PAXO_NO_STB)
+#if __has_include("stb_truetype.h") && !defined(LEP_NO_STB)
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
-#define PAXO_HAS_FONT 1
+#include "stb_easy_font.h"
+#define LEP_HAS_FONT 1
+#endif
+
+#if __has_include("stb_ds.h")
+#include "stb_ds.h"
 #endif
 
 // --- Audio (miniaudio) ---
-#if __has_include("miniaudio.h") && !defined(PAXO_NO_MINIAUDIO)
+#if __has_include("miniaudio.h") && !defined(LEP_NO_MINIAUDIO)
 #define MA_IMPLEMENTATION
 #include "miniaudio.h"
-#define PAXO_HAS_AUDIO 1
+#define LEP_HAS_AUDIO 1
 #endif
 
 // --- Física (Chipmunk2D 7, fuentes en third_party/chipmunk) ---
 #if __has_include("third_party/chipmunk/chipmunk/chipmunk.h")
 #include "third_party/chipmunk/chipmunk/chipmunk.h"
-#define PAXO_HAS_PHYS 1
+#define LEP_HAS_PHYS 1
 #endif
 
 // --- PDF (pdfio + zlib, fuentes en third_party/pdfio) ---
 #if __has_include("third_party/pdfio/pdfio.h")
 #include "third_party/pdfio/pdfio-content.h"
 #include "third_party/pdfio/pdfio.h"
-#define PAXO_HAS_PDF 1
+#define LEP_HAS_PDF 1
 #endif
 
-// --- Ventana/gráficos (SDL3 del sistema, opcional) ---
-#if defined(PAXO_ENABLE_SDL3) && __has_include("SDL3/SDL.h")
-#include "SDL3/SDL.h"
-#define PAXO_HAS_WIN 1
+#if __has_include("sokol_app.h")
+#include "sokol_app.h"
+#include "sokol_gfx.h"
+#include "sokol_time.h"
+#define LEP_HAS_SOKOL 1
 #endif
 
 #if __has_include("nanovg.h")
 #include "gl3_compat.h"
 #include "nanovg_gl3.h" // NanoVG (requiere nanovg.h + headers GL)
 #endif
-#if __has_include("SDL3/SDL.h") && !defined(PAXO_HAS_WIN)
-#define SDL_MAIN_HANDLED
-#include "simple2d.h" // Simple 2D (requiere SDL3)
-#undef main           // evita el rewrite de main de SDL_main.h
-#endif
+
 #include "termcolor-c.h"
 #include <math.h>
 #include <stdint.h>
@@ -78,7 +80,7 @@
 // IDs de funciones nativas
 // ==========================================
 typedef enum {
-  NATIVE_PRINT = 0,
+  NATIVE_PRINT,
   NATIVE_PRINTLN,
   NATIVE_TYPEOF,
   NATIVE_SET_COLOR_TEXT,
@@ -181,19 +183,12 @@ typedef enum {
 // Funciones nativas
 // ==========================================
 
-static void print_fxp(PaxoFxp f) {
-  int32_t v = f.value;
-  uint8_t s = f.scale;
-  if (s == 0) {
-    printf("%d", v);
-    return;
-  }
-  int32_t div = 1;
-  for (uint8_t i = 0; i < s; i++)
-    div *= 10;
-  int32_t ip = v / div;
-  int32_t fp = (v < 0 ? -v : v) % div;
-  printf("%d.%0*d", ip, (int)s, fp);
+static void print_intfp(PaxoFxp f) {
+  printf("%s", (const char *)readint(f));
+}
+
+static void print_pkdec(PaxoPdec d) {
+  printf("%s", (const char *)readpdec(d));
 }
 
 static void print_var_inline(PaxoVar elem) {
@@ -214,12 +209,17 @@ static void print_var_inline(PaxoVar elem) {
     printf("'%s'", (const char *)readchar32(var_char_get(elem)));
     break;
   case INT_FP:
-  case PKDEC: {
-    print_fxp(var_fxp_get(elem));
+    print_intfp(var_fxp_get(elem));
     break;
-  }
+  case PKDEC:
+    print_pkdec(var_pkdec_get(elem));
+    break;
   case COLOR:
     printf("#%08X", var_color_get(elem));
+    break;
+  case COMPLEX:
+  case COMPLEX16:
+    printf("%s", (const char *)readcomplex(var_complex_get(elem)));
     break;
   case STRING:
     printf("\"%s\"", var_string_get(elem));
@@ -237,7 +237,7 @@ static void print_var_inline(PaxoVar elem) {
 
 static PaxoVar native_print(PaxoVar *args, uint8_t argc) {
   if (argc < 1)
-    return PAXO_ZERO;
+    return LEP_ZERO;
 
   for (uint8_t i = 0; i < argc; i++) {
     PaxoVar val = args[i];
@@ -259,11 +259,17 @@ static PaxoVar native_print(PaxoVar *args, uint8_t argc) {
       printf("%s", (const char *)readchar32(var_char_get(val)));
       break;
     case INT_FP:
+      print_intfp(var_fxp_get(val));
+      break;
     case PKDEC:
-      print_fxp(var_fxp_get(val));
+      print_pkdec(var_pkdec_get(val));
       break;
     case COLOR:
       printf("#%08X", var_color_get(val));
+      break;
+    case COMPLEX:
+    case COMPLEX16:
+      printf("%s", (const char *)readcomplex(var_complex_get(val)));
       break;
     case STRING:
       printf("%s", var_string_get(val));
@@ -287,18 +293,18 @@ static PaxoVar native_print(PaxoVar *args, uint8_t argc) {
     }
   }
 
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 static PaxoVar native_println(PaxoVar *args, uint8_t argc) {
   native_print(args, argc);
   putchar('\n');
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 static PaxoVar native_typeof(PaxoVar *args, uint8_t argc) {
   if (argc < 1)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   const char *type_name = "unknown";
   switch (var_type(args[0])) {
   case NUM16:
@@ -340,6 +346,12 @@ static PaxoVar native_typeof(PaxoVar *args, uint8_t argc) {
   case COLOR:
     type_name = "col";
     break;
+  case COMPLEX:
+    type_name = "ni";
+    break;
+  case COMPLEX16:
+    type_name = "sni";
+    break;
   }
 
   return var_string(type_name);
@@ -347,7 +359,7 @@ static PaxoVar native_typeof(PaxoVar *args, uint8_t argc) {
 
 static PaxoVar native_set_text_color(PaxoVar *args, uint8_t argc) {
   if (argc < 1 || var_type(args[0]) != STRING) {
-    return PAXO_ZERO;
+    return LEP_ZERO;
   }
   const char *color = var_string_get(args[0]);
   if (strcmp(color, "red") == 0) {
@@ -393,19 +405,19 @@ static PaxoVar native_set_text_color(PaxoVar *args, uint8_t argc) {
     text_dark(stdout);
     text_gray(stdout);
   }
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 static PaxoVar native_reset_color(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
   reset_colors(stdout);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 static PaxoVar native_set_bg_color(PaxoVar *args, uint8_t argc) {
   if (argc < 1 || var_type(args[0]) != STRING) {
-    return PAXO_ZERO;
+    return LEP_ZERO;
   }
   const char *color = var_string_get(args[0]);
   if (strcmp(color, "red") == 0) {
@@ -442,7 +454,7 @@ static PaxoVar native_set_bg_color(PaxoVar *args, uint8_t argc) {
              strcmp(color, "dark grey") == 0) {
     background_dark_gray(stdout);
   }
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 static PaxoVar native_scan(PaxoVar *args, uint8_t argc) {
@@ -461,7 +473,7 @@ static PaxoVar native_scan(PaxoVar *args, uint8_t argc) {
 
 static PaxoVar native_array_len(PaxoVar *args, uint8_t argc) {
   if (argc < 1 || var_type(args[0]) != ARRAY)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   size_t len = var_array_get(args[0])->len;
   Num64 result = {0};
   result.exp = BIAS64;
@@ -471,19 +483,19 @@ static PaxoVar native_array_len(PaxoVar *args, uint8_t argc) {
 
 static PaxoVar native_array_push(PaxoVar *args, uint8_t argc) {
   if (argc < 2 || var_type(args[0]) != ARRAY)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   PaxoArray *arr = var_array_get(args[0]);
   if (arr->len >= arr->capacity) {
     arr->capacity *= 2;
     arr->items = realloc(arr->items, sizeof(PaxoVar) * arr->capacity);
   }
   arr->items[arr->len++] = args[1];
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 static PaxoVar native_set_text_type(PaxoVar *args, uint8_t argc) {
   if (argc < 1 || var_type(args[0]) != STRING) {
-    return PAXO_ZERO;
+    return LEP_ZERO;
   }
   const char *type = var_string_get(args[0]);
   if (strcmp(type, "bold") == 0) {
@@ -499,7 +511,7 @@ static PaxoVar native_set_text_type(PaxoVar *args, uint8_t argc) {
   } else if (strcmp(type, "concealed") == 0) {
     text_concealed(stdout);
   }
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // ==========================================
@@ -512,6 +524,11 @@ static long gfx_height = 24;
 // Convierte un PaxoVar numérico a entero largo (coordenadas, tamaños)
 static inline long native_arg_long(PaxoVar v) {
   enum type t = var_type(v);
+  if (t == INT_FP)
+    v = var_num64(fxp_to_num64(var_fxp_get(v)));
+  else if (t == PKDEC)
+    v = var_num64(pdec_to_num64(var_pkdec_get(v)));
+  t = var_type(v);
   if (t != NUM16 && t != NUM64)
     return 0;
   Num64 n = (t == NUM16) ? num16tonum64(var_num16_get(v)) : var_num64_get(v);
@@ -533,9 +550,14 @@ static inline long native_arg_long(PaxoVar v) {
   return n.signo ? -r : r;
 }
 
-// Convierte un PaxoVar numérico a doble
+// Convierte un PaxoVar numérico a doble (MP16/MP64/int/pdec)
 static inline double native_arg_double(PaxoVar v) {
   enum type t = var_type(v);
+  if (t == INT_FP)
+    v = var_num64(fxp_to_num64(var_fxp_get(v)));
+  else if (t == PKDEC)
+    v = var_num64(pdec_to_num64(var_pkdec_get(v)));
+  t = var_type(v);
   if (t != NUM16 && t != NUM64)
     return 0;
   Num64 n = (t == NUM16) ? num16tonum64(var_num16_get(v)) : var_num64_get(v);
@@ -744,7 +766,7 @@ static PaxoVar native_clear_screen(PaxoVar *args, uint8_t argc) {
   (void)argc;
   fputs("\033[2J\033[H", stdout);
   fflush(stdout);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Dibuja un rectángulo relleno con '█': draw_rect(x, y, ancho, alto)
@@ -752,7 +774,7 @@ static PaxoVar native_clear_screen(PaxoVar *args, uint8_t argc) {
 // al lienzo de init_window. Usa el color de texto actual.
 static PaxoVar native_draw_rect(PaxoVar *args, uint8_t argc) {
   if (argc < 4)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   long x = native_arg_long(args[0]);
   long y = native_arg_long(args[1]);
   long w = native_arg_long(args[2]);
@@ -771,7 +793,7 @@ static PaxoVar native_draw_rect(PaxoVar *args, uint8_t argc) {
   if (y + h > gfx_height)
     h = gfx_height - y;
   if (w <= 0 || h <= 0)
-    return PAXO_ZERO;
+    return LEP_ZERO;
 
   for (long row = 0; row < h; row++) {
     printf("\033[%ld;%ldH", y + row + 1, x + 1);
@@ -779,7 +801,7 @@ static PaxoVar native_draw_rect(PaxoVar *args, uint8_t argc) {
       fputs("█", stdout);
   }
   fflush(stdout);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // ==========================================
@@ -860,7 +882,7 @@ static PaxoVar native_file_delete(PaxoVar *args, uint8_t argc) {
 // Imágenes (stb_image / stb_image_write / stb_image_resize2)
 // ==========================================
 
-#ifdef PAXO_HAS_IMG
+#ifdef LEP_HAS_IMG
 
 // Carga una imagen: img_load(ruta) -> [w, h, canales, byte0, byte1, ...]
 // Retorna un array vacío si falla.
@@ -1000,13 +1022,13 @@ static PaxoVar native_img_resize(PaxoVar *args, uint8_t argc) {
   return var_array(arr_new(0));
 }
 
-#endif // PAXO_HAS_IMG
+#endif // LEP_HAS_IMG
 
 // ==========================================
 // Fuentes (stb_truetype)
 // ==========================================
 
-#ifdef PAXO_HAS_FONT
+#ifdef LEP_HAS_FONT
 
 typedef struct {
   unsigned char *buf;
@@ -1109,7 +1131,7 @@ static PaxoVar native_font_free(PaxoVar *args, uint8_t argc) {
       reg_del(&font_reg, id, true);
     }
   }
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 #else
@@ -1132,16 +1154,16 @@ static PaxoVar native_font_metrics(PaxoVar *args, uint8_t argc) {
 static PaxoVar native_font_free(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
-#endif // PAXO_HAS_FONT
+#endif // LEP_HAS_FONT
 
 // ==========================================
 // Audio (miniaudio, motor global + sonidos por handle)
 // ==========================================
 
-#ifdef PAXO_HAS_AUDIO
+#ifdef LEP_HAS_AUDIO
 
 static ma_engine audio_engine;
 static bool audio_up = false;
@@ -1170,7 +1192,7 @@ static PaxoVar native_audio_quit(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
   if (!audio_up)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   for (size_t i = 0; i < snd_reg.len; i++) {
     if (snd_reg.ptr[i])
       snd_freer(snd_reg.ptr[i]);
@@ -1178,7 +1200,7 @@ static PaxoVar native_audio_quit(PaxoVar *args, uint8_t argc) {
   }
   ma_engine_uninit(&audio_engine);
   audio_up = false;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Reproduce un archivo: audio_play(ruta, en_loop) -> handle o 0
@@ -1243,7 +1265,7 @@ static PaxoVar native_audio_volume(PaxoVar *args, uint8_t argc) {
   ma_sound *s = argc >= 1 ? snd_from_args(args[0]) : NULL;
   if (!s)
     return var_bool(false);
-  float vol = (float)native_arg_double(argc >= 2 ? args[1] : PAXO_ZERO);
+  float vol = (float)native_arg_double(argc >= 2 ? args[1] : LEP_ZERO);
   if (vol < 0)
     vol = 0;
   ma_sound_set_volume(s, vol);
@@ -1267,7 +1289,7 @@ static PaxoVar native_audio_init(PaxoVar *args, uint8_t argc) {
 static PaxoVar native_audio_quit(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_audio_play(PaxoVar *args, uint8_t argc) {
   (void)args;
@@ -1300,14 +1322,14 @@ static PaxoVar native_audio_playing(PaxoVar *args, uint8_t argc) {
   return var_bool(false);
 }
 
-#endif // PAXO_HAS_AUDIO
+#endif // LEP_HAS_AUDIO
 
 // ==========================================
 // Física 2D (Chipmunk2D)
 // Espacios, cuerpos y formas referenciados por handles numéricos.
 // ==========================================
 
-#ifdef PAXO_HAS_PHYS
+#ifdef LEP_HAS_PHYS
 
 typedef struct {
   cpBody *body;
@@ -1376,8 +1398,8 @@ static PaxoVar native_phys_gravity(PaxoVar *args, uint8_t argc) {
   if (sp)
     cpSpaceSetGravity(sp,
                       cpv(native_arg_double(args[1]),
-                          native_arg_double(argc >= 3 ? args[2] : PAXO_ZERO)));
-  return PAXO_ZERO;
+                          native_arg_double(argc >= 3 ? args[2] : LEP_ZERO)));
+  return LEP_ZERO;
 }
 
 // Avanza la simulación: phys_step(space, dt)
@@ -1389,7 +1411,7 @@ static PaxoVar native_phys_step(PaxoVar *args, uint8_t argc) {
       dt = 1.0 / 60.0;
     cpSpaceStep(sp, dt);
   }
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Cuerpo dinámico: phys_body(space, masa, inercia) -> handle
@@ -1444,8 +1466,8 @@ static PaxoVar native_phys_set_pos(PaxoVar *args, uint8_t argc) {
   if (r)
     cpBodySetPosition(r->body,
                       cpv(native_arg_double(args[1]),
-                          native_arg_double(argc >= 3 ? args[2] : PAXO_ZERO)));
-  return PAXO_ZERO;
+                          native_arg_double(argc >= 3 ? args[2] : LEP_ZERO)));
+  return LEP_ZERO;
 }
 
 // Fija velocidad: phys_set_vel(body, vx, vy)
@@ -1454,8 +1476,8 @@ static PaxoVar native_phys_set_vel(PaxoVar *args, uint8_t argc) {
   if (r)
     cpBodySetVelocity(r->body,
                       cpv(native_arg_double(args[1]),
-                          native_arg_double(argc >= 3 ? args[2] : PAXO_ZERO)));
-  return PAXO_ZERO;
+                          native_arg_double(argc >= 3 ? args[2] : LEP_ZERO)));
+  return LEP_ZERO;
 }
 
 // Ángulo en radianes: phys_angle(body) -> num
@@ -1469,7 +1491,7 @@ static PaxoVar native_phys_set_angle(PaxoVar *args, uint8_t argc) {
   PhysBodyRec *r = argc >= 1 ? body_from_args(args[0]) : NULL;
   if (r)
     cpBodySetAngle(r->body, native_arg_double(args[1]));
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Acumula fuerza este paso: phys_force(body, fx, fy)
@@ -1479,9 +1501,9 @@ static PaxoVar native_phys_force(PaxoVar *args, uint8_t argc) {
     cpBodyApplyForceAtLocalPoint(
         r->body,
         cpv(native_arg_double(args[1]),
-            native_arg_double(argc >= 3 ? args[2] : PAXO_ZERO)),
+            native_arg_double(argc >= 3 ? args[2] : LEP_ZERO)),
         cpvzero);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Impulso instantáneo: phys_impulse(body, ix, iy)
@@ -1491,9 +1513,9 @@ static PaxoVar native_phys_impulse(PaxoVar *args, uint8_t argc) {
     cpBodyApplyImpulseAtLocalPoint(
         r->body,
         cpv(native_arg_double(args[1]),
-            native_arg_double(argc >= 3 ? args[2] : PAXO_ZERO)),
+            native_arg_double(argc >= 3 ? args[2] : LEP_ZERO)),
         cpvzero);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 static PaxoVar shape_add(cpSpace *sp, cpShape *s) {
@@ -1543,7 +1565,7 @@ static PaxoVar native_phys_elasticity(PaxoVar *args, uint8_t argc) {
   PhysShapeRec *r = argc >= 1 ? shape_from_args(args[0]) : NULL;
   if (r)
     cpShapeSetElasticity(r->shape, native_arg_double(args[1]));
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Rozamiento: phys_friction(shape, f)
@@ -1551,7 +1573,7 @@ static PaxoVar native_phys_friction(PaxoVar *args, uint8_t argc) {
   PhysShapeRec *r = argc >= 1 ? shape_from_args(args[0]) : NULL;
   if (r)
     cpShapeSetFriction(r->shape, native_arg_double(args[1]));
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // ¿Colisionan?: phys_collide(shape_a, shape_b) -> bool
@@ -1570,7 +1592,7 @@ static PaxoVar native_phys_free_shape(PaxoVar *args, uint8_t argc) {
     if (reg_get(&shape_reg, id))
       ps_freer(reg_get(&shape_reg, id)), reg_del(&shape_reg, id, false);
   }
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Libera cuerpo: phys_free_body(body)
@@ -1583,20 +1605,20 @@ static PaxoVar native_phys_free_body(PaxoVar *args, uint8_t argc) {
       reg_del(&body_reg, id, false);
     }
   }
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Libera espacio con todo su contenido: phys_free_space(space)
 static PaxoVar native_phys_free_space(PaxoVar *args, uint8_t argc) {
   cpSpace *sp = argc >= 1 ? space_from_args(args[0]) : NULL;
   if (!sp)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   int64_t sid = (int64_t)native_arg_long(args[0]);
   reg_free_owned(&shape_reg, sp, ps_freer);
   reg_free_owned(&body_reg, sp, pb_freer);
   cpSpaceFree(sp);
   reg_del(&space_reg, sid, false);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 #else
@@ -1610,12 +1632,12 @@ static PaxoVar native_phys_space(PaxoVar *args, uint8_t argc) {
 static PaxoVar native_phys_gravity(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_phys_step(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_phys_body(PaxoVar *args, uint8_t argc) {
   (void)args;
@@ -1640,32 +1662,32 @@ static PaxoVar native_phys_vel(PaxoVar *args, uint8_t argc) {
 static PaxoVar native_phys_set_pos(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_phys_set_vel(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_phys_angle(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_phys_set_angle(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_phys_force(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_phys_impulse(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_phys_circle(PaxoVar *args, uint8_t argc) {
   (void)args;
@@ -1685,12 +1707,12 @@ static PaxoVar native_phys_segment(PaxoVar *args, uint8_t argc) {
 static PaxoVar native_phys_elasticity(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_phys_friction(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_phys_collide(PaxoVar *args, uint8_t argc) {
   (void)args;
@@ -1700,26 +1722,26 @@ static PaxoVar native_phys_collide(PaxoVar *args, uint8_t argc) {
 static PaxoVar native_phys_free_shape(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_phys_free_body(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_phys_free_space(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
-#endif // PAXO_HAS_PHYS
+#endif // LEP_HAS_PHYS
 
 // ==========================================
-// Ventana y gráficos 2D (SDL3, opcional: PAXO_ENABLE_SDL3)
+// Ventana y gráficos 2D (SDL3, opcional: LEP_ENABLE_SDL3)
 // ==========================================
 
-#ifdef PAXO_HAS_WIN
+#ifdef LEP_HAS_WIN
 
 static SDL_Window *g_win = NULL;
 static SDL_Renderer *g_ren = NULL;
@@ -1758,7 +1780,7 @@ static PaxoVar native_win_close(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
   if (!g_win)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   if (tex_reg.cap != 0)
     reg_free_owned(&tex_reg, g_ren, tex_freer);
   SDL_DestroyRenderer(g_ren);
@@ -1766,19 +1788,19 @@ static PaxoVar native_win_close(PaxoVar *args, uint8_t argc) {
   g_ren = NULL;
   g_win = NULL;
   SDL_QuitSubSystem(SDL_INIT_VIDEO);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Color de dibujo 0..255: win_color(r, g, b)
 static PaxoVar native_win_color(PaxoVar *args, uint8_t argc) {
   if (argc < 3)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   long r = native_arg_long(args[0]), g = native_arg_long(args[1]),
        b = native_arg_long(args[2]);
   g_r = (int)(r < 0 ? 0 : (r > 255 ? 255 : r));
   g_g = (int)(g < 0 ? 0 : (g > 255 ? 255 : g));
   g_b = (int)(b < 0 ? 0 : (b > 255 ? 255 : b));
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Limpia con el color actual: win_clear()
@@ -1786,45 +1808,45 @@ static PaxoVar native_win_clear(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
   if (!g_ren)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   SDL_SetRenderDrawColor(g_ren, g_r, g_g, g_b, 255);
   SDL_RenderClear(g_ren);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Rectángulo relleno: win_rect(x, y, w, h)
 static PaxoVar native_win_rect(PaxoVar *args, uint8_t argc) {
   if (!g_ren || argc < 4)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   SDL_FRect rc = {
       (float)native_arg_double(args[0]), (float)native_arg_double(args[1]),
       (float)native_arg_double(args[2]), (float)native_arg_double(args[3])};
   SDL_SetRenderDrawColor(g_ren, g_r, g_g, g_b, 255);
   SDL_RenderFillRect(g_ren, &rc);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Línea: win_line(x1, y1, x2, y2)
 static PaxoVar native_win_line(PaxoVar *args, uint8_t argc) {
   if (!g_ren || argc < 4)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   SDL_FPoint a = {(float)native_arg_double(args[0]),
                   (float)native_arg_double(args[1])};
   SDL_FPoint b = {(float)native_arg_double(args[2]),
                   (float)native_arg_double(args[3])};
   SDL_SetRenderDrawColor(g_ren, g_r, g_g, g_b, 255);
   SDL_RenderLine(g_ren, a.x, a.y, b.x, b.y);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Círculo relleno: win_circle(cx, cy, radio)
 static PaxoVar native_win_circle(PaxoVar *args, uint8_t argc) {
   if (!g_ren || argc < 3)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   double cx = native_arg_double(args[0]), cy = native_arg_double(args[1]);
   double r = native_arg_double(args[2]);
   if (r <= 0)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   enum { SEG = 40 };
   static SDL_Vertex v[SEG + 2];
   SDL_FColor col = {(float)g_r / 255.0f, (float)g_g / 255.0f,
@@ -1840,20 +1862,20 @@ static PaxoVar native_win_circle(PaxoVar *args, uint8_t argc) {
   }
   SDL_SetRenderDrawColor(g_ren, g_r, g_g, g_b, 255);
   SDL_RenderGeometry(g_ren, NULL, v, SEG + 2, NULL, 0);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Texto rápido: win_text(x, y, texto)
 static PaxoVar native_win_text(PaxoVar *args, uint8_t argc) {
   if (!g_ren || argc < 3)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   const char *s = native_arg_str(args[2]);
   if (!s)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   SDL_SetRenderDrawColor(g_ren, g_r, g_g, g_b, 255);
   SDL_RenderDebugText(g_ren, (float)native_arg_double(args[0]),
                       (float)native_arg_double(args[1]), s);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Crea textura desde píxeles RGBA/RGB:
@@ -1901,7 +1923,7 @@ static SDL_Texture *tex_from_args(PaxoVar v) {
 static PaxoVar native_tex_draw(PaxoVar *args, uint8_t argc) {
   SDL_Texture *t = argc >= 1 ? tex_from_args(args[0]) : NULL;
   if (!t || !g_ren)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   float x = (float)native_arg_double(args[1]);
   float y = (float)native_arg_double(args[2]);
   float w, h;
@@ -1913,7 +1935,7 @@ static PaxoVar native_tex_draw(PaxoVar *args, uint8_t argc) {
   }
   SDL_FRect dst = {x, y, w, h};
   SDL_RenderTexture(g_ren, t, NULL, &dst);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Libera textura: tex_free(tex)
@@ -1926,7 +1948,7 @@ static PaxoVar native_tex_free(PaxoVar *args, uint8_t argc) {
       reg_del(&tex_reg, id, false);
     }
   }
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Presenta el frame: win_show()
@@ -1935,7 +1957,7 @@ static PaxoVar native_win_show(PaxoVar *args, uint8_t argc) {
   (void)argc;
   if (g_ren)
     SDL_RenderPresent(g_ren);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Procesa eventos: win_poll() -> ["quit", "keydown:32", "mousedown", ...]
@@ -2003,7 +2025,7 @@ static PaxoVar native_win_delay(PaxoVar *args, uint8_t argc) {
   long ms = argc >= 1 ? native_arg_long(args[0]) : 0;
   if (ms > 0)
     SDL_Delay((Uint32)ms);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 #else
@@ -2012,44 +2034,44 @@ static PaxoVar native_win_open(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
   fputs("[paxo] win_open: recompila la VM con SDL3 "
-        "(PAXO_ENABLE_SDL3) para usar ventanas\n",
+        "(LEP_ENABLE_SDL3) para usar ventanas\n",
         stderr);
   return var_bool(false);
 }
 static PaxoVar native_win_close(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_win_color(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_win_clear(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_win_rect(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_win_line(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_win_circle(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_win_text(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_tex_load(PaxoVar *args, uint8_t argc) {
   (void)args;
@@ -2059,17 +2081,17 @@ static PaxoVar native_tex_load(PaxoVar *args, uint8_t argc) {
 static PaxoVar native_tex_draw(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_tex_free(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_win_show(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_win_poll(PaxoVar *args, uint8_t argc) {
   (void)args;
@@ -2099,16 +2121,16 @@ static PaxoVar native_win_time(PaxoVar *args, uint8_t argc) {
 static PaxoVar native_win_delay(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
-#endif // PAXO_HAS_WIN
+#endif // LEP_HAS_WIN
 
 // ==========================================
 // PDF (pdfio)
 // ==========================================
 
-#ifdef PAXO_HAS_PDF
+#ifdef LEP_HAS_PDF
 
 typedef struct {
   pdfio_file_t *file;
@@ -2285,38 +2307,38 @@ static PaxoVar native_pdf_page_begin(PaxoVar *args, uint8_t argc) {
 static PaxoVar native_pdf_color(PaxoVar *args, uint8_t argc) {
   PaxoPdf *d = argc >= 4 ? pdf_from_args(args[0]) : NULL;
   if (!d || !d->page)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   double r = native_arg_double(args[1]) / 255.0;
   double g = native_arg_double(args[2]) / 255.0;
   double b = native_arg_double(args[3]) / 255.0;
   pdfioContentSetFillColorDeviceRGB(d->page, r, g, b);
   pdfioContentSetStrokeColorDeviceRGB(d->page, r, g, b);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Rectángulo relleno: pdf_write_rect(doc, x, y, w, h)
 static PaxoVar native_pdf_write_rect(PaxoVar *args, uint8_t argc) {
   PaxoPdf *d = argc >= 5 ? pdf_from_args(args[0]) : NULL;
   if (!d || !d->page)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   pdfioContentPathRect(d->page, native_arg_double(args[1]),
                        native_arg_double(args[2]), native_arg_double(args[3]),
                        native_arg_double(args[4]));
   pdfioContentFill(d->page, false);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Línea: pdf_write_line(doc, x1, y1, x2, y2)
 static PaxoVar native_pdf_write_line(PaxoVar *args, uint8_t argc) {
   PaxoPdf *d = argc >= 5 ? pdf_from_args(args[0]) : NULL;
   if (!d || !d->page)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   pdfioContentPathMoveTo(d->page, native_arg_double(args[1]),
                          native_arg_double(args[2]));
   pdfioContentPathLineTo(d->page, native_arg_double(args[3]),
                          native_arg_double(args[4]));
   pdfioContentStroke(d->page);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Escribe texto: pdf_write_text(doc, x, y, tamano, texto)
@@ -2324,13 +2346,13 @@ static PaxoVar native_pdf_write_text(PaxoVar *args, uint8_t argc) {
   PaxoPdf *d = argc >= 5 ? pdf_from_args(args[0]) : NULL;
   const char *s = argc >= 5 ? native_arg_str(args[4]) : NULL;
   if (!d || !d->page || !s)
-    return PAXO_ZERO;
+    return LEP_ZERO;
   pdfioContentSetTextFont(d->page, d->names[d->curfont],
                           native_arg_double(args[3]));
   pdfioContentTextMoveTo(d->page, native_arg_double(args[1]),
                          native_arg_double(args[2]));
   pdfioContentTextShow(d->page, false, s);
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 // Cierra y guarda/libera: pdf_close(doc)
@@ -2348,7 +2370,7 @@ static PaxoVar native_pdf_close(PaxoVar *args, uint8_t argc) {
       reg_del(&pdf_reg, id, false);
     }
   }
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
 #else
@@ -2392,30 +2414,30 @@ static PaxoVar native_pdf_page_begin(PaxoVar *args, uint8_t argc) {
 static PaxoVar native_pdf_color(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_pdf_write_rect(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_pdf_write_line(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_pdf_write_text(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 static PaxoVar native_pdf_close(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return PAXO_ZERO;
+  return LEP_ZERO;
 }
 
-#endif // PAXO_HAS_PDF
+#endif // LEP_HAS_PDF
 
 PaxoVar native_call(uint16_t id, PaxoVar *args, uint8_t argc) {
   switch (id) {
@@ -2604,5 +2626,5 @@ PaxoVar native_call(uint16_t id, PaxoVar *args, uint8_t argc) {
   default:
     break;
   }
-  return PAXO_NO_VALUE;
+  return LEP_NO_VALUE;
 }
