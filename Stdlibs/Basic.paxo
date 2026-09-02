@@ -1,0 +1,93 @@
+/* Basic.paxo */
+
+📦 arrays = {
+	🌎 fx split_arr = (📥 array, int pos): 📥 {
+		📥 arr1
+		📥 arr2
+		int i = 0
+		(i < array_len(array)): ▶️{
+			(pos)? (pos > i) ->{
+				arr1[i] = data[i]
+			}: _ -> {
+				arr2[i] = data[i]
+			}
+		}
+		return «arr1, arr2»
+	}
+}
+
+📦 strings = {
+	🌎 fx parse_num = (abc text): n{
+		n result = 0
+		int i = 0
+		bool is_dec = .×
+		(i < array_len(text)): ▶️{
+			(text[i])? (text[i] = '.' & is_dec) -> {
+				is_dec = .✓
+			}: (!is_dec) ->{
+				(text[i])? '0' -> {
+					result = (result × 10) + 0
+				}: '1' -> {
+					result = (result × 10) + 1
+				}: '2' -> {
+					result = (result × 10) + 2
+				}: '3' -> {
+					result = (result × 10) + 3
+				}: '4' -> {
+					result = (result × 10) + 4
+				}: '5' -> {
+					result = (result × 10) + 5
+				}: '6' -> {
+					result = (result × 10) + 6
+				}: '7' -> {
+					result = (result × 10) + 7
+				}: '8' -> {
+					result = (result × 10) + 8
+				}: '9' -> {
+					result = (result × 10) + 9
+				}
+			}: (is_dec) -> {
+				fx pow_dec = (n num, int pos): n{
+					int p = 0
+					(p < pos): ▶️{
+						num = num /10
+					}
+					return num
+				}
+				int dec_pos = 0
+				(test[i])? '0' -> {
+					dec_pos++
+				}: '1' -> {
+					result = result + pow_dec(1, dec_pos)
+					dec_pos++
+				}: '2' -> {
+					result = result + pow_dec(2, dec_pos)
+					dec_pos++
+				}: '3' -> {
+					result = result + pow_dec(3, dec_pos)
+					dec_pos++
+				}: '4' -> {
+					result = result + pow_dec(4, dec_pos)
+					dec_pos++
+				}: '5' -> {
+					result = result + pow_dec(5, dec_pos)
+					dec_pos++
+				}: '6' -> {
+					result = result + pow_dec(6, dec_pos)
+					dec_pos++
+				}: '7' -> {
+					result = result + pow_dec(7, dec_pos)
+					dec_pos++
+				}: '8' -> {
+					result = result + pow_dec(8, dec_pos)
+					dec_pos++
+				}: '9' -> {
+					result = result + pow_dec(9, dec_pos)
+					dec_pos++
+				}
+			}
+		}
+		return result
+	}
+	
+}

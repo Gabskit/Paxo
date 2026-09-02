@@ -53,8 +53,6 @@ enum NVGcreateFlags {
 
 // Creates NanoVG contexts for different OpenGL (ES) versions.
 // Flags should be combination of the create flags above.
-// (Local adaptation: nvgCreateGL3 keeps the legacy (atlasw, atlash, edgeaa)
-// signature used by the Paxo VM, see NANOVG_GL3 section below.)
 
 #if defined NANOVG_GL2
 
@@ -68,11 +66,7 @@ GLuint nvglImageHandleGL2(NVGcontext* ctx, int image);
 
 #if defined NANOVG_GL3
 
-// Legacy (atlasw, atlash, edgeaa) signature kept for compatibility with the
-// Paxo VM (Functions.c calls nvgCreateGL3(4096, 4096, 0)). Upstream master uses
-// nvgCreateGL3(int flags); the atlas is managed internally by nanovg.c since the
-// 2014 API refactor, so atlasw/atlash are accepted for source-compat and ignored.
-NVGcontext* nvgCreateGL3(int atlasw, int atlash, int edgeaa);
+NVGcontext* nvgCreateGL3(int flags);
 void nvgDeleteGL3(NVGcontext* ctx);
 
 int nvglCreateImageFromHandleGL3(NVGcontext* ctx, GLuint textureId, int w, int h, int flags);
@@ -110,16 +104,6 @@ enum NVGimageFlagsGL {
 #endif
 
 #endif /* NANOVG_GL_H */
-
-// Legacy unconditional entry-point declarations (split over two files original
-// Public version): the VM's Functions.c includes this header WITHOUT defining
-// NANOVG_GL3_IMPLEMENTATION, but still calls nvgCreateGL3()/nvgDeleteGL3().
-// (Legal duplicates of the guarded declarations above when the implementation
-// is compiled in the same TU.)
-#ifndef NANOVG_GLES3
-struct NVGcontext* nvgCreateGL3(int atlasw, int atlash, int edgeaa);
-void nvgDeleteGL3(struct NVGcontext* ctx);
-#endif
 
 #ifdef NANOVG_GL_IMPLEMENTATION
 
@@ -1579,7 +1563,7 @@ static void glnvg__renderDelete(void* uptr)
 #if defined NANOVG_GL2
 NVGcontext* nvgCreateGL2(int flags)
 #elif defined NANOVG_GL3
-NVGcontext* nvgCreateGL3(int atlasw, int atlash, int edgeaa)
+NVGcontext* nvgCreateGL3(int flags)
 #elif defined NANOVG_GLES2
 NVGcontext* nvgCreateGLES2(int flags)
 #elif defined NANOVG_GLES3
@@ -1606,13 +1590,9 @@ NVGcontext* nvgCreateGLES3(int flags)
 	params.renderTriangles = glnvg__renderTriangles;
 	params.renderDelete = glnvg__renderDelete;
 	params.userPtr = gl;
-	params.edgeAntiAlias = edgeaa ? 1 : 0;
+	params.edgeAntiAlias = flags & NVG_ANTIALIAS ? 1 : 0;
 
-	// atlasw/atlash have no effect with the post-2014 API: the font atlas is
-	// allocated internally by nanovg.c. The legacy edgeaa flag maps to NVG_ANTIALIAS.
-	NVG_NOTUSED(atlasw);
-	NVG_NOTUSED(atlash);
-	gl->flags = edgeaa ? NVG_ANTIALIAS : 0;
+	gl->flags = flags;
 
 	ctx = nvgCreateInternal(&params);
 	if (ctx == NULL) goto error;

@@ -26,8 +26,8 @@
 // --- Fuentes (stb_truetype) ---
 #if __has_include("stb_truetype.h") && !defined(LEP_NO_STB)
 #define STB_TRUETYPE_IMPLEMENTATION
-#include "stb_truetype.h"
 #include "stb_easy_font.h"
+#include "stb_truetype.h"
 #define LEP_HAS_FONT 1
 #endif
 
@@ -55,16 +55,28 @@
 #define LEP_HAS_PDF 1
 #endif
 
-#if __has_include("sokol_app.h")
+// Gráficos (sokol + NanoVG, opcional: LEP_ENABLE_NVG). Se activa solo si se
+// compila con -DLEP_ENABLE_NVG y los headers sokol/nanovg están disponibles.
+// Las implementaciones de sokol (app/gfx/time) y del backend GL3 de NanoVG
+// se compilan aquí mismo en la TU de la VM; SOKOL_NO_ENTRY evita que sokol
+// capture main() (la VM define su propio main en Main.c). Sin la bandera, los
+// nativos quedan como fallback inofensivo.
+#if (defined(LEP_ENABLE_NVG) && __has_include("sokol_app.h") && \
+     __has_include("nanovg.h")) || \
+    (defined(LEP_EMBEDDED_LIBS) && defined(LEP_ENABLE_NVG))
+#define SOKOL_GLCORE
+#define SOKOL_NO_ENTRY
+#define SOKOL_APP_IMPL
+#define SOKOL_GFX_IMPL
+#define SOKOL_TIME_IMPL
+#define NANOVG_GL3_IMPLEMENTATION
 #include "sokol_app.h"
 #include "sokol_gfx.h"
 #include "sokol_time.h"
-#define LEP_HAS_SOKOL 1
-#endif
-
-#if __has_include("nanovg.h")
 #include "gl3_compat.h"
-#include "nanovg_gl3.h" // NanoVG (requiere nanovg.h + headers GL)
+#include "nanovg.h"     // NVGcontext y API de dibujo
+#include "nanovg_gl.h"  // backend GL3 de NanoVG
+#define LEP_HAS_NVG 1
 #endif
 
 #include "termcolor-c.h"
@@ -144,38 +156,64 @@ typedef enum {
   NATIVE_PHYS_FREE_SHAPE,
   NATIVE_PHYS_FREE_BODY,
   NATIVE_PHYS_FREE_SPACE,
-  // Ventana/gráficos (SDL3, opcional)
-  NATIVE_WIN_OPEN,
-  NATIVE_WIN_CLOSE,
-  NATIVE_WIN_COLOR,
-  NATIVE_WIN_CLEAR,
-  NATIVE_WIN_RECT,
-  NATIVE_WIN_LINE,
-  NATIVE_WIN_CIRCLE,
-  NATIVE_WIN_TEXT,
-  NATIVE_TEX_LOAD,
-  NATIVE_TEX_DRAW,
-  NATIVE_TEX_FREE,
-  NATIVE_WIN_SHOW,
-  NATIVE_WIN_POLL,
-  NATIVE_WIN_KEY,
-  NATIVE_WIN_MOUSE,
-  NATIVE_WIN_MOUSEDOWN,
-  NATIVE_WIN_TIME,
-  NATIVE_WIN_DELAY,
+  // Ventana/gráficos. Los IDs DEBEN coincidir con los que emite el
+  // compilador (abytec.go): win_*/tex_* = 58..75, pdf_* = 76..87.
+  NATIVE_WIN_OPEN = 58,       // -> sokol_init
+  NATIVE_WIN_CLOSE = 59,      // -> sokol_shutdown
+  NATIVE_WIN_COLOR = 60,      // -> sokol_color
+  NATIVE_WIN_CLEAR = 61,      // -> sokol_clear
+  NATIVE_WIN_RECT = 62,       // -> nvg_rect
+  NATIVE_WIN_LINE = 63,       // -> nvg_line
+  NATIVE_WIN_CIRCLE = 64,     // -> nvg_circle
+  NATIVE_WIN_TEXT = 65,       // -> nvg_text
+  NATIVE_TEX_LOAD = 66,       // -> tex_load (textura desde píxeles)
+  NATIVE_TEX_DRAW = 67,       // -> tex_draw
+  NATIVE_TEX_FREE = 68,       // -> tex_free
+  NATIVE_WIN_SHOW = 69,       // -> sokol_show (bucle de eventos)
+  NATIVE_WIN_POLL = 70,       // -> sokol_poll
+  NATIVE_WIN_KEY = 71,        // -> sokol_key
+  NATIVE_WIN_MOUSE = 72,      // -> sokol_mouse
+  NATIVE_WIN_MOUSEDOWN = 73,  // -> sokol_mousedown
+  NATIVE_WIN_TIME = 74,       // -> sokol_time
+  NATIVE_WIN_DELAY = 75,      // -> sokol_delay
   // PDF (pdfio)
-  NATIVE_PDF_OPEN,
-  NATIVE_PDF_NEW,
-  NATIVE_PDF_PAGES,
-  NATIVE_PDF_PAGE_SIZE,
-  NATIVE_PDF_TEXT,
-  NATIVE_PDF_FONT,
-  NATIVE_PDF_PAGE_BEGIN,
-  NATIVE_PDF_COLOR,
-  NATIVE_PDF_WRITE_RECT,
-  NATIVE_PDF_WRITE_LINE,
-  NATIVE_PDF_WRITE_TEXT,
-  NATIVE_PDF_CLOSE,
+  NATIVE_PDF_OPEN = 76,
+  NATIVE_PDF_NEW = 77,
+  NATIVE_PDF_PAGES = 78,
+  NATIVE_PDF_PAGE_SIZE = 79,
+  NATIVE_PDF_TEXT = 80,
+  NATIVE_PDF_FONT = 81,
+  NATIVE_PDF_PAGE_BEGIN = 82,
+  NATIVE_PDF_COLOR = 83,
+  NATIVE_PDF_WRITE_RECT = 84,
+  NATIVE_PDF_WRITE_LINE = 85,
+  NATIVE_PDF_WRITE_TEXT = 86,
+  NATIVE_PDF_CLOSE = 87,
+  // Nativos adicionales de sokol/NanoVG (no emitidos por el compilador).
+  NATIVE_SOKOL_INIT = 88,
+  NATIVE_SOKOL_SHUTDOWN = 89,
+  NATIVE_SOKOL_CLEAR = 90,
+  NATIVE_SOKOL_COLOR = 91,
+  NATIVE_SOKOL_SHOW = 92,
+  NATIVE_SOKOL_POLL = 93,
+  NATIVE_SOKOL_KEY = 94,
+  NATIVE_SOKOL_MOUSE = 95,
+  NATIVE_SOKOL_MOUSEDOWN = 96,
+  NATIVE_SOKOL_TIME = 97,
+  NATIVE_SOKOL_DELAY = 98,
+  NATIVE_NVG_CREATE = 99,
+  NATIVE_NVG_CANCEL_FRAME = 100,
+  NATIVE_NVG_BEGIN_FRAME = 101,
+  NATIVE_NVG_END_FRAME = 102,
+  NATIVE_NVG_RECT = 103,
+  NATIVE_NVG_LINE = 104,
+  NATIVE_NVG_CIRCLE = 105,
+  NATIVE_NVG_TEXT = 106,
+  NATIVE_NVG_FILL_COLOR = 107,
+  NATIVE_NVG_STROKE_COLOR = 108,
+  NATIVE_NVG_STROKE_WIDTH = 109,
+  NATIVE_NVG_FILL = 110,
+  NATIVE_NVG_STROKE = 111,
   NATIVE_ID_COUNT
 } NativeId;
 
@@ -183,13 +221,9 @@ typedef enum {
 // Funciones nativas
 // ==========================================
 
-static void print_intfp(PaxoFxp f) {
-  printf("%s", (const char *)readint(f));
-}
+static void print_intfp(PaxoFxp f) { printf("%s", (const char *)readint(f)); }
 
-static void print_pkdec(PaxoPdec d) {
-  printf("%s", (const char *)readpdec(d));
-}
+static void print_pkdec(PaxoPdec d) { printf("%s", (const char *)readpdec(d)); }
 
 static void print_var_inline(PaxoVar elem) {
   switch (var_type(elem)) {
@@ -199,7 +233,7 @@ static void print_var_inline(PaxoVar elem) {
   case NUM64:
     printf("%s", (const char *)readnum64(var_num64_get(elem), 1));
     break;
-  case BOOL:
+  case VBOOL:
     printf("%s", var_bool_get(elem) ? "true" : "false");
     break;
   case TRIT:
@@ -249,7 +283,7 @@ static PaxoVar native_print(PaxoVar *args, uint8_t argc) {
     case NUM64:
       printf("%s", (const char *)readnum64(var_num64_get(val), 1));
       break;
-    case BOOL:
+    case VBOOL:
       printf("%s", var_bool_get(val) ? "true" : "false");
       break;
     case TRIT:
@@ -313,7 +347,7 @@ static PaxoVar native_typeof(PaxoVar *args, uint8_t argc) {
   case NUM64:
     type_name = "num64";
     break;
-  case BOOL:
+  case VBOOL:
     type_name = "bool";
     break;
   case TRIT:
@@ -460,7 +494,7 @@ static PaxoVar native_set_bg_color(PaxoVar *args, uint8_t argc) {
 static PaxoVar native_scan(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  static char buf[1024];
+  static char buf[65536];
   if (!fgets(buf, sizeof(buf), stdin)) {
     buf[0] = '\0';
   }
@@ -1738,345 +1772,742 @@ static PaxoVar native_phys_free_space(PaxoVar *args, uint8_t argc) {
 #endif // LEP_HAS_PHYS
 
 // ==========================================
-// Ventana y gráficos 2D (SDL3, opcional: LEP_ENABLE_SDL3)
+// Ventana y gráficos (sokol + NanoVG, opcional: LEP_ENABLE_NVG)
+// Los nativos sokol_* y nvg_* dibujan con NanoVG sobre un contexto GL.
+// Sin LEP_ENABLE_NVG se activa el fallback que devuelve valores inofensivos.
 // ==========================================
 
-#ifdef LEP_HAS_WIN
+#ifdef LEP_HAS_NVG
 
-static SDL_Window *g_win = NULL;
-static SDL_Renderer *g_ren = NULL;
-static int g_r = 255, g_g = 255, g_b = 255;
-static NativeReg tex_reg = {0};
+// =====================================================================
+// Estado de ventana (sokol) y cola de eventos
+// =====================================================================
+static NVGcontext *g_nvg = NULL;
+static int g_nvg_w = 800, g_nvg_h = 600;
+static float g_nvg_scale = 1.0f;
+static int g_sok_master = 0; // 1 mientras sapp_run esté en curso
 
-static void tex_freer(void *p) { SDL_DestroyTexture((SDL_Texture *)p); }
+#define LEP_EVQ_CAP 256
+static char g_evq[LEP_EVQ_CAP][64];
+static int g_evq_head = 0, g_evq_tail = 0, g_evq_n = 0;
 
-// Abre ventana: win_open(titulo, ancho, alto) -> bool
-static PaxoVar native_win_open(PaxoVar *args, uint8_t argc) {
-  if (argc < 3)
-    return var_bool(false);
-  if (g_win)
-    return var_bool(true);
-  const char *title = native_arg_str(args[0]);
-  if (!title)
-    title = "paxo";
-  long w = native_arg_long(args[1]), h = native_arg_long(args[2]);
-  if (w <= 0 || h <= 0)
-    return var_bool(false);
-  if (!SDL_Init(SDL_INIT_VIDEO)) {
-    fputs("[paxo] win_open: no se pudo iniciar SDL\n", stderr);
-    return var_bool(false);
+// Color de limpieza de pantalla (0..255)
+static unsigned char g_cc_r = 0, g_cc_g = 0, g_cc_b = 0, g_cc_a = 255;
+
+// Color de pincel NanoVG actual (canal 0..1); usado para relleno/trazo/texto
+static float g_fill_r = 1, g_fill_g = 1, g_fill_b = 1, g_fill_a = 1;
+
+// Estado de entrada, completado desde event_cb
+static int g_sok_key_state[512];
+static float g_sok_mouse_x = 0, g_sok_mouse_y = 0;
+static int g_sok_mouse_down = 0;
+
+static void evq_push(const char *s) {
+  if (g_evq_n >= LEP_EVQ_CAP)
+    return;
+  strncpy(g_evq[g_evq_tail], s, 63);
+  g_evq[g_evq_tail][63] = '\0';
+  g_evq_tail = (g_evq_tail + 1) % LEP_EVQ_CAP;
+  g_evq_n++;
+}
+
+// =====================================================================
+// Cola de comandos de dibujo: se graba SIN contexto GL y se reproduce
+// dentro de frame_cb de sokol (donde sí hay contexto GL activo).
+// =====================================================================
+typedef enum {
+  LG_FILLCOLOR, LG_STROKECOLOR, LG_STROKEW,
+  LG_RECT, LG_LINE, LG_CIRCLE, LG_TEXT, LG_IMAGE
+} lg_cmd_kind;
+
+typedef struct {
+  lg_cmd_kind k;
+  float a, b, c, d;
+  float r, g, bb, aa; // color
+  char *text;
+  int tex;            // textura (LG_IMAGE)
+} lg_cmd;
+
+#define LEP_MAX_TEX 32
+typedef struct {
+  int used;              // slot ocupado
+  int built;             // textura ya subida a GL (img válido)
+  int img;               // NVG image handle
+  int w, h, ch;
+  unsigned char *px;     // copia de los píxeles (RGBA o RGB)
+} LEPTex;
+static LEPTex g_tex[LEP_MAX_TEX] = {{0}};
+
+static lg_cmd *g_cmds = NULL;
+static size_t g_cmd_n = 0, g_cmd_cap = 0;
+
+static void lg_push(lg_cmd_kind k, float a, float b, float c, float d,
+                    const char *txt) {
+  if (g_cmd_n == g_cmd_cap) {
+    g_cmd_cap = g_cmd_cap ? g_cmd_cap * 2 : 64;
+    g_cmds = (lg_cmd *)realloc(g_cmds, g_cmd_cap * sizeof(lg_cmd));
+    if (!g_cmds)
+      return;
   }
-  if (!SDL_CreateWindowAndRenderer(title, (int)w, (int)h, 0, &g_win, &g_ren)) {
-    SDL_Quit();
-    return var_bool(false);
+  lg_cmd *cmd = &g_cmds[g_cmd_n++];
+  cmd->k = k;
+  cmd->a = a; cmd->b = b; cmd->c = c; cmd->d = d;
+  cmd->r = g_fill_r; cmd->g = g_fill_g; cmd->bb = g_fill_b; cmd->aa = g_fill_a;
+  cmd->text = NULL;
+  cmd->tex = 0;
+  if (txt) {
+    size_t len = strlen(txt);
+    cmd->text = (char *)malloc(len + 1);
+    if (cmd->text)
+      memcpy(cmd->text, txt, len + 1);
   }
-  if (tex_reg.cap == 0)
-    reg_init(&tex_reg);
+}
+static void lg_reset(void) {
+  size_t i;
+  for (i = 0; i < g_cmd_n; i++)
+    free(g_cmds[i].text);
+  g_cmd_n = 0;
+}
+
+// Sube a la GPU las texturas pendientes (solo se puede crear la imagen
+// NVG con contexto GL activo, es decir dentro del bucle de sokol).
+static void lep_tex_build_all(void) {
+  int i;
+  if (!g_nvg)
+    return;
+  for (i = 0; i < LEP_MAX_TEX; i++) {
+    LEPTex *t = &g_tex[i];
+    if (!t->used || t->built)
+      continue;
+    t->img = nvgCreateImageRGBA(g_nvg, t->w, t->h, 0, t->px);
+    t->built = (t->img != 0);
+  }
+}
+
+// =====================================================================
+// Callbacks de sokol (ventana, eventos y frame)
+// =====================================================================
+static void lep_sapp_init(void) {
+  // Crea el contexto de dibujo de NanoVG sobre el contexto GL de sokol.
+  // on the rendering (frame) thread.
+  if (!g_nvg)
+    g_nvg = nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
+  lep_tex_build_all();
+}
+
+static void lep_sapp_frame(void) {
+  size_t i;
+  if (!g_nvg)
+    return;
+  lep_tex_build_all();
+  glViewport(0, 0, g_nvg_w, g_nvg_h);
+  glClearColor((float)g_cc_r / 255.f, (float)g_cc_g / 255.f,
+               (float)g_cc_b / 255.f, (float)g_cc_a / 255.f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  nvgBeginFrame(g_nvg, (float)g_nvg_w, (float)g_nvg_h, g_nvg_scale);
+  for (i = 0; i < g_cmd_n; i++) {
+    lg_cmd *c = &g_cmds[i];
+    switch (c->k) {
+    case LG_FILLCOLOR:
+      nvgFillColor(g_nvg, nvgRGBAf(c->r, c->g, c->bb, c->aa));
+      break;
+    case LG_STROKECOLOR:
+      nvgStrokeColor(g_nvg, nvgRGBAf(c->r, c->g, c->bb, c->aa));
+      break;
+    case LG_STROKEW:
+      nvgStrokeWidth(g_nvg, c->a);
+      break;
+    case LG_RECT:
+      nvgBeginPath(g_nvg);
+      nvgRect(g_nvg, c->a, c->b, c->c, c->d);
+      nvgFill(g_nvg);
+      break;
+    case LG_LINE:
+      nvgBeginPath(g_nvg);
+      nvgMoveTo(g_nvg, c->a, c->b);
+      nvgLineTo(g_nvg, c->c, c->d);
+      nvgStroke(g_nvg);
+      break;
+    case LG_CIRCLE:
+      nvgBeginPath(g_nvg);
+      nvgCircle(g_nvg, c->a, c->b, c->c);
+      nvgFill(g_nvg);
+      break;
+    case LG_TEXT:
+      if (c->text) {
+        nvgFillColor(g_nvg, nvgRGBAf(c->r, c->g, c->bb, c->aa));
+        nvgFontSize(g_nvg, c->d > 0 ? c->d : 16.0f);
+        nvgFontFace(g_nvg, "sans");
+        nvgTextAlign(g_nvg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+        nvgText(g_nvg, c->a, c->b, c->text, NULL);
+      }
+      break;
+    case LG_IMAGE: {
+      int idx = c->tex - 1;
+      if (idx >= 0 && idx < LEP_MAX_TEX && g_tex[idx].used && g_tex[idx].built) {
+        NVGpaint img =
+            nvgImagePattern(g_nvg, c->a, c->b, c->c, c->d, 0.0f, g_tex[idx].img, 1.0f);
+        nvgBeginPath(g_nvg);
+        nvgRect(g_nvg, c->a, c->b, c->c, c->d);
+        nvgFillPaint(g_nvg, img);
+        nvgFill(g_nvg);
+      }
+      break;
+    }
+    default:
+      break;
+    }
+  }
+  nvgEndFrame(g_nvg);
+}
+
+static void lep_sapp_event(const sapp_event *ev) {
+  char buf[64];
+  switch (ev->type) {
+  case SAPP_EVENTTYPE_KEY_DOWN:
+    if (ev->key_code >= 0 && ev->key_code < 512)
+      g_sok_key_state[ev->key_code] = 1;
+    if (!ev->key_repeat) {
+      snprintf(buf, sizeof(buf), "keydown:%d", (int)ev->key_code);
+      evq_push(buf);
+    }
+    break;
+  case SAPP_EVENTTYPE_KEY_UP:
+    if (ev->key_code >= 0 && ev->key_code < 512)
+      g_sok_key_state[ev->key_code] = 0;
+    snprintf(buf, sizeof(buf), "keyup:%d", (int)ev->key_code);
+    evq_push(buf);
+    break;
+  case SAPP_EVENTTYPE_MOUSE_DOWN:
+    g_sok_mouse_down = 1;
+    evq_push("mousedown");
+    break;
+  case SAPP_EVENTTYPE_MOUSE_UP:
+    g_sok_mouse_down = 0;
+    evq_push("mouseup");
+    break;
+  case SAPP_EVENTTYPE_MOUSE_MOVE:
+    g_sok_mouse_x = ev->mouse_x;
+    g_sok_mouse_y = ev->mouse_y;
+    break;
+  case SAPP_EVENTTYPE_QUIT_REQUESTED:
+    evq_push("quit");
+    break;
+  default:
+    break;
+  }
+}
+
+static void lep_sapp_cleanup(void) {
+  int i;
+  for (i = 0; i < LEP_MAX_TEX; i++) {
+    LEPTex *t = &g_tex[i];
+    if (t->used && t->built && g_nvg)
+      nvgDeleteImage(g_nvg, t->img);
+    free(t->px);
+    memset(t, 0, sizeof(*t));
+  }
+  if (g_nvg) {
+    nvgDeleteGL3(g_nvg);
+    g_nvg = NULL;
+  }
+}
+
+// =====================================================================
+// Nativos: sokol (ventana / utilidades)
+// =====================================================================
+// sokol_init(titulo, ancho, alto) -> bool (prepara; la ventana se abre
+// al llamar sokol_show, ya que sokol exige su propio bucle de eventos).
+static PaxoVar native_sokol_init(PaxoVar *args, uint8_t argc) {
+  long w = argc >= 2 ? native_arg_long(args[1]) : 800;
+  long h = argc >= 3 ? native_arg_long(args[2]) : 600;
+  if (w <= 0)
+    w = 800;
+  if (h <= 0)
+    h = 600;
+  g_nvg_w = (int)w;
+  g_nvg_h = (int)h;
+  g_nvg_scale = 1.0f;
+  stm_setup();
   return var_bool(true);
 }
 
-// Cierra la ventana: win_close()
-static PaxoVar native_win_close(PaxoVar *args, uint8_t argc) {
+// sokol_shutdown() -> bool (fuerza fin del bucle en curso)
+static PaxoVar native_sokol_shutdown(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  if (!g_win)
-    return LEP_ZERO;
-  if (tex_reg.cap != 0)
-    reg_free_owned(&tex_reg, g_ren, tex_freer);
-  SDL_DestroyRenderer(g_ren);
-  SDL_DestroyWindow(g_win);
-  g_ren = NULL;
-  g_win = NULL;
-  SDL_QuitSubSystem(SDL_INIT_VIDEO);
-  return LEP_ZERO;
+  if (g_sok_master)
+    sapp_request_quit();
+  lg_reset();
+  return var_bool(true);
 }
 
-// Color de dibujo 0..255: win_color(r, g, b)
-static PaxoVar native_win_color(PaxoVar *args, uint8_t argc) {
+// sokol_color(r, g, b[, a]) -> LEP_ZERO (color de limpieza, 0..255)
+static PaxoVar native_sokol_color(PaxoVar *args, uint8_t argc) {
   if (argc < 3)
     return LEP_ZERO;
   long r = native_arg_long(args[0]), g = native_arg_long(args[1]),
        b = native_arg_long(args[2]);
-  g_r = (int)(r < 0 ? 0 : (r > 255 ? 255 : r));
-  g_g = (int)(g < 0 ? 0 : (g > 255 ? 255 : g));
-  g_b = (int)(b < 0 ? 0 : (b > 255 ? 255 : b));
+  long a = argc >= 4 ? native_arg_long(args[3]) : 255;
+  g_cc_r = (unsigned char)(r < 0 ? 0 : (r > 255 ? 255 : r));
+  g_cc_g = (unsigned char)(g < 0 ? 0 : (g > 255 ? 255 : g));
+  g_cc_b = (unsigned char)(b < 0 ? 0 : (b > 255 ? 255 : b));
+  g_cc_a = (unsigned char)(a < 0 ? 0 : (a > 255 ? 255 : a));
   return LEP_ZERO;
 }
 
-// Limpia con el color actual: win_clear()
-static PaxoVar native_win_clear(PaxoVar *args, uint8_t argc) {
+// sokol_clear() -> LEP_ZERO (marca limpieza; se aplica cada frame)
+static PaxoVar native_sokol_clear(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  if (!g_ren)
-    return LEP_ZERO;
-  SDL_SetRenderDrawColor(g_ren, g_r, g_g, g_b, 255);
-  SDL_RenderClear(g_ren);
   return LEP_ZERO;
 }
 
-// Rectángulo relleno: win_rect(x, y, w, h)
-static PaxoVar native_win_rect(PaxoVar *args, uint8_t argc) {
-  if (!g_ren || argc < 4)
-    return LEP_ZERO;
-  SDL_FRect rc = {
-      (float)native_arg_double(args[0]), (float)native_arg_double(args[1]),
-      (float)native_arg_double(args[2]), (float)native_arg_double(args[3])};
-  SDL_SetRenderDrawColor(g_ren, g_r, g_g, g_b, 255);
-  SDL_RenderFillRect(g_ren, &rc);
-  return LEP_ZERO;
-}
-
-// Línea: win_line(x1, y1, x2, y2)
-static PaxoVar native_win_line(PaxoVar *args, uint8_t argc) {
-  if (!g_ren || argc < 4)
-    return LEP_ZERO;
-  SDL_FPoint a = {(float)native_arg_double(args[0]),
-                  (float)native_arg_double(args[1])};
-  SDL_FPoint b = {(float)native_arg_double(args[2]),
-                  (float)native_arg_double(args[3])};
-  SDL_SetRenderDrawColor(g_ren, g_r, g_g, g_b, 255);
-  SDL_RenderLine(g_ren, a.x, a.y, b.x, b.y);
-  return LEP_ZERO;
-}
-
-// Círculo relleno: win_circle(cx, cy, radio)
-static PaxoVar native_win_circle(PaxoVar *args, uint8_t argc) {
-  if (!g_ren || argc < 3)
-    return LEP_ZERO;
-  double cx = native_arg_double(args[0]), cy = native_arg_double(args[1]);
-  double r = native_arg_double(args[2]);
-  if (r <= 0)
-    return LEP_ZERO;
-  enum { SEG = 40 };
-  static SDL_Vertex v[SEG + 2];
-  SDL_FColor col = {(float)g_r / 255.0f, (float)g_g / 255.0f,
-                    (float)g_b / 255.0f, 1.0f};
-  v[0].position.x = (float)cx;
-  v[0].position.y = (float)cy;
-  v[0].color = col;
-  for (int i = 0; i <= SEG; i++) {
-    double t = 2.0 * 3.14159265358979 * i / SEG;
-    v[i + 1].position.x = (float)(cx + r * cos(t));
-    v[i + 1].position.y = (float)(cy + r * sin(t));
-    v[i + 1].color = col;
-  }
-  SDL_SetRenderDrawColor(g_ren, g_r, g_g, g_b, 255);
-  SDL_RenderGeometry(g_ren, NULL, v, SEG + 2, NULL, 0);
-  return LEP_ZERO;
-}
-
-// Texto rápido: win_text(x, y, texto)
-static PaxoVar native_win_text(PaxoVar *args, uint8_t argc) {
-  if (!g_ren || argc < 3)
-    return LEP_ZERO;
-  const char *s = native_arg_str(args[2]);
-  if (!s)
-    return LEP_ZERO;
-  SDL_SetRenderDrawColor(g_ren, g_r, g_g, g_b, 255);
-  SDL_RenderDebugText(g_ren, (float)native_arg_double(args[0]),
-                      (float)native_arg_double(args[1]), s);
-  return LEP_ZERO;
-}
-
-// Crea textura desde píxeles RGBA/RGB:
-// tex_load(datos, w, h, canales) -> handle
-static PaxoVar native_tex_load(PaxoVar *args, uint8_t argc) {
-  if (!g_ren || argc < 4)
-    return num_from_i64(0);
-  long w = native_arg_long(args[1]), h = native_arg_long(args[2]),
-       ch = native_arg_long(args[3]);
-  if (w <= 0 || h <= 0 || (ch != 3 && ch != 4))
-    return num_from_i64(0);
-  size_t len = 0;
-  uint8_t *data = arg_arr_bytes(args[0], &len);
-  if (!data || len < (size_t)(w * h * ch)) {
-    free(data);
-    return num_from_i64(0);
-  }
-  SDL_Surface *sf = SDL_CreateSurface((int)w, (int)h, SDL_PIXELFORMAT_RGBA32);
-  if (!sf) {
-    free(data);
-    return num_from_i64(0);
-  }
-  uint8_t *px = (uint8_t *)sf->pixels;
-  for (long i = 0; i < w * h; i++) {
-    px[i * 4 + 0] = data[i * ch];
-    px[i * 4 + 1] = data[i * ch + 1 % ch];
-    px[i * 4 + 2] = data[i * ch + 2 % ch];
-    px[i * 4 + 3] = ch == 4 ? data[i * ch + 3] : 255;
-  }
-  free(data);
-  SDL_Texture *t = SDL_CreateTextureFromSurface(g_ren, sf);
-  SDL_DestroySurface(sf);
-  if (!t)
-    return num_from_i64(0);
-  return num_from_i64(reg_add(&tex_reg, t, g_ren));
-}
-
-static SDL_Texture *tex_from_args(PaxoVar v) {
-  if (tex_reg.cap == 0)
-    return NULL;
-  return (SDL_Texture *)reg_get(&tex_reg, (int64_t)native_arg_long(v));
-}
-
-// Dibuja textura: tex_draw(tex, x, y [, w, h])
-static PaxoVar native_tex_draw(PaxoVar *args, uint8_t argc) {
-  SDL_Texture *t = argc >= 1 ? tex_from_args(args[0]) : NULL;
-  if (!t || !g_ren)
-    return LEP_ZERO;
-  float x = (float)native_arg_double(args[1]);
-  float y = (float)native_arg_double(args[2]);
-  float w, h;
-  if (argc >= 5) {
-    w = (float)native_arg_double(args[3]);
-    h = (float)native_arg_double(args[4]);
-  } else {
-    SDL_GetTextureSize(t, &w, &h);
-  }
-  SDL_FRect dst = {x, y, w, h};
-  SDL_RenderTexture(g_ren, t, NULL, &dst);
-  return LEP_ZERO;
-}
-
-// Libera textura: tex_free(tex)
-static PaxoVar native_tex_free(PaxoVar *args, uint8_t argc) {
-  if (argc >= 1 && tex_reg.cap != 0) {
-    int64_t id = (int64_t)native_arg_long(args[0]);
-    SDL_Texture *t = (SDL_Texture *)reg_get(&tex_reg, id);
-    if (t) {
-      tex_freer(t);
-      reg_del(&tex_reg, id, false);
-    }
-  }
-  return LEP_ZERO;
-}
-
-// Presenta el frame: win_show()
-static PaxoVar native_win_show(PaxoVar *args, uint8_t argc) {
+// sokol_show() -> bool (abre la ventana y corre el bucle de eventos hasta
+// que se cierra; dibuja la escena grabada con los nativos nvg_*).
+static PaxoVar native_sokol_show(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  if (g_ren)
-    SDL_RenderPresent(g_ren);
-  return LEP_ZERO;
+  if (g_sok_master)
+    return var_bool(true);
+  sapp_desc desc = {0};
+  desc.width = g_nvg_w;
+  desc.height = g_nvg_h;
+  desc.sample_count = 4;
+  desc.init_cb = lep_sapp_init;
+  desc.frame_cb = lep_sapp_frame;
+  desc.event_cb = lep_sapp_event;
+  desc.cleanup_cb = lep_sapp_cleanup;
+  desc.window_title = "Lepvm";
+  desc.user_data = NULL;
+  g_sok_master = 1;
+  sapp_run(&desc);
+  g_sok_master = 0;
+  lg_reset();
+  return var_bool(true);
 }
 
-// Procesa eventos: win_poll() -> ["quit", "keydown:32", "mousedown", ...]
-static PaxoVar native_win_poll(PaxoVar *args, uint8_t argc) {
+// sokol_poll() -> array de strings con eventos colgantes
+static PaxoVar native_sokol_poll(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
   PaxoArray *a = arr_new(4);
-  if (!g_win)
-    return var_array(a);
-  SDL_Event ev;
-  while (SDL_PollEvent(&ev)) {
-    if (ev.type == SDL_EVENT_QUIT) {
-      arr_push_var(a, var_string("quit"));
-    } else if (ev.type == SDL_EVENT_KEY_DOWN || ev.type == SDL_EVENT_KEY_UP) {
-      char buf[32];
-      snprintf(buf, sizeof(buf), "%s:%lu",
-               ev.type == SDL_EVENT_KEY_DOWN ? "keydown" : "keyup",
-               (unsigned long)ev.key.key);
-      arr_push_var(a, var_string(buf));
-    } else if (ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
-      arr_push_var(a, var_string("mousedown"));
-    } else if (ev.type == SDL_EVENT_MOUSE_BUTTON_UP) {
-      arr_push_var(a, var_string("mouseup"));
-    }
+  while (g_evq_n > 0) {
+    arr_push_var(a, var_string(g_evq[g_evq_head]));
+    g_evq_head = (g_evq_head + 1) % LEP_EVQ_CAP;
+    g_evq_n--;
   }
   return var_array(a);
 }
 
-// ¿Tecla presionada?: win_key("W" | "Space" | ...) -> bool
-static PaxoVar native_win_key(PaxoVar *args, uint8_t argc) {
-  const char *name = argc >= 1 ? native_arg_str(args[0]) : NULL;
-  if (!name)
+// sokol_key(codigo) -> bool
+static PaxoVar native_sokol_key(PaxoVar *args, uint8_t argc) {
+  long k = argc >= 1 ? native_arg_long(args[0]) : 0;
+  if (k < 0 || k >= 512)
     return var_bool(false);
-  SDL_Scancode sc = SDL_GetScancodeFromName(name);
-  if (sc == SDL_SCANCODE_UNKNOWN)
-    return var_bool(false);
-  return var_bool(SDL_GetKeyboardState(NULL)[sc]);
+  return var_bool(g_sok_key_state[(int)k] != 0);
 }
 
-// Posición del mouse: win_mouse() -> [x, y]
-static PaxoVar native_win_mouse(PaxoVar *args, uint8_t argc) {
+// sokol_mouse() -> [x, y]
+static PaxoVar native_sokol_mouse(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  float mx = 0, my = 0;
-  SDL_GetMouseState(&mx, &my);
-  return ret_xy(mx, my);
+  return ret_xy(g_sok_mouse_x, g_sok_mouse_y);
 }
 
-// ¿Botón izquierdo presionado?: win_mousedown() -> bool
-static PaxoVar native_win_mousedown(PaxoVar *args, uint8_t argc) {
+// sokol_mousedown() -> bool
+static PaxoVar native_sokol_mousedown(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return var_bool(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON_LMASK);
+  return var_bool(g_sok_mouse_down != 0);
 }
 
-// Milisegundos desde el inicio: win_time() -> num
-static PaxoVar native_win_time(PaxoVar *args, uint8_t argc) {
+// sokol_time() -> num (milisegundos desde sokol_init)
+static PaxoVar native_sokol_time(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return num_from_i64((int64_t)SDL_GetTicks());
+  uint64_t now = stm_now();
+  return num_from_i64((int64_t)stm_ms(now));
 }
 
-// Espera: win_delay(ms)
-static PaxoVar native_win_delay(PaxoVar *args, uint8_t argc) {
+// sokol_delay(ms) -> LEP_ZERO
+static PaxoVar native_sokol_delay(PaxoVar *args, uint8_t argc) {
   long ms = argc >= 1 ? native_arg_long(args[0]) : 0;
   if (ms > 0)
-    SDL_Delay((Uint32)ms);
+    usleep((useconds_t)(ms * 1000));
   return LEP_ZERO;
 }
 
-#else
-
-static PaxoVar native_win_open(PaxoVar *args, uint8_t argc) {
+// =====================================================================
+// Nativos: NanoVG (dibujo). Graban comandos reproducidos en cada frame.
+// =====================================================================
+// nvg_create() -> bool (ameniza la API; sin operación aquí)
+static PaxoVar native_nvg_create(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  fputs("[paxo] win_open: recompila la VM con SDL3 "
-        "(LEP_ENABLE_SDL3) para usar ventanas\n",
+  return var_bool(true);
+}
+
+// nvg_fill_color([r,g,b,a] o COLOR 0..255) -> LEP_ZERO
+static PaxoVar native_nvg_fill_color(PaxoVar *args, uint8_t argc) {
+  float r = 1, g = 1, b = 1, a = 1;
+  if (argc >= 1 && var_type(args[0]) == COLOR) {
+    uint32_t rgba = var_color_get(args[0]);
+    r = (float)((rgba >> 24) & 0xFF) / 255.f;
+    g = (float)((rgba >> 16) & 0xFF) / 255.f;
+    b = (float)((rgba >> 8) & 0xFF) / 255.f;
+    a = (float)(rgba & 0xFF) / 255.f;
+  } else if (argc >= 3) {
+    r = ((float)native_arg_long(args[0])) / 255.f;
+    g = ((float)native_arg_long(args[1])) / 255.f;
+    b = ((float)native_arg_long(args[2])) / 255.f;
+    a = argc >= 4 ? ((float)native_arg_long(args[3])) / 255.f : 1.f;
+  }
+  g_fill_r = r; g_fill_g = g; g_fill_b = b; g_fill_a = a;
+  if (g_sok_master)
+    lg_push(LG_FILLCOLOR, 0, 0, 0, 0, NULL);
+  return LEP_ZERO;
+}
+
+// nvg_stroke_color([r,g,b,a] o COLOR) -> LEP_ZERO
+static PaxoVar native_nvg_stroke_color(PaxoVar *args, uint8_t argc) {
+  float r = 1, g = 1, b = 1, a = 1;
+  if (argc >= 1 && var_type(args[0]) == COLOR) {
+    uint32_t rgba = var_color_get(args[0]);
+    r = (float)((rgba >> 24) & 0xFF) / 255.f;
+    g = (float)((rgba >> 16) & 0xFF) / 255.f;
+    b = (float)((rgba >> 8) & 0xFF) / 255.f;
+    a = (float)(rgba & 0xFF) / 255.f;
+  } else if (argc >= 3) {
+    r = ((float)native_arg_long(args[0])) / 255.f;
+    g = ((float)native_arg_long(args[1])) / 255.f;
+    b = ((float)native_arg_long(args[2])) / 255.f;
+    a = argc >= 4 ? ((float)native_arg_long(args[3])) / 255.f : 1.f;
+  }
+  g_fill_r = r; g_fill_g = g; g_fill_b = b; g_fill_a = a;
+  if (g_sok_master)
+    lg_push(LG_STROKECOLOR, 0, 0, 0, 0, NULL);
+  return LEP_ZERO;
+}
+
+// nvg_stroke_width(w) -> LEP_ZERO
+static PaxoVar native_nvg_stroke_width(PaxoVar *args, uint8_t argc) {
+  float w = argc >= 1 ? (float)native_arg_double(args[0]) : 1.0f;
+  lg_push(LG_STROKEW, w, 0, 0, 0, NULL);
+  return LEP_ZERO;
+}
+
+// nvg_rect(x, y, w, h) -> LEP_ZERO (rectángulo relleno con el color actual)
+static PaxoVar native_nvg_rect(PaxoVar *args, uint8_t argc) {
+  if (argc < 4)
+    return LEP_ZERO;
+  float x = (float)native_arg_double(args[0]);
+  float y = (float)native_arg_double(args[1]);
+  float w = (float)native_arg_double(args[2]);
+  float h = (float)native_arg_double(args[3]);
+  lg_push(LG_RECT, x, y, w, h, NULL);
+  return LEP_ZERO;
+}
+
+// nvg_line(x1, y1, x2, y2) -> LEP_ZERO
+static PaxoVar native_nvg_line(PaxoVar *args, uint8_t argc) {
+  if (argc < 4)
+    return LEP_ZERO;
+  float x1 = (float)native_arg_double(args[0]);
+  float y1 = (float)native_arg_double(args[1]);
+  float x2 = (float)native_arg_double(args[2]);
+  float y2 = (float)native_arg_double(args[3]);
+  lg_push(LG_LINE, x1, y1, x2, y2, NULL);
+  return LEP_ZERO;
+}
+
+// nvg_circle(cx, cy, r) -> LEP_ZERO (relleno con el color actual)
+static PaxoVar native_nvg_circle(PaxoVar *args, uint8_t argc) {
+  if (argc < 3)
+    return LEP_ZERO;
+  float cx = (float)native_arg_double(args[0]);
+  float cy = (float)native_arg_double(args[1]);
+  float r = (float)native_arg_double(args[2]);
+  lg_push(LG_CIRCLE, cx, cy, r, 0, NULL);
+  return LEP_ZERO;
+}
+
+// nvg_text(x, y, texto[, tamaño]) -> LEP_ZERO
+static PaxoVar native_nvg_text(PaxoVar *args, uint8_t argc) {
+  if (argc < 3)
+    return LEP_ZERO;
+  const char *s = native_arg_str(args[2]);
+  if (!s)
+    return LEP_ZERO;
+  float x = (float)native_arg_double(args[0]);
+  float y = (float)native_arg_double(args[1]);
+  float sz = argc >= 4 ? (float)native_arg_double(args[3]) : 16.0f;
+  lg_push(LG_TEXT, x, y, 0, sz, s);
+  return LEP_ZERO;
+}
+
+// nvg_begin_frame([w, h]) -> bool (no-op en el modelo grabado)
+static PaxoVar native_nvg_begin_frame(PaxoVar *args, uint8_t argc) {
+  if (argc >= 2) {
+    long w = native_arg_long(args[0]), h = native_arg_long(args[1]);
+    if (w > 0)
+      g_nvg_w = (int)w;
+    if (h > 0)
+      g_nvg_h = (int)h;
+  }
+  return var_bool(true);
+}
+
+// nvg_end_frame() -> bool
+static PaxoVar native_nvg_end_frame(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return var_bool(true);
+}
+
+// nvg_cancel_frame() -> bool
+static PaxoVar native_nvg_cancel_frame(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return var_bool(true);
+}
+
+// nvg_fill() -> LEP_ZERO (consolida la ruta; en el modelo grabado no-op)
+static PaxoVar native_nvg_fill(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return LEP_ZERO;
+}
+
+// nvg_stroke() -> LEP_ZERO (no-op en el modelo grabado; ver nvg_line)
+static PaxoVar native_nvg_stroke(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return LEP_ZERO;
+}
+
+// =====================================================================
+// Nativos: texturas (tex_load / tex_draw / tex_free)
+// =====================================================================
+// tex_load(píxeles, w, h, ch) -> num (handle) | 0 si falla.
+static PaxoVar native_tex_load(PaxoVar *args, uint8_t argc) {
+  if (argc < 4)
+    return num_from_double(0);
+  if (var_type(args[0]) != ARRAY)
+    return num_from_double(0);
+  long w = native_arg_long(args[1]);
+  long h = native_arg_long(args[2]);
+  long ch = native_arg_long(args[3]);
+  if (w <= 0 || h <= 0)
+    return num_from_double(0);
+  if (ch != 3 && ch != 4)
+    return num_from_double(0);
+  PaxoArray *a = var_array_get(args[0]);
+  if (a->len < (size_t)(w * h * ch))
+    return num_from_double(0);
+  int slot = -1;
+  for (int i = 0; i < LEP_MAX_TEX; i++) {
+    if (!g_tex[i].used) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0)
+    return num_from_double(0);
+  size_t npix = (size_t)(w * h * ch);
+  unsigned char *px = (unsigned char *)malloc(npix);
+  if (!px)
+    return num_from_double(0);
+  for (size_t i = 0; i < npix; i++) {
+    double v = native_arg_double(a->items[i]);
+    long b = (long)v;
+    px[i] = (unsigned char)(b < 0 ? 0 : (b > 255 ? 255 : b));
+  }
+  LEPTex *t = &g_tex[slot];
+  memset(t, 0, sizeof(*t));
+  t->used = 1;
+  t->w = (int)w;
+  t->h = (int)h;
+  t->ch = (int)ch;
+  t->px = px;
+  if (g_nvg) {
+    t->img = nvgCreateImageRGBA(g_nvg, t->w, t->h, 0, t->px);
+    t->built = (t->img != 0);
+  }
+  return num_from_double((double)(slot + 1));
+}
+
+// tex_draw(tex, x, y[, w, h]) -> LEP_ZERO
+static PaxoVar native_tex_draw(PaxoVar *args, uint8_t argc) {
+  if (argc < 3)
+    return LEP_ZERO;
+  long handle = native_arg_long(args[0]);
+  int idx = (int)handle - 1;
+  if (idx < 0 || idx >= LEP_MAX_TEX || !g_tex[idx].used)
+    return LEP_ZERO;
+  float x = (float)native_arg_double(args[1]);
+  float y = (float)native_arg_double(args[2]);
+  float w = (float)(argc >= 4 ? native_arg_double(args[3]) : g_tex[idx].w);
+  float h = (float)(argc >= 5 ? native_arg_double(args[4]) : g_tex[idx].h);
+  lg_push(LG_IMAGE, x, y, w, h, NULL);
+  g_cmds[g_cmd_n - 1].tex = (int)handle;
+  return LEP_ZERO;
+}
+
+// tex_free(tex) -> LEP_ZERO
+static PaxoVar native_tex_free(PaxoVar *args, uint8_t argc) {
+  if (argc < 1)
+    return LEP_ZERO;
+  long handle = native_arg_long(args[0]);
+  int idx = (int)handle - 1;
+  if (idx < 0 || idx >= LEP_MAX_TEX || !g_tex[idx].used)
+    return LEP_ZERO;
+  LEPTex *t = &g_tex[idx];
+  if (t->built && g_nvg)
+    nvgDeleteImage(g_nvg, t->img);
+  free(t->px);
+  memset(t, 0, sizeof(*t));
+  return LEP_ZERO;
+}
+
+#else // !LEP_HAS_NVG
+
+static PaxoVar native_sokol_init(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  fputs("[paxo] sokol_init: recompila la VM con -DLEP_ENABLE_NVG para usar "
+        "gráficos\n",
         stderr);
   return var_bool(false);
 }
-static PaxoVar native_win_close(PaxoVar *args, uint8_t argc) {
+static PaxoVar native_sokol_shutdown(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
   return LEP_ZERO;
 }
-static PaxoVar native_win_color(PaxoVar *args, uint8_t argc) {
+static PaxoVar native_sokol_color(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
   return LEP_ZERO;
 }
-static PaxoVar native_win_clear(PaxoVar *args, uint8_t argc) {
+static PaxoVar native_sokol_clear(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
   return LEP_ZERO;
 }
-static PaxoVar native_win_rect(PaxoVar *args, uint8_t argc) {
+static PaxoVar native_sokol_show(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return LEP_ZERO;
+  return var_bool(false);
 }
-static PaxoVar native_win_line(PaxoVar *args, uint8_t argc) {
+static PaxoVar native_sokol_poll(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return LEP_ZERO;
+  return var_array(arr_new(0));
 }
-static PaxoVar native_win_circle(PaxoVar *args, uint8_t argc) {
+static PaxoVar native_sokol_key(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return LEP_ZERO;
+  return var_bool(false);
 }
-static PaxoVar native_win_text(PaxoVar *args, uint8_t argc) {
+static PaxoVar native_sokol_mouse(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
-  return LEP_ZERO;
+  return ret_xy(0, 0);
 }
-static PaxoVar native_tex_load(PaxoVar *args, uint8_t argc) {
+static PaxoVar native_sokol_mousedown(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return var_bool(false);
+}
+static PaxoVar native_sokol_time(PaxoVar *args, uint8_t argc) {
   (void)args;
   (void)argc;
   return num_from_i64(0);
+}
+static PaxoVar native_sokol_delay(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return LEP_ZERO;
+}
+static PaxoVar native_nvg_create(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return var_bool(false);
+}
+static PaxoVar native_nvg_begin_frame(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return var_bool(false);
+}
+static PaxoVar native_nvg_end_frame(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return var_bool(false);
+}
+static PaxoVar native_nvg_cancel_frame(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return var_bool(false);
+}
+static PaxoVar native_nvg_rect(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  fputs("[paxo] nvg_rect: recompila la VM con -DLEP_ENABLE_NVG para usar "
+        "gráficos\n",
+        stderr);
+  return LEP_ZERO;
+}
+static PaxoVar native_nvg_line(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return LEP_ZERO;
+}
+static PaxoVar native_nvg_circle(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return LEP_ZERO;
+}
+static PaxoVar native_nvg_text(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return LEP_ZERO;
+}
+static PaxoVar native_nvg_fill_color(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return LEP_ZERO;
+}
+static PaxoVar native_nvg_stroke_color(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return LEP_ZERO;
+}
+static PaxoVar native_nvg_stroke_width(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return LEP_ZERO;
+}
+static PaxoVar native_nvg_fill(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return LEP_ZERO;
+}
+static PaxoVar native_nvg_stroke(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  return LEP_ZERO;
+}
+
+// Fallbacks de textura sin gráficos
+static PaxoVar native_tex_load(PaxoVar *args, uint8_t argc) {
+  (void)args;
+  (void)argc;
+  fputs("[paxo] tex_load: recompila la VM con -DLEP_ENABLE_NVG para usar "
+        "texturas\n",
+        stderr);
+  return num_from_double(0);
 }
 static PaxoVar native_tex_draw(PaxoVar *args, uint8_t argc) {
   (void)args;
@@ -2088,43 +2519,8 @@ static PaxoVar native_tex_free(PaxoVar *args, uint8_t argc) {
   (void)argc;
   return LEP_ZERO;
 }
-static PaxoVar native_win_show(PaxoVar *args, uint8_t argc) {
-  (void)args;
-  (void)argc;
-  return LEP_ZERO;
-}
-static PaxoVar native_win_poll(PaxoVar *args, uint8_t argc) {
-  (void)args;
-  (void)argc;
-  return var_array(arr_new(0));
-}
-static PaxoVar native_win_key(PaxoVar *args, uint8_t argc) {
-  (void)args;
-  (void)argc;
-  return var_bool(false);
-}
-static PaxoVar native_win_mouse(PaxoVar *args, uint8_t argc) {
-  (void)args;
-  (void)argc;
-  return ret_xy(0, 0);
-}
-static PaxoVar native_win_mousedown(PaxoVar *args, uint8_t argc) {
-  (void)args;
-  (void)argc;
-  return var_bool(false);
-}
-static PaxoVar native_win_time(PaxoVar *args, uint8_t argc) {
-  (void)args;
-  (void)argc;
-  return num_from_i64(0);
-}
-static PaxoVar native_win_delay(PaxoVar *args, uint8_t argc) {
-  (void)args;
-  (void)argc;
-  return LEP_ZERO;
-}
 
-#endif // LEP_HAS_WIN
+#endif // LEP_HAS_NVG
 
 // ==========================================
 // PDF (pdfio)
@@ -2561,43 +2957,77 @@ PaxoVar native_call(uint16_t id, PaxoVar *args, uint8_t argc) {
     return native_phys_free_body(args, argc);
   case NATIVE_PHYS_FREE_SPACE:
     return native_phys_free_space(args, argc);
-  // Ventana/gráficos
+    // Ventana/gráficos. NATIVE_WIN_*/TEX_* son los IDs que emite el
+    // compilador; NATIVE_SOKOL_*/NVG_* los internos de la VM.
   case NATIVE_WIN_OPEN:
-    return native_win_open(args, argc);
+  case NATIVE_SOKOL_INIT:
+    return native_sokol_init(args, argc);
   case NATIVE_WIN_CLOSE:
-    return native_win_close(args, argc);
-  case NATIVE_WIN_COLOR:
-    return native_win_color(args, argc);
+  case NATIVE_SOKOL_SHUTDOWN:
+    return native_sokol_shutdown(args, argc);
   case NATIVE_WIN_CLEAR:
-    return native_win_clear(args, argc);
-  case NATIVE_WIN_RECT:
-    return native_win_rect(args, argc);
-  case NATIVE_WIN_LINE:
-    return native_win_line(args, argc);
-  case NATIVE_WIN_CIRCLE:
-    return native_win_circle(args, argc);
-  case NATIVE_WIN_TEXT:
-    return native_win_text(args, argc);
+  case NATIVE_SOKOL_CLEAR:
+    return native_sokol_clear(args, argc);
+  case NATIVE_WIN_COLOR:
+  case NATIVE_SOKOL_COLOR:
+    return native_sokol_color(args, argc);
+  case NATIVE_WIN_SHOW:
+  case NATIVE_SOKOL_SHOW:
+    return native_sokol_show(args, argc);
+  case NATIVE_WIN_POLL:
+  case NATIVE_SOKOL_POLL:
+    return native_sokol_poll(args, argc);
+  case NATIVE_WIN_KEY:
+  case NATIVE_SOKOL_KEY:
+    return native_sokol_key(args, argc);
+  case NATIVE_WIN_MOUSE:
+  case NATIVE_SOKOL_MOUSE:
+    return native_sokol_mouse(args, argc);
+  case NATIVE_WIN_MOUSEDOWN:
+  case NATIVE_SOKOL_MOUSEDOWN:
+    return native_sokol_mousedown(args, argc);
+  case NATIVE_WIN_TIME:
+  case NATIVE_SOKOL_TIME:
+    return native_sokol_time(args, argc);
+  case NATIVE_WIN_DELAY:
+  case NATIVE_SOKOL_DELAY:
+    return native_sokol_delay(args, argc);
   case NATIVE_TEX_LOAD:
     return native_tex_load(args, argc);
   case NATIVE_TEX_DRAW:
     return native_tex_draw(args, argc);
   case NATIVE_TEX_FREE:
     return native_tex_free(args, argc);
-  case NATIVE_WIN_SHOW:
-    return native_win_show(args, argc);
-  case NATIVE_WIN_POLL:
-    return native_win_poll(args, argc);
-  case NATIVE_WIN_KEY:
-    return native_win_key(args, argc);
-  case NATIVE_WIN_MOUSE:
-    return native_win_mouse(args, argc);
-  case NATIVE_WIN_MOUSEDOWN:
-    return native_win_mousedown(args, argc);
-  case NATIVE_WIN_TIME:
-    return native_win_time(args, argc);
-  case NATIVE_WIN_DELAY:
-    return native_win_delay(args, argc);
+  case NATIVE_WIN_RECT:
+  case NATIVE_NVG_RECT:
+    return native_nvg_rect(args, argc);
+  case NATIVE_WIN_LINE:
+  case NATIVE_NVG_LINE:
+    return native_nvg_line(args, argc);
+  case NATIVE_WIN_CIRCLE:
+  case NATIVE_NVG_CIRCLE:
+    return native_nvg_circle(args, argc);
+  case NATIVE_WIN_TEXT:
+  case NATIVE_NVG_TEXT:
+    return native_nvg_text(args, argc);
+  case NATIVE_NVG_CREATE:
+    return native_nvg_create(args, argc);
+  case NATIVE_NVG_CANCEL_FRAME:
+    return native_nvg_cancel_frame(args, argc);
+  case NATIVE_NVG_BEGIN_FRAME:
+    return native_nvg_begin_frame(args, argc);
+  case NATIVE_NVG_END_FRAME:
+    return native_nvg_end_frame(args, argc);
+  case NATIVE_NVG_FILL_COLOR:
+    return native_nvg_fill_color(args, argc);
+  case NATIVE_NVG_STROKE_COLOR:
+    return native_nvg_stroke_color(args, argc);
+  case NATIVE_NVG_STROKE_WIDTH:
+    return native_nvg_stroke_width(args, argc);
+  case NATIVE_NVG_FILL:
+    return native_nvg_fill(args, argc);
+  case NATIVE_NVG_STROKE:
+    return native_nvg_stroke(args, argc);
   // PDF
   case NATIVE_PDF_OPEN:
     return native_pdf_open(args, argc);

@@ -78,6 +78,8 @@ pkgDeclaration
 block
     : '{' statement* '}' 
 		| ':' statement* '🏁'
+		| statement* 'end'
+		| ':' statement* ';'
     ;
 
 parameterList
@@ -106,6 +108,7 @@ expression
     | expression ( '<'|'>'|'≤'|'<='|'≥'|'>='|'=='|'!='|'≠' ) expression   # relationalExpr
     | expression ( '&' | '|' | '.&' | '.|' ) expression     # bitwiseExpr
     | ( '!' | '.!' ) expression # notgateExpr
+		| THIS_SCOPE '.' expression
     | INT_LITERAL # intLitExpr
     | DECIMAL_LITERAL # decLitExpr
     | CHAR_LITERAL # charLitExpr
@@ -123,6 +126,8 @@ expression
 
 arrayLiteral
     : '«' expression (',' expression)* '»'
+		| '{' expression (',' expression)* '}'
+		| '[' expression (',' expression)* ']'
     ;
 
 // ==========================================
@@ -165,6 +170,8 @@ BOOLEAN_BIT			: '.×' | '.✓' ;
 BOOLEAN_TRIT    : '×' | '•' | '✓' ;
 POINTER_LITERAL : '@' IDENTIFIER ;
 COLOR_LITERAL : '#' ([0-9A-F])+ ;
+
+THIS_SCOPE: 'this' | '📍';
 
 IDENTIFIER      : [a-zA-Z_\p{L}\p{Emoji}][a-zA-Z0-9_\p{L}\p{Emoji}]* ;
 STRING_LITERAL  : '"' (~["\r\n])* '"' ;

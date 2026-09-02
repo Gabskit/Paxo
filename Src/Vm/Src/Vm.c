@@ -65,7 +65,7 @@ typedef enum {
   OP_HALT,
   OP_CALL,
   OP_CALL_NATIVE,
-  // --- Comparación (push BOOL) ---
+  // --- Comparación (push VBOOL) ---
   OP_EQ,
   OP_NEQ,
   OP_LT,
@@ -220,19 +220,19 @@ static inline PaxoComplex complex_of_operand(PaxoVar v) {
   PaxoComplex c = {.re = v, .im = 0};
   switch (var_type(v)) {
   case INT_FP:
-    c.kind = PAXO_COMPLEX_KIND_NI;
+    c.kind = LEP_COMPLEX_KIND_NI;
     c.im = var_num64((Num64){0, BIAS64, 0, 0});
     break;
   case PKDEC:
-    c.kind = PAXO_COMPLEX_KIND_NI;
+    c.kind = LEP_COMPLEX_KIND_NI;
     c.im = var_num64((Num64){0, BIAS64, 0, 0});
     break;
   case NUM64:
-    c.kind = PAXO_COMPLEX_KIND_NI;
+    c.kind = LEP_COMPLEX_KIND_NI;
     c.im = var_num64((Num64){0, BIAS64, 0, 0});
     break;
   default:
-    c.kind = PAXO_COMPLEX_KIND_SNI;
+    c.kind = LEP_COMPLEX_KIND_SNI;
     c.im = var_num16((Num16){0, BIAS16, 0, 0});
     break;
   }
@@ -241,14 +241,14 @@ static inline PaxoComplex complex_of_operand(PaxoVar v) {
 
 // Sistema del resultado: MP64 (ni) domina, luego MP16 (sni).
 static inline int complex_domain(PaxoComplex a, PaxoComplex b) {
-  int da = (a.kind == PAXO_COMPLEX_KIND_SNI) ? 0 : 1;
-  int db = (b.kind == PAXO_COMPLEX_KIND_SNI) ? 0 : 1;
-  return (da > db ? da : db) ? PAXO_COMPLEX_KIND_NI : PAXO_COMPLEX_KIND_SNI;
+  int da = (a.kind == LEP_COMPLEX_KIND_SNI) ? 0 : 1;
+  int db = (b.kind == LEP_COMPLEX_KIND_SNI) ? 0 : 1;
+  return (da > db ? da : db) ? LEP_COMPLEX_KIND_NI : LEP_COMPLEX_KIND_SNI;
 }
 
 // Empaqueta (re, im) en el sistema elegido
 static inline PaxoVar complex_pack(int domain, long double re, long double im) {
-  if (domain == PAXO_COMPLEX_KIND_NI)
+  if (domain == LEP_COMPLEX_KIND_NI)
     return var_complex_ni(num64_from_ld(re), num64_from_ld(im));
   return var_complex_sni(num64tonum16(num64_from_ld(re)),
                          num64tonum16(num64_from_ld(im)));
@@ -277,7 +277,7 @@ static inline PaxoVar complex_mul(PaxoVar a, PaxoVar b) {
 }
 
 // División: (a+bi)/(c+di) = (ac+bd)/(c²+d²) + (bc-ad)/(c²+d²)i.
-// Devuelve PAXO_NO_VALUE si el divisor es cero (para vm_error en el intérprete).
+// Devuelve LEP_NO_VALUE si el divisor es cero (para vm_error en el intérprete).
 static inline PaxoVar complex_div(PaxoVar a, PaxoVar b) {
   PaxoComplex ca = complex_of_operand(a), cb = complex_of_operand(b);
   int dom = complex_domain(ca, cb);
@@ -285,7 +285,7 @@ static inline PaxoVar complex_div(PaxoVar a, PaxoVar b) {
   long double br = var_to_ld(cb.re), bi = var_to_ld(cb.im);
   long double denom = br * br + bi * bi;
   if (denom == 0.0L)
-    return PAXO_NO_VALUE;
+    return LEP_NO_VALUE;
   return complex_pack(dom, (ar * br + ai * bi) / denom,
                       (ai * br - ar * bi) / denom);
 }
@@ -304,7 +304,7 @@ static inline Num16 zero_num16(void) {
 // Escalar completo (MP16/MP64/int/pdec/bool/trit/char) → MP64
 static inline Num64 scalar_to64(PaxoVar v) {
   switch (var_type(v)) {
-  case BOOL:
+  case VBOOL:
     return booltonum64(var_bool_get(v));
   case TRIT:
     return trittonum64(var_trit_get(v));
@@ -367,7 +367,7 @@ static inline int cmp_any(PaxoVar a, PaxoVar b) {
 
 static inline bool var_truthy(PaxoVar v) {
   switch (var_type(v)) {
-  case BOOL:
+  case VBOOL:
     return var_bool_get(v);
   case TRIT:
     return var_trit_get(v) == 1;
@@ -447,7 +447,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
                                 .p = (raw >> 59)});
         break;
       }
-      case BOOL:
+      case VBOOL:
         val = var_bool(vm->bytecode[vm->ip++] != 0);
         break;
       case TRIT:
@@ -539,13 +539,13 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     PaxoVar b = deque_pop_back(stack);                                         \
     PaxoVar a = deque_pop_back(stack);                                         \
     enum type ta = var_type(a), tb = var_type(b);                              \
-    PaxoVar res = PAXO_ZERO;                                                   \
+    PaxoVar res = LEP_ZERO;                                                   \
     if (var_is_complex_type(ta) || var_is_complex_type(tb)) {                  \
       res = oppcpx(a, b);                                                      \
-      if (res == PAXO_NO_VALUE) {                                              \
+      if (res == LEP_NO_VALUE) {                                              \
         vm_error(vm, "división entre cero en complejo");                        \
         running = false;                                                       \
-        deque_push_back(stack, PAXO_ZERO);                                     \
+        deque_push_back(stack, LEP_ZERO);                                     \
         break;                                                                 \
       }                                                                        \
     } else if (var_is_numeric(ta) && var_is_numeric(tb)) {                     \
@@ -615,7 +615,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       case NUM64:
         str = readnum64(var_num64_get(val), 1);
         break;
-      case BOOL:
+      case VBOOL:
         str = readbool(var_bool_get(val));
         break;
       case CHAR:
@@ -648,7 +648,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       PaxoVar condition = deque_pop_back(stack);
 
       bool is_false = false;
-      if (var_type(condition) == BOOL)
+      if (var_type(condition) == VBOOL)
         is_false = !var_bool_get(condition);
       else if (var_type(condition) == TRIT)
         is_false = (var_trit_get(condition) == 0);
@@ -685,7 +685,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         case NUM64:
           res = var_num64(num16tonum64(n));
           break;
-        case BOOL:
+        case VBOOL:
           res = var_bool(num16tobool(n));
           break;
         case TRIT:
@@ -727,7 +727,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         case NUM16:
           res = var_num16(num64tonum16(n));
           break;
-        case BOOL:
+        case VBOOL:
           res = var_bool(num64tobool(n));
           break;
         case TRIT:
@@ -760,7 +760,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         }
         break;
       }
-      case BOOL: {
+      case VBOOL: {
         bool b = var_bool_get(val);
         switch (target_type) {
         case NUM16:
@@ -798,7 +798,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         case NUM64:
           res = var_num64(trittonum64(t));
           break;
-        case BOOL:
+        case VBOOL:
           res = var_bool(trittobool(t));
           break;
         case INT_FP:
@@ -837,7 +837,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
           res = var_num64(conv);
           break;
         }
-        case BOOL:
+        case VBOOL:
           res = var_bool(c != 0);
           break;
         case TRIT:
@@ -892,7 +892,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
           // int → pdec: convierte el entero escalado a dígitos BCD (exacto)
           res = pdec_to_var(pdec_from_int64((int64_t)f.value, f.scale));
           break;
-        case BOOL:
+        case VBOOL:
           res = var_bool(num64tobool(fxp_to_num64(f)));
           break;
         case TRIT:
@@ -927,7 +927,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
           // pdec → int: redondea a entero (mismo criterio que num64 → int)
           res = fxp_to_var(num64_to_fxp(pdec_to_num64(d), 0));
           break;
-        case BOOL: {
+        case VBOOL: {
           Num64 n = pdec_to_num64(d);
           res = var_bool(num64tobool(n));
           break;
@@ -1001,7 +1001,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
           res = pdec_to_var(num64_to_pdec(re, sc));
           break;
         }
-        case BOOL:
+        case VBOOL:
           res = var_bool(num64tobool(re));
           break;
         case TRIT:
@@ -1043,7 +1043,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         args[i] = deque_pop_back(stack);
 
       PaxoVar result = native_call(native_id, args, argc);
-      if (result != PAXO_NO_VALUE)
+      if (result != LEP_NO_VALUE)
         deque_push_back(stack, result);
       break;
     }
@@ -1298,7 +1298,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     }
 
     // ==========================================
-    // COMPARACIONES (result -> BOOL)
+    // COMPARACIONES (result -> VBOOL)
     // ==========================================
 #define c_eq(c)  ((c) == 0)
 #define c_neq(c) ((c) != 0)
@@ -1328,7 +1328,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
           var_is_complex_type(ta) || var_is_complex_type(tb)) {
         CMP_NUMBERS(c_eq);
       } else {
-        CMP_BOTH(BOOL, var_bool_get(a) == var_bool_get(b));
+        CMP_BOTH(VBOOL, var_bool_get(a) == var_bool_get(b));
         CMP_BOTH(TRIT, var_trit_get(a) == var_trit_get(b));
         CMP_BOTH(CHAR, var_char_get(a) == var_char_get(b));
         CMP_BOTH(POINT, var_pin_get(a) == var_pin_get(b));
@@ -1348,7 +1348,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         CMP_NUMBERS(c_neq);
       } else if (ta == tb) {
         result_bool = false;
-        CMP_BOTH(BOOL, var_bool_get(a) != var_bool_get(b));
+        CMP_BOTH(VBOOL, var_bool_get(a) != var_bool_get(b));
         CMP_BOTH(TRIT, var_trit_get(a) != var_trit_get(b));
         CMP_BOTH(CHAR, var_char_get(a) != var_char_get(b));
         CMP_BOTH(POINT, var_pin_get(a) != var_pin_get(b));
@@ -1425,7 +1425,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
 #undef c_gte
 
     // ==========================================
-    // LÓGICOS (BOOL / TRIT)
+    // LÓGICOS (VBOOL / TRIT)
     // ==========================================
     case OP_AND: {
       PaxoVar b = deque_pop_back(stack);
@@ -1445,7 +1445,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       PaxoVar a = deque_pop_back(stack);
       enum type ta = var_type(a);
       bool result_bool = true;
-      if (ta == BOOL)
+      if (ta == VBOOL)
         result_bool = !var_bool_get(a);
       else if (ta == TRIT)
         result_bool = (var_trit_get(a) == 0);
@@ -1453,18 +1453,20 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         result_bool = (var_fxp_get(a).value == 0);
       else if (ta == PKDEC)
         result_bool = pdec_is_zero(var_pkdec_get(a));
+      else if (ta == COMPLEX || ta == COMPLEX16)
+        result_bool = var_complex_is_zero(var_complex_get(a));
       deque_push_back(stack, var_bool(result_bool));
       break;
     }
 
     // ==========================================
-    // BITWISE (BOOL / TRIT / CHAR)
+    // BITWISE (VBOOL / TRIT / CHAR)
     // ==========================================
     case OP_BIT_AND: {
       PaxoVar b = deque_pop_back(stack);
       PaxoVar a = deque_pop_back(stack);
       PaxoVar res = 0;
-      if (var_type(a) == BOOL && var_type(b) == BOOL) {
+      if (var_type(a) == VBOOL && var_type(b) == VBOOL) {
         res = var_bool((int)var_bool_get(a) & (int)var_bool_get(b));
       } else if (var_type(a) == TRIT && var_type(b) == TRIT) {
         res = var_trit(var_trit_get(a) & var_trit_get(b));
@@ -1483,7 +1485,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       PaxoVar b = deque_pop_back(stack);
       PaxoVar a = deque_pop_back(stack);
       PaxoVar res = 0;
-      if (var_type(a) == BOOL && var_type(b) == BOOL) {
+      if (var_type(a) == VBOOL && var_type(b) == VBOOL) {
         res = var_bool((int)var_bool_get(a) | (int)var_bool_get(b));
       } else if (var_type(a) == TRIT && var_type(b) == TRIT) {
         res = var_trit(var_trit_get(a) | var_trit_get(b));
@@ -1502,7 +1504,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       PaxoVar a = deque_pop_back(stack);
       PaxoVar res = 0;
       switch (var_type(a)) {
-      case BOOL:
+      case VBOOL:
         res = var_bool(!var_bool_get(a));
         break;
       case TRIT:
@@ -1533,7 +1535,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       PaxoVar b = deque_pop_back(stack);
       PaxoVar a = deque_pop_back(stack);
       PaxoVar res = 0;
-      if (var_type(a) == BOOL && var_type(b) == BOOL) {
+      if (var_type(a) == VBOOL && var_type(b) == VBOOL) {
         res = var_bool(var_bool_get(a) ^ var_bool_get(b));
       } else if (var_type(a) == TRIT && var_type(b) == TRIT) {
         res = var_trit(var_trit_get(a) ^ var_trit_get(b));

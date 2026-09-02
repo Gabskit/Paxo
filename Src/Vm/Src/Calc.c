@@ -1,4 +1,5 @@
 #pragma once
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,7 +39,7 @@ enum type {
   NUM64,
   CHAR,
   TRIT,
-  BOOL,
+  VBOOL,
   POINT,
   FUNC,
   STRING,
@@ -67,19 +68,19 @@ typedef uint64_t PaxoVar;
 
 static inline enum type var_type(PaxoVar v);
 
-#define PAXO_MARK_BOX   0x1AULL // 11010
-#define PAXO_MARK_FXPKD 0x1BULL // 11011 (fixed point/int + packed decimal)
-#define PAXO_MARK_N16   0x1CULL // 11100 (MP16)
-#define PAXO_MARK_MASK  0x1FULL
-#define PAXO_VAL_SHIFT  5
+#define LEP_MARK_BOX   0x1AULL // 11010
+#define LEP_MARK_FXPKD 0x1BULL // 11011 (fixed point/int + packed decimal)
+#define LEP_MARK_N16   0x1CULL // 11100 (MP16)
+#define LEP_MARK_MASK  0x1FULL
+#define LEP_VAL_SHIFT  5
 
 // refinamiento de color dentro del marcador BOX, tag CHAR (10)
-#define PAXO_COLOR_FLAG (1ULL << 37)
+#define LEP_COLOR_FLAG (1ULL << 37)
 
-#define PAXO_TAG_BIT 0x0ULL
-#define PAXO_TAG_TRIT 0x1ULL
-#define PAXO_TAG_CHAR 0x2ULL
-#define PAXO_TAG_REF 0x3ULL
+#define LEP_TAG_BIT 0x0ULL
+#define LEP_TAG_TRIT 0x1ULL
+#define LEP_TAG_CHAR 0x2ULL
+#define LEP_TAG_REF 0x3ULL
 
 #define REF_SUB_ARRAY 0u
 #define REF_SUB_PKG 1u
@@ -88,7 +89,7 @@ static inline enum type var_type(PaxoVar v);
 #define REF_SUB_PIN 4u
 #define REF_SUB_COMPLEX 5u
 
-#define PAXO_NO_VALUE UINT64_MAX
+#define LEP_NO_VALUE UINT64_MAX
 
 typedef struct PaxoPackageField {
   char *key;
@@ -168,49 +169,49 @@ static inline Num16 num16_unpack(uint16_t raw) {
 }
 
 static inline PaxoVar var_num16(Num16 n) {
-  return ((PaxoVar)num16_pack(n) << PAXO_VAL_SHIFT) | PAXO_MARK_N16;
+  return ((PaxoVar)num16_pack(n) << LEP_VAL_SHIFT) | LEP_MARK_N16;
 }
 
-#define PAXO_ZERO var_num16((Num16){0})
+#define LEP_ZERO var_num16((Num16){0})
 
 static inline Num16 var_num16_get(PaxoVar v) {
-  return num16_unpack((uint16_t)(v >> PAXO_VAL_SHIFT));
+  return num16_unpack((uint16_t)(v >> LEP_VAL_SHIFT));
 }
 
 static inline PaxoVar var_bool(bool b) {
-  return (PAXO_TAG_BIT << 62) | PAXO_MARK_BOX |
-         ((PaxoVar)(b ? 1u : 0u) << PAXO_VAL_SHIFT);
+  return (LEP_TAG_BIT << 62) | LEP_MARK_BOX |
+         ((PaxoVar)(b ? 1u : 0u) << LEP_VAL_SHIFT);
 }
 
-static inline bool var_bool_get(PaxoVar v) { return (v >> PAXO_VAL_SHIFT) & 1; }
+static inline bool var_bool_get(PaxoVar v) { return (v >> LEP_VAL_SHIFT) & 1; }
 
 static inline PaxoVar var_trit(uint8_t t) {
-  return (PAXO_TAG_TRIT << 62) | PAXO_MARK_BOX |
-         ((PaxoVar)(t & 0x3u) << PAXO_VAL_SHIFT);
+  return (LEP_TAG_TRIT << 62) | LEP_MARK_BOX |
+         ((PaxoVar)(t & 0x3u) << LEP_VAL_SHIFT);
 }
 
 static inline uint8_t var_trit_get(PaxoVar v) {
-  return (uint8_t)((v >> PAXO_VAL_SHIFT) & 0x3u);
+  return (uint8_t)((v >> LEP_VAL_SHIFT) & 0x3u);
 }
 
 static inline PaxoVar var_char(char32_t c) {
-  return (PAXO_TAG_CHAR << 62) | PAXO_MARK_BOX | ((PaxoVar)c << PAXO_VAL_SHIFT);
+  return (LEP_TAG_CHAR << 62) | LEP_MARK_BOX | ((PaxoVar)c << LEP_VAL_SHIFT);
 }
 
 static inline char32_t var_char_get(PaxoVar v) {
-  return (char32_t)((v >> PAXO_VAL_SHIFT) & 0xFFFFFFFFULL);
+  return (char32_t)((v >> LEP_VAL_SHIFT) & 0xFFFFFFFFULL);
 }
 
 // color: RGBA empaquetado en bits [5..36] + flag 11010 (mismo tag que char,
-// distinguido por PAXO_COLOR_FLAG en el bit 37; los codepoints utf32 <= 0x1FFFFF
+// distinguido por LEP_COLOR_FLAG en el bit 37; los codepoints utf32 <= 0x1FFFFF
 // nunca lo activan).
 static inline PaxoVar var_color(uint32_t rgba) {
-  return (PAXO_TAG_CHAR << 62) | PAXO_COLOR_FLAG | PAXO_MARK_BOX |
-         ((PaxoVar)rgba << PAXO_VAL_SHIFT);
+  return (LEP_TAG_CHAR << 62) | LEP_COLOR_FLAG | LEP_MARK_BOX |
+         ((PaxoVar)rgba << LEP_VAL_SHIFT);
 }
 
 static inline uint32_t var_color_get(PaxoVar v) {
-  return (uint32_t)((v >> PAXO_VAL_SHIFT) & 0xFFFFFFFFULL);
+  return (uint32_t)((v >> LEP_VAL_SHIFT) & 0xFFFFFFFFULL);
 }
 
 // fixed point / int (marcador 11011, t=0): NO es decimal empaquetado.
@@ -230,7 +231,7 @@ static inline PaxoVar var_fxp(PaxoFxp f) {
   PaxoVar out = (uint64_t)(f.scale & 0xF) << 59;
   out |= (uint64_t)sign << 56;
   out |= (uint64_t)(mag & 0x1FFFu) << 43;
-  return out | PAXO_MARK_FXPKD;
+  return out | LEP_MARK_FXPKD;
 }
 
 static inline PaxoFxp var_fxp_get(PaxoVar v) {
@@ -250,13 +251,13 @@ static inline PaxoVar var_int_fp(int16_t value, uint8_t scale) {
 //   t(1)=1 pppp(4) s(1) ·(1 pad) d12..d0 (52 bits = 13 dígitos BCD) 11011
 //   d0 (unidades) en bits 5..8, d12 (la más significativa) en bits 53..56.
 //   valor = (-1)^signo · Σ d_i·10^i · 10^(-pppp)
-#define PAXO_PDEC_DIGITS 13
-#define PAXO_PDEC_DIG_SHIFT 5
-#define PAXO_PDEC_SIGN_SHIFT 58
-#define PAXO_PDEC_MAX_MAG ((int64_t)9999999999999LL) // 13 dígitos
+#define LEP_PDEC_DIGITS 13
+#define LEP_PDEC_DIG_SHIFT 5
+#define LEP_PDEC_SIGN_SHIFT 58
+#define LEP_PDEC_MAX_MAG ((int64_t)9999999999999LL) // 13 dígitos
 
 typedef struct {
-  uint8_t digits[PAXO_PDEC_DIGITS]; // dígito BCD 0..9, d[0] = unidades
+  uint8_t digits[LEP_PDEC_DIGITS]; // dígito BCD 0..9, d[0] = unidades
   uint8_t signo;                    // 0 positivo, 1 negativo
   uint8_t scale;                    // pppp (0..15) dígitos fraccionarios
 } PaxoPdec;
@@ -265,16 +266,16 @@ typedef struct {
 static inline PaxoVar var_pkdec_pack(uint64_t mag, uint8_t signo, uint8_t scale) {
   if (scale > 15)
     scale = 15;
-  if (mag > (uint64_t)PAXO_PDEC_MAX_MAG)
-    mag = (uint64_t)PAXO_PDEC_MAX_MAG;
+  if (mag > (uint64_t)LEP_PDEC_MAX_MAG)
+    mag = (uint64_t)LEP_PDEC_MAX_MAG;
   PaxoVar out = 1ULL << 63;
   out |= (uint64_t)(scale & 0xF) << 59;
-  out |= (uint64_t)(signo & 1) << PAXO_PDEC_SIGN_SHIFT;
-  for (int i = 0; mag && i < PAXO_PDEC_DIGITS; i++) {
-    out |= (uint64_t)(mag % 10) << (PAXO_PDEC_DIG_SHIFT + 4 * i);
+  out |= (uint64_t)(signo & 1) << LEP_PDEC_SIGN_SHIFT;
+  for (int i = 0; mag && i < LEP_PDEC_DIGITS; i++) {
+    out |= (uint64_t)(mag % 10) << (LEP_PDEC_DIG_SHIFT + 4 * i);
     mag /= 10;
   }
-  return out | PAXO_MARK_FXPKD;
+  return out | LEP_MARK_FXPKD;
 }
 
 // Literal / constructor: valor escalado con signo (int16, como lo emite el
@@ -286,7 +287,7 @@ static inline PaxoVar var_pkdec(int16_t value, uint8_t scale) {
 
 static inline PaxoVar pdec_to_var(PaxoPdec d) {
   uint64_t mag = 0, pow10 = 1;
-  for (int i = 0; i < PAXO_PDEC_DIGITS; i++) {
+  for (int i = 0; i < LEP_PDEC_DIGITS; i++) {
     mag += (uint64_t)(d.digits[i] & 0xF) * pow10;
     pow10 *= 10;
   }
@@ -296,15 +297,15 @@ static inline PaxoVar pdec_to_var(PaxoPdec d) {
 static inline PaxoPdec var_pkdec_get(PaxoVar v) {
   PaxoPdec d;
   d.scale = (uint8_t)((v >> 59) & 0xF);
-  d.signo = (uint8_t)((v >> PAXO_PDEC_SIGN_SHIFT) & 1);
-  for (int i = 0; i < PAXO_PDEC_DIGITS; i++)
-    d.digits[i] = (uint8_t)((v >> (PAXO_PDEC_DIG_SHIFT + 4 * i)) & 0xF);
+  d.signo = (uint8_t)((v >> LEP_PDEC_SIGN_SHIFT) & 1);
+  for (int i = 0; i < LEP_PDEC_DIGITS; i++)
+    d.digits[i] = (uint8_t)((v >> (LEP_PDEC_DIG_SHIFT + 4 * i)) & 0xF);
   return d;
 }
 
 static inline int64_t pdec_magnitude(PaxoPdec d) {
   int64_t m = 0, pow10 = 1;
-  for (int i = 0; i < PAXO_PDEC_DIGITS; i++) {
+  for (int i = 0; i < LEP_PDEC_DIGITS; i++) {
     m += (int64_t)(d.digits[i] & 0xF) * pow10;
     pow10 *= 10;
   }
@@ -326,9 +327,9 @@ static inline PaxoPdec pdec_from_int64(int64_t v, uint8_t scale) {
     d.signo = 1;
     v = -v;
   }
-  if (v > PAXO_PDEC_MAX_MAG)
-    v = PAXO_PDEC_MAX_MAG;
-  for (int i = 0; v && i < PAXO_PDEC_DIGITS; i++) {
+  if (v > LEP_PDEC_MAX_MAG)
+    v = LEP_PDEC_MAX_MAG;
+  for (int i = 0; v && i < LEP_PDEC_DIGITS; i++) {
     d.digits[i] = (uint8_t)(v % 10);
     v /= 10;
   }
@@ -336,8 +337,8 @@ static inline PaxoPdec pdec_from_int64(int64_t v, uint8_t scale) {
 }
 
 static inline PaxoVar var_ref(uint32_t sub, uint32_t punt, uint16_t aux13) {
-  return (PAXO_TAG_REF << 62) | PAXO_MARK_BOX | ((PaxoVar)(sub & 0x7u) << 18) |
-         ((PaxoVar)(aux13 & 0x1FFFu) << PAXO_VAL_SHIFT) | ((PaxoVar)punt << 21);
+  return (LEP_TAG_REF << 62) | LEP_MARK_BOX | ((PaxoVar)(sub & 0x7u) << 18) |
+         ((PaxoVar)(aux13 & 0x1FFFu) << LEP_VAL_SHIFT) | ((PaxoVar)punt << 21);
 }
 
 static inline uint32_t var_ref_sub_get(PaxoVar v) {
@@ -349,7 +350,7 @@ static inline uint32_t var_ref_punt_get(PaxoVar v) {
 }
 
 static inline uint16_t var_ref_aux_get(PaxoVar v) {
-  return (uint16_t)((v >> PAXO_VAL_SHIFT) & 0x1FFFu);
+  return (uint16_t)((v >> LEP_VAL_SHIFT) & 0x1FFFu);
 }
 
 static inline PaxoVar var_string(const char *s) {
@@ -400,12 +401,12 @@ static inline uint32_t var_pin_get(PaxoVar v) { return var_ref_punt_get(v); }
 //    eliminado al deprecarse el tipo pdec.)
 // ==========================================
 
-#define PAXO_COMPLEX_KIND_SNI 0u // componentes num16 (tipo sni)
-#define PAXO_COMPLEX_KIND_NI 1u  // componentes num64 (tipo ni)
-#define PAXO_COMPLEX_KIND_MASK 0x1FFFu
+#define LEP_COMPLEX_KIND_SNI 0u // componentes num16 (tipo sni)
+#define LEP_COMPLEX_KIND_NI 1u  // componentes num64 (tipo ni)
+#define LEP_COMPLEX_KIND_MASK 0x1FFFu
 
 typedef struct {
-  uint16_t kind; // PAXO_COMPLEX_KIND_*
+  uint16_t kind; // LEP_COMPLEX_KIND_*
   PaxoVar re;
   PaxoVar im;
 } PaxoComplex;
@@ -424,18 +425,18 @@ static inline PaxoComplex var_complex_get(PaxoVar v) {
 }
 
 static inline uint16_t var_complex_kind(PaxoVar v) {
-  return var_ref_aux_get(v) & PAXO_COMPLEX_KIND_MASK;
+  return var_ref_aux_get(v) & LEP_COMPLEX_KIND_MASK;
 }
 
 // construye según el tipo declarado: ni → MP64, sni → MP16
 static inline PaxoVar var_complex_ni(Num64 re, Num64 im) {
-  PaxoComplex c = {.kind = PAXO_COMPLEX_KIND_NI, .re = var_num64(re),
+  PaxoComplex c = {.kind = LEP_COMPLEX_KIND_NI, .re = var_num64(re),
                    .im = var_num64(im)};
   return var_complex_of(c);
 }
 
 static inline PaxoVar var_complex_sni(Num16 re, Num16 im) {
-  PaxoComplex c = {.kind = PAXO_COMPLEX_KIND_SNI, .re = var_num16(re),
+  PaxoComplex c = {.kind = LEP_COMPLEX_KIND_SNI, .re = var_num16(re),
                    .im = var_num16(im)};
   return var_complex_of(c);
 }
@@ -444,19 +445,19 @@ static inline PaxoVar var_complex_scalar(PaxoVar x) {
   PaxoComplex c = {.re = x, .im = 0};
   switch (var_type(x)) {
   case INT_FP:
-    c.kind = PAXO_COMPLEX_KIND_NI;
+    c.kind = LEP_COMPLEX_KIND_NI;
     c.im = var_num64((Num64){0, BIAS64, 0, 0});
     break;
   case PKDEC:
-    c.kind = PAXO_COMPLEX_KIND_NI;
+    c.kind = LEP_COMPLEX_KIND_NI;
     c.im = var_num64((Num64){0, BIAS64, 0, 0});
     break;
   case NUM64:
-    c.kind = PAXO_COMPLEX_KIND_NI;
+    c.kind = LEP_COMPLEX_KIND_NI;
     c.im = var_num64((Num64){0, BIAS64, 0, 0});
     break;
   default:
-    c.kind = PAXO_COMPLEX_KIND_SNI;
+    c.kind = LEP_COMPLEX_KIND_SNI;
     c.im = var_num16((Num16){0, BIAS16, 0, 0});
     break;
   }
@@ -472,21 +473,21 @@ static inline PaxoVar var_complex_zero_sni(void) {
 }
 
 static inline bool var_is_num(PaxoVar v) {
-  uint32_t mark = (uint32_t)(v & PAXO_MARK_MASK);
-  return mark != PAXO_MARK_BOX && mark != PAXO_MARK_N16 &&
-         mark != PAXO_MARK_FXPKD;
+  uint32_t mark = (uint32_t)(v & LEP_MARK_MASK);
+  return mark != LEP_MARK_BOX && mark != LEP_MARK_N16 &&
+         mark != LEP_MARK_FXPKD;
 }
 
 static inline enum type var_type(PaxoVar v) {
-  switch (v & PAXO_MARK_MASK) {
-  case PAXO_MARK_BOX:
+  switch (v & LEP_MARK_MASK) {
+  case LEP_MARK_BOX:
     switch (v >> 62) {
-    case PAXO_TAG_BIT:
-      return BOOL;
-    case PAXO_TAG_TRIT:
+    case LEP_TAG_BIT:
+      return VBOOL;
+    case LEP_TAG_TRIT:
       return TRIT;
-    case PAXO_TAG_CHAR:
-      if (v & PAXO_COLOR_FLAG)
+    case LEP_TAG_CHAR:
+      if (v & LEP_COLOR_FLAG)
         return COLOR;
       return CHAR;
     default:
@@ -500,15 +501,15 @@ static inline enum type var_type(PaxoVar v) {
       case REF_SUB_FUNC:
         return FUNC;
       case REF_SUB_COMPLEX:
-        return (var_complex_kind(v) == PAXO_COMPLEX_KIND_SNI) ? COMPLEX16
+        return (var_complex_kind(v) == LEP_COMPLEX_KIND_SNI) ? COMPLEX16
                                                               : COMPLEX;
       default:
         return POINT;
       }
     }
-  case PAXO_MARK_FXPKD:
+  case LEP_MARK_FXPKD:
     return (v >> 63) ? PKDEC : INT_FP;
-  case PAXO_MARK_N16:
+  case LEP_MARK_N16:
     return NUM16;
   default:
     return NUM64;
@@ -1049,9 +1050,9 @@ static inline PaxoPdec pdec_from_mag128(unsigned __int128 m, uint8_t scale,
   PaxoPdec r = {0};
   r.scale = scale > 15 ? 15 : scale;
   r.signo = signo & 1;
-  if (m > (unsigned __int128)PAXO_PDEC_MAX_MAG)
-    m = (unsigned __int128)PAXO_PDEC_MAX_MAG;
-  for (int i = 0; m && i < PAXO_PDEC_DIGITS; i++) {
+  if (m > (unsigned __int128)LEP_PDEC_MAX_MAG)
+    m = (unsigned __int128)LEP_PDEC_MAX_MAG;
+  for (int i = 0; m && i < LEP_PDEC_DIGITS; i++) {
     r.digits[i] = (uint8_t)(m % 10);
     m /= 10;
   }

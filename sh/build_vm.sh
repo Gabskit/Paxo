@@ -3,55 +3,66 @@
 #
 # - Detecta compilador y estándar soportado vía sh/pick_cc.sh
 #   (gcc, clang o cc; funciona en Linux, macOS y MinGW/Windows).
-# - Incluye las fuentes vendidas de Chipmunk2D, pdfio y zlib
-#   (Src/Vm/Src/third_party), por lo que no requieren instalación.
-# - stb_image / stb_truetype / miniaudio son header-only: se compilan solos.
-# - Si detecta SDL3 en el sistema (pkg-config), habilita las funciones de
-#   ventana/gráficos con -DPAXO_ENABLE_SDL3.
+# - Incluye las fuentes de Chipmunk2D, pdfio, zlib, Sokol y NanoVG
+#   (Src/Vm/Src/third_party).
+# - Gráficos vía Sokol + NanoVG habilitados por defecto.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 VM_SRC="$ROOT_DIR/Src/Vm/Src"
 TP="$VM_SRC/third_party"
-SDL="$VM_SRC/SDL3"
-
 # Compilador, estándar y libs de enlace según plataforma.
 eval "$(bash "$SCRIPT_DIR/pick_cc.sh")"
 
 mkdir -p "$ROOT_DIR/Build"
 
-# Sufijo ejecutable de la plataforma (.exe bajo MinGW/MSYS).
 OUT="Lepvm"
 case "$(uname -s)" in
   MINGW* | MSYS* | CYGWIN*) OUT="Lepvm.exe" ;;
 esac
 
-# Detección opcional de SDL3 para ventana/gráficos.
-# Los cflags van antes de los objetos y las libs después del main.
-SDL_CFLAGS=""
-SDL_LIBS=""
-if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists sdl3 2>/dev/null; then
-  SDL_CFLAGS="-DPAXO_ENABLE_SDL3 $(pkg-config --cflags sdl3)"
-  SDL_LIBS="$(pkg-config --libs sdl3)"
-  echo "[build_vm] SDL3 detectada: ventanas/gráficos habilitados"
+NVG_CFLAGS=""
+NVG_LIBS=""
+NVG_SRCS=""
+if [[ "${LEP_ENABLE_NVG:-1}" == "1" ]]; then
+  NVG_CFLAGS="-DLEP_ENABLE_NVG"
+  # NVG_NO_STB evita que nanovg.c vuelva a definir los símbolos stbi_*:
+  # Functions.c ya los implementa (STB_IMAGE_IMPLEMENTATION). Sin esta
+  # bandera el enlazado falla con "multiple definition" para stbi_*.
+  NVG_CFLAGS="$NVG_CFLAGS -DNVG_NO_STB"
+  # FONS_NO_STB_TT_IMPL: nanovg.c declara stb_truetype pero no lo implementa
+  # (evita stbtt_* duplicados con Functions.c); las funciones se resuelven
+  # contra el impl de la TU principal (LEP_HAS_FONT).
+  NVG_CFLAGS="$NVG_CFLAGS -DFONS_NO_STB_TT_IMPL"
+  # Núcleo de NanoVG compilado como una TU separada (nanovg.c).
+  NVG_SRCS="$VM_SRC/nanovg.c"
+  case "$(uname -s)" in
+    MINGW* | MSYS* | CYGWIN*) 
+        NVG_LIBS="-lopengl32 -lgdi32" 
+        ;;
+    Darwin*) 
+        NVG_LIBS="-framework OpenGL -framework Cocoa -framework QuartzCore -framework AudioToolbox" 
+        ;;
+    *) 
+        NVG_LIBS="-lGL -lX11 -lXi -lXcursor -ldl -lm -lpthread" 
+        ;;
+  esac
+  echo "[build_vm] Gráficos sokol+NanoVG habilitados (-DLEP_ENABLE_NVG)"
 else
-  echo "[build_vm] SDL3 no encontrada: win_* quedará deshabilitado"
+  echo "[build_vm] Gráficos sokol+NanoVG deshabilitados (LEP_ENABLE_NVG=1 para activar)"
 fi
 
 # shellcheck disable=SC2086
 "$CC" ${STD:+-std=$STD} -Wall -Wextra -O3 -DNDEBUG \
   -I"$VM_SRC" -I"$TP/chipmunk" -I"$TP/zlib" -I"$TP/pdfio" \
-  $SDL_CFLAGS \
+  $NVG_CFLAGS \
   "$VM_SRC/Main.c" \
+  $NVG_SRCS \
   "$TP"/chipmunk/src/*.c \
-  "$TP"/chipmunk/src/*.h \
   "$TP"/pdfio/*.c \
-  "$TP"/pdfio/*.h \
   "$TP"/zlib/*.c \
-  "$TP"/zlib/*.h \
-	"$SDL"/* .h \
   -o "$ROOT_DIR/Build/$OUT" \
-  $SDL_LIBS $LIBS
+  $NVG_LIBS $LIBS
 
 echo "[build_vm] Build/$OUT generado"

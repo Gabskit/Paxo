@@ -63,7 +63,7 @@ static inline Num16 num64tonum16(Num64 num) {
   return num16_repack(num.signo, (int64_t)(bc << 10), e, MP16_MEDIO);
 }
 
-// --- CONVERSIÓN CON TRIT / BOOL ---
+// --- CONVERSIÓN CON TRIT / VBOOL ---
 
 static inline Num16 trittonum16(PaxoBool trit) {
   Num16 result = {0};
@@ -207,7 +207,7 @@ static inline PaxoPdec num64_to_pdec(Num64 n, uint8_t scale_target) {
   if (n.signo)
     rl = -rl;
   if (!isfinite(rl))
-    return pdec_from_int64(n.signo ? -PAXO_PDEC_MAX_MAG : PAXO_PDEC_MAX_MAG,
+    return pdec_from_int64(n.signo ? -LEP_PDEC_MAX_MAG : LEP_PDEC_MAX_MAG,
                            scale_target);
   return pdec_from_int64((int64_t)rl, scale_target);
 }
