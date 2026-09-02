@@ -46,11 +46,13 @@ MA_FILES=(
 )
 
 # zlib (base para pdfio). zlib.h incluye a zconf.h; internos tras zutil.h.
+# NOTA: crc32.h NO se emite aqui: es una tabla de datos generada que zlib
+# incluye DENTRO de crc32.c (tras definir N/W/z_word_t). Se injerta en su
+# sitio natural via emit_zlib_crc32().
 ZLIB_H_FILES=(
   zconf.h
   zlib.h
   zutil.h
-  crc32.h
   inftrees.h
   inflate.h
   inffast.h
@@ -70,11 +72,11 @@ ZLIB_C_FILES=(
   "$TP/zlib/inffast.c"
 )
 
-# chipmunk 2D: primero el paraguas chipmunk.h (define CP_EXPORT y la version),
-# luego los headers publicos en el orden de sus includes, luego privados,
-# luego fuentes.
+# chipmunk 2D: chipmunk.h (paraguas) contiene codigo inline que usa cpFloat/
+# cpVect/etc., asi que va el ULTIMO, tras los headers reales. CP_EXPORT se
+# cubre con un define generico en el prologo. Le siguen los headers publicos
+# en el orden de sus dependencias, luego privados, luego fuentes.
 CHIP_H_FILES=(
-  chipmunk.h
   chipmunk_types.h
   cpVect.h
   cpBB.h
@@ -102,6 +104,7 @@ CHIP_H_FILES=(
   cpPolyline.h
   chipmunk_structs.h
   chipmunk_private.h
+  chipmunk.h
 )
 CHIP_C_FILES=( "$TP"/chipmunk/src/*.c )
 
@@ -215,6 +218,23 @@ bake_resize2() {
   echo ""
 }
 
+# crc32.c incluye crc32.h en su sitio natural (tras definir N/W y z_word_t).
+# Emitirlo antes no funcionaria: crc32.h es una tabla generada que solo se
+# activa con W definido, asi que se injerta aqui en lugar de en linea.
+emit_zlib_crc32() {
+  echo "/* --- crc32.c --- */"
+  sed -E '/^[[:space:]]*#[[:space:]]*include[[:space:]]+"crc32.h".*$/{
+    r '"$TP"'/zlib/crc32.h
+    d
+  }' "$TP/zlib/crc32.c" | sed -E '
+      /^#pragma once$/d;
+      /^[[:space:]]*#[[:space:]]*include[[:space:]]+"[^"]+".*$/d;
+      /^[[:space:]]*#[[:space:]]*include[[:space:]]+<'"$STRIP_ANGLE"'>/d;
+      /^[[:space:]]*#[[:space:]]*include[[:space:]]+(FT_FREETYPE_H|FT_ADVANCES_H)/d
+    '
+  echo ""
+}
+
 # Generar el single-header completo de la VM (con terceros embebidos)
 generate_lep_full() {
   local guard="$1"
@@ -264,6 +284,20 @@ generate_lep_full() {
     echo "#ifndef CP_SPACE_DISABLE_DEBUG_API"
     echo "#define CP_SPACE_DISABLE_DEBUG_API 1"
     echo "#endif"
+    echo "#ifndef CP_EXPORT"
+    echo "#define CP_EXPORT"
+    echo "#endif"
+    echo "/* chipmunk.h (paraguas) va al final, pero sus forward-declarations"
+    echo " * de structs las emiten los headers intermedios; se declaran aqui"
+    echo " * (chipmunk.h las repite de forma identica, legal en C11+)."
+    echo " */"
+    for t in cpArray cpHashSet cpBody cpShape cpCircleShape cpSegmentShape cpPolyShape \
+             cpConstraint cpPinJoint cpSlideJoint cpPivotJoint cpGrooveJoint \
+             cpDampedSpring cpDampedRotarySpring cpRotaryLimitJoint cpRatchetJoint \
+             cpGearJoint cpSimpleMotorJoint cpCollisionHandler cpContactPointSet \
+             cpArbiter cpSpace; do
+      echo "typedef struct $t $t;"
+    done
     echo ""
     echo "#if !defined(LEP_NO_STB)"
     echo "#define LEP_HAS_IMG 1"
@@ -317,8 +351,17 @@ echo "/* ===== stb_image_resize2 (cocido) ===== */"
     echo "#endif"
     emit_snip "$TP/zlib/trees.h"
     for f in "${ZLIB_C_FILES[@]}"; do
-      emit_snip "$f"
+      if [[ "$(basename "$f")" == "crc32.c" ]]; then
+        emit_zlib_crc32
+      else
+        emit_snip "$f"
+      fi
     done
+    # crc32.c define N (5) y W (4/8) para sus tablas; se liberan para que no
+    # colisionen con variables homonimas de otros bloques (p.ej. pdfio).
+    echo "/* zlib: liberar macros temporales de crc32.c */"
+    echo "#undef N"
+    echo "#undef W"
 
     # --- chipmunk ---
     echo "/* ===== chipmunk 2D ===== */"
@@ -329,6 +372,13 @@ echo "/* ===== stb_image_resize2 (cocido) ===== */"
     for f in "${CHIP_C_FILES[@]}"; do
       emit_snip "$f"
     done
+    # cpBBTree.c define A/B/STAMP/PAIRS (atajos de union); se liberan para
+    # no romper identificadores homonimos de bloques posteriores (pdfio sha).
+    echo "/* chipmunk: liberar macros temporales de cpBBTree.c */"
+    echo "#undef A"
+    echo "#undef B"
+    echo "#undef STAMP"
+    echo "#undef PAIRS"
 
     # --- pdfio ---
     echo "/* ===== pdfio ===== */"

@@ -3,7 +3,7 @@
 	"version": "3.14.16",
 	"type": "module",
 	"scripts": {
-		"antlr": "antlr-ng -Dlanguage=Go -o ./Src/Bcgen ./Src/Bcgen/Paxo.g4",
+		"antlr": "java -jar ./Build/antlr-4.13.1-complete.jar -Dlanguage=Go -o ./Src/Bcgen ./Src/Bcgen/Paxo.g4",
 		"build:bcg": "npx shx mkdir -p ./Build && go build -o ./Build/Bcg ./Src/Bcgen/cmd/paxocc/",
 		"build:vm": "bash ./sh/build_vm.sh",
 		"build": "npm run antlr && npm run build:bcg && npm run build:vm && npm run gen:lep",

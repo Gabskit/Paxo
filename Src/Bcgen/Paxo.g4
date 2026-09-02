@@ -108,7 +108,7 @@ expression
     | expression ( '<'|'>'|'≤'|'<='|'≥'|'>='|'=='|'!='|'≠' ) expression   # relationalExpr
     | expression ( '&' | '|' | '.&' | '.|' ) expression     # bitwiseExpr
     | ( '!' | '.!' ) expression # notgateExpr
-		| THIS_SCOPE '.' expression
+		| THIS_SCOPE '.' expression # thisScopeExpr
     | INT_LITERAL # intLitExpr
     | DECIMAL_LITERAL # decLitExpr
     | CHAR_LITERAL # charLitExpr

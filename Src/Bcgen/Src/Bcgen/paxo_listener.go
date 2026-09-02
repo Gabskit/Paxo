@@ -1,0 +1,274 @@
+// Code generated from ./Src/Bcgen/Paxo.g4 by ANTLR 4.13.1. DO NOT EDIT.
+
+package parser // Paxo
+
+import "github.com/antlr4-go/antlr/v4"
+
+// PaxoListener is a complete listener for a parse tree produced by PaxoParser.
+type PaxoListener interface {
+	antlr.ParseTreeListener
+
+	// EnterProgram is called when entering the program production.
+	EnterProgram(c *ProgramContext)
+
+	// EnterStatement is called when entering the statement production.
+	EnterStatement(c *StatementContext)
+
+	// EnterVarDeclaration is called when entering the varDeclaration production.
+	EnterVarDeclaration(c *VarDeclarationContext)
+
+	// EnterType is called when entering the type production.
+	EnterType(c *TypeContext)
+
+	// EnterScope is called when entering the scope production.
+	EnterScope(c *ScopeContext)
+
+	// EnterAssignment is called when entering the assignment production.
+	EnterAssignment(c *AssignmentContext)
+
+	// EnterCondStatement is called when entering the condStatement production.
+	EnterCondStatement(c *CondStatementContext)
+
+	// EnterMatchCase is called when entering the matchCase production.
+	EnterMatchCase(c *MatchCaseContext)
+
+	// EnterLoopStatement is called when entering the loopStatement production.
+	EnterLoopStatement(c *LoopStatementContext)
+
+	// EnterLoopMode is called when entering the loopMode production.
+	EnterLoopMode(c *LoopModeContext)
+
+	// EnterLoopDelimiter is called when entering the loopDelimiter production.
+	EnterLoopDelimiter(c *LoopDelimiterContext)
+
+	// EnterLoopEndDelimiter is called when entering the loopEndDelimiter production.
+	EnterLoopEndDelimiter(c *LoopEndDelimiterContext)
+
+	// EnterTryCatchStatement is called when entering the tryCatchStatement production.
+	EnterTryCatchStatement(c *TryCatchStatementContext)
+
+	// EnterFunctionDeclaration is called when entering the functionDeclaration production.
+	EnterFunctionDeclaration(c *FunctionDeclarationContext)
+
+	// EnterPkgDeclaration is called when entering the pkgDeclaration production.
+	EnterPkgDeclaration(c *PkgDeclarationContext)
+
+	// EnterBlock is called when entering the block production.
+	EnterBlock(c *BlockContext)
+
+	// EnterParameterList is called when entering the parameterList production.
+	EnterParameterList(c *ParameterListContext)
+
+	// EnterReturnStatement is called when entering the returnStatement production.
+	EnterReturnStatement(c *ReturnStatementContext)
+
+	// EnterThrowStatement is called when entering the throwStatement production.
+	EnterThrowStatement(c *ThrowStatementContext)
+
+	// EnterArgumentList is called when entering the argumentList production.
+	EnterArgumentList(c *ArgumentListContext)
+
+	// EnterBoolBitExpr is called when entering the boolBitExpr production.
+	EnterBoolBitExpr(c *BoolBitExprContext)
+
+	// EnterFuncExpr is called when entering the funcExpr production.
+	EnterFuncExpr(c *FuncExprContext)
+
+	// EnterAddSubExpr is called when entering the addSubExpr production.
+	EnterAddSubExpr(c *AddSubExprContext)
+
+	// EnterNotgateExpr is called when entering the notgateExpr production.
+	EnterNotgateExpr(c *NotgateExprContext)
+
+	// EnterIntLitExpr is called when entering the intLitExpr production.
+	EnterIntLitExpr(c *IntLitExprContext)
+
+	// EnterDecLitExpr is called when entering the decLitExpr production.
+	EnterDecLitExpr(c *DecLitExprContext)
+
+	// EnterStringLitExpr is called when entering the stringLitExpr production.
+	EnterStringLitExpr(c *StringLitExprContext)
+
+	// EnterPtrLitExpr is called when entering the ptrLitExpr production.
+	EnterPtrLitExpr(c *PtrLitExprContext)
+
+	// EnterRelationalExpr is called when entering the relationalExpr production.
+	EnterRelationalExpr(c *RelationalExprContext)
+
+	// EnterDotAccessExpr is called when entering the dotAccessExpr production.
+	EnterDotAccessExpr(c *DotAccessExprContext)
+
+	// EnterShiftExpr is called when entering the shiftExpr production.
+	EnterShiftExpr(c *ShiftExprContext)
+
+	// EnterColLitExpr is called when entering the colLitExpr production.
+	EnterColLitExpr(c *ColLitExprContext)
+
+	// EnterIdentExpr is called when entering the identExpr production.
+	EnterIdentExpr(c *IdentExprContext)
+
+	// EnterBitwiseExpr is called when entering the bitwiseExpr production.
+	EnterBitwiseExpr(c *BitwiseExprContext)
+
+	// EnterArrayLitExpr is called when entering the arrayLitExpr production.
+	EnterArrayLitExpr(c *ArrayLitExprContext)
+
+	// EnterCharLitExpr is called when entering the charLitExpr production.
+	EnterCharLitExpr(c *CharLitExprContext)
+
+	// EnterBoolTritExpr is called when entering the boolTritExpr production.
+	EnterBoolTritExpr(c *BoolTritExprContext)
+
+	// EnterIndexedAccessExpr is called when entering the indexedAccessExpr production.
+	EnterIndexedAccessExpr(c *IndexedAccessExprContext)
+
+	// EnterComLitExpr is called when entering the comLitExpr production.
+	EnterComLitExpr(c *ComLitExprContext)
+
+	// EnterThisScopeExpr is called when entering the thisScopeExpr production.
+	EnterThisScopeExpr(c *ThisScopeExprContext)
+
+	// EnterMultDivExpr is called when entering the multDivExpr production.
+	EnterMultDivExpr(c *MultDivExprContext)
+
+	// EnterCallExpr is called when entering the callExpr production.
+	EnterCallExpr(c *CallExprContext)
+
+	// EnterPkgExpr is called when entering the pkgExpr production.
+	EnterPkgExpr(c *PkgExprContext)
+
+	// EnterArrayLiteral is called when entering the arrayLiteral production.
+	EnterArrayLiteral(c *ArrayLiteralContext)
+
+	// ExitProgram is called when exiting the program production.
+	ExitProgram(c *ProgramContext)
+
+	// ExitStatement is called when exiting the statement production.
+	ExitStatement(c *StatementContext)
+
+	// ExitVarDeclaration is called when exiting the varDeclaration production.
+	ExitVarDeclaration(c *VarDeclarationContext)
+
+	// ExitType is called when exiting the type production.
+	ExitType(c *TypeContext)
+
+	// ExitScope is called when exiting the scope production.
+	ExitScope(c *ScopeContext)
+
+	// ExitAssignment is called when exiting the assignment production.
+	ExitAssignment(c *AssignmentContext)
+
+	// ExitCondStatement is called when exiting the condStatement production.
+	ExitCondStatement(c *CondStatementContext)
+
+	// ExitMatchCase is called when exiting the matchCase production.
+	ExitMatchCase(c *MatchCaseContext)
+
+	// ExitLoopStatement is called when exiting the loopStatement production.
+	ExitLoopStatement(c *LoopStatementContext)
+
+	// ExitLoopMode is called when exiting the loopMode production.
+	ExitLoopMode(c *LoopModeContext)
+
+	// ExitLoopDelimiter is called when exiting the loopDelimiter production.
+	ExitLoopDelimiter(c *LoopDelimiterContext)
+
+	// ExitLoopEndDelimiter is called when exiting the loopEndDelimiter production.
+	ExitLoopEndDelimiter(c *LoopEndDelimiterContext)
+
+	// ExitTryCatchStatement is called when exiting the tryCatchStatement production.
+	ExitTryCatchStatement(c *TryCatchStatementContext)
+
+	// ExitFunctionDeclaration is called when exiting the functionDeclaration production.
+	ExitFunctionDeclaration(c *FunctionDeclarationContext)
+
+	// ExitPkgDeclaration is called when exiting the pkgDeclaration production.
+	ExitPkgDeclaration(c *PkgDeclarationContext)
+
+	// ExitBlock is called when exiting the block production.
+	ExitBlock(c *BlockContext)
+
+	// ExitParameterList is called when exiting the parameterList production.
+	ExitParameterList(c *ParameterListContext)
+
+	// ExitReturnStatement is called when exiting the returnStatement production.
+	ExitReturnStatement(c *ReturnStatementContext)
+
+	// ExitThrowStatement is called when exiting the throwStatement production.
+	ExitThrowStatement(c *ThrowStatementContext)
+
+	// ExitArgumentList is called when exiting the argumentList production.
+	ExitArgumentList(c *ArgumentListContext)
+
+	// ExitBoolBitExpr is called when exiting the boolBitExpr production.
+	ExitBoolBitExpr(c *BoolBitExprContext)
+
+	// ExitFuncExpr is called when exiting the funcExpr production.
+	ExitFuncExpr(c *FuncExprContext)
+
+	// ExitAddSubExpr is called when exiting the addSubExpr production.
+	ExitAddSubExpr(c *AddSubExprContext)
+
+	// ExitNotgateExpr is called when exiting the notgateExpr production.
+	ExitNotgateExpr(c *NotgateExprContext)
+
+	// ExitIntLitExpr is called when exiting the intLitExpr production.
+	ExitIntLitExpr(c *IntLitExprContext)
+
+	// ExitDecLitExpr is called when exiting the decLitExpr production.
+	ExitDecLitExpr(c *DecLitExprContext)
+
+	// ExitStringLitExpr is called when exiting the stringLitExpr production.
+	ExitStringLitExpr(c *StringLitExprContext)
+
+	// ExitPtrLitExpr is called when exiting the ptrLitExpr production.
+	ExitPtrLitExpr(c *PtrLitExprContext)
+
+	// ExitRelationalExpr is called when exiting the relationalExpr production.
+	ExitRelationalExpr(c *RelationalExprContext)
+
+	// ExitDotAccessExpr is called when exiting the dotAccessExpr production.
+	ExitDotAccessExpr(c *DotAccessExprContext)
+
+	// ExitShiftExpr is called when exiting the shiftExpr production.
+	ExitShiftExpr(c *ShiftExprContext)
+
+	// ExitColLitExpr is called when exiting the colLitExpr production.
+	ExitColLitExpr(c *ColLitExprContext)
+
+	// ExitIdentExpr is called when exiting the identExpr production.
+	ExitIdentExpr(c *IdentExprContext)
+
+	// ExitBitwiseExpr is called when exiting the bitwiseExpr production.
+	ExitBitwiseExpr(c *BitwiseExprContext)
+
+	// ExitArrayLitExpr is called when exiting the arrayLitExpr production.
+	ExitArrayLitExpr(c *ArrayLitExprContext)
+
+	// ExitCharLitExpr is called when exiting the charLitExpr production.
+	ExitCharLitExpr(c *CharLitExprContext)
+
+	// ExitBoolTritExpr is called when exiting the boolTritExpr production.
+	ExitBoolTritExpr(c *BoolTritExprContext)
+
+	// ExitIndexedAccessExpr is called when exiting the indexedAccessExpr production.
+	ExitIndexedAccessExpr(c *IndexedAccessExprContext)
+
+	// ExitComLitExpr is called when exiting the comLitExpr production.
+	ExitComLitExpr(c *ComLitExprContext)
+
+	// ExitThisScopeExpr is called when exiting the thisScopeExpr production.
+	ExitThisScopeExpr(c *ThisScopeExprContext)
+
+	// ExitMultDivExpr is called when exiting the multDivExpr production.
+	ExitMultDivExpr(c *MultDivExprContext)
+
+	// ExitCallExpr is called when exiting the callExpr production.
+	ExitCallExpr(c *CallExprContext)
+
+	// ExitPkgExpr is called when exiting the pkgExpr production.
+	ExitPkgExpr(c *PkgExprContext)
+
+	// ExitArrayLiteral is called when exiting the arrayLiteral production.
+	ExitArrayLiteral(c *ArrayLiteralContext)
+}
