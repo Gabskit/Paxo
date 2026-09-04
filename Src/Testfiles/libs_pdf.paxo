@@ -1,0 +1,35 @@
+// Prueba de PDF (pdfio): crear un documento con una página, escribir
+// rectángulos, líneas y texto, cerrarlo, reabrirlo y leer su contenido.
+// Requiere PAXO_HAS_PDF; si falta, pdf_new retorna 0 y se degrada.
+
+var doc = pdf_new("Src/Testfiles/paxo_test.pdf", 400, 200);
+(doc > 0) ? .✓ -> {
+    println("pdf creado, handle ", doc);
+
+    pdf_font(doc, "Helvetica");
+    println("pagina=", pdf_page_begin(doc));
+
+    pdf_color(doc, 200, 0, 0);
+    pdf_write_rect(doc, 10, 30, 60, 40);
+    pdf_color(doc, 0, 0, 0);
+    pdf_write_line(doc, 10, 80, 390, 80);
+    pdf_write_text(doc, 20, 100, 16, "Hola Paxo PDF");
+    pdf_write_text(doc, 20, 120, 12, "Una prueba de texto");
+
+    pdf_close(doc);
+} : _ -> {
+    println("PDF no disponible");
+};
+
+var doc2 = pdf_open("Src/Testfiles/paxo_test.pdf");
+(doc2 > 0) ? .✓ -> {
+    println("paginas=", pdf_pages(doc2));
+    var tam = pdf_page_size(doc2, 1);
+    println("tamano=", tam[0], "x", tam[1]);
+    var contenido = pdf_text(doc2, 1);
+    println("contenido=", contenido);
+    pdf_close(doc2);
+    file_delete("Src/Testfiles/paxo_test.pdf");
+} : _ -> {
+    println("no se pudo reabrir el pdf");
+};

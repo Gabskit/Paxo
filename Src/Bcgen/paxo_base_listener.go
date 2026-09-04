@@ -152,6 +152,12 @@ func (s *BasePaxoListener) EnterNotgateExpr(ctx *NotgateExprContext) {}
 // ExitNotgateExpr is called when production notgateExpr is exited.
 func (s *BasePaxoListener) ExitNotgateExpr(ctx *NotgateExprContext) {}
 
+// EnterThisScopeExpr is called when production thisScopeExpr is entered.
+func (s *BasePaxoListener) EnterThisScopeExpr(ctx *ThisScopeExprContext) {}
+
+// ExitThisScopeExpr is called when production thisScopeExpr is exited.
+func (s *BasePaxoListener) ExitThisScopeExpr(ctx *ThisScopeExprContext) {}
+
 // EnterIntLitExpr is called when production intLitExpr is entered.
 func (s *BasePaxoListener) EnterIntLitExpr(ctx *IntLitExprContext) {}
 
@@ -260,11 +266,23 @@ func (s *BasePaxoListener) EnterBitwiseExpr(ctx *BitwiseExprContext) {}
 // ExitBitwiseExpr is called when production bitwiseExpr is exited.
 func (s *BasePaxoListener) ExitBitwiseExpr(ctx *BitwiseExprContext) {}
 
+// EnterIndexedCallExpr is called when production indexedCallExpr is entered.
+func (s *BasePaxoListener) EnterIndexedCallExpr(ctx *IndexedCallExprContext) {}
+
+// ExitIndexedCallExpr is called when production indexedCallExpr is exited.
+func (s *BasePaxoListener) ExitIndexedCallExpr(ctx *IndexedCallExprContext) {}
+
 // EnterIndexedAccessExpr is called when production indexedAccessExpr is entered.
 func (s *BasePaxoListener) EnterIndexedAccessExpr(ctx *IndexedAccessExprContext) {}
 
 // ExitIndexedAccessExpr is called when production indexedAccessExpr is exited.
 func (s *BasePaxoListener) ExitIndexedAccessExpr(ctx *IndexedAccessExprContext) {}
+
+// EnterMethodCallExpr is called when production methodCallExpr is entered.
+func (s *BasePaxoListener) EnterMethodCallExpr(ctx *MethodCallExprContext) {}
+
+// ExitMethodCallExpr is called when production methodCallExpr is exited.
+func (s *BasePaxoListener) ExitMethodCallExpr(ctx *MethodCallExprContext) {}
 
 // EnterDotAccessExpr is called when production dotAccessExpr is entered.
 func (s *BasePaxoListener) EnterDotAccessExpr(ctx *DotAccessExprContext) {}

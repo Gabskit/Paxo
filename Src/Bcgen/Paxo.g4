@@ -38,6 +38,8 @@ assignment
     | IDENTIFIER '[' expression ']' '=' expression ';'?
     | IDENTIFIER '++' ';'?
     | IDENTIFIER '--' ';'?
+    | expression '.' IDENTIFIER '=' expression ';'?
+    | THIS_SCOPE '.' IDENTIFIER '=' expression ';'?
     ;
 
 condStatement
@@ -72,7 +74,7 @@ functionDeclaration
     ;
 
 pkgDeclaration
-    : '{' varDeclaration* '}'
+    : '{' (','? varDeclaration)* ','? '}'
     ;
 
 block
@@ -95,12 +97,14 @@ throwStatement
     ;
 
 argumentList
-    : expression (',' expression)*
+    : (expression (',' expression)*)?
     ;
 
 expression
     : IDENTIFIER '(' argumentList? ')' # callExpr
+    | expression '[' expression ']' '(' argumentList ')' # indexedCallExpr
     | expression '[' expression ']'                        # indexedAccessExpr
+    | expression '.' IDENTIFIER '(' argumentList ')' # methodCallExpr
     | expression '.' IDENTIFIER                             # dotAccessExpr
     | expression ( '÷' | '×' ) expression       # multDivExpr
     | expression ( '+' | '-' ) expression                   # addSubExpr
@@ -108,7 +112,7 @@ expression
     | expression ( '<'|'>'|'≤'|'<='|'≥'|'>='|'=='|'!='|'≠' ) expression   # relationalExpr
     | expression ( '&' | '|' | '.&' | '.|' ) expression     # bitwiseExpr
     | ( '!' | '.!' ) expression # notgateExpr
-		| THIS_SCOPE '.' expression # thisScopeExpr
+		| THIS_SCOPE '.' IDENTIFIER # thisScopeExpr
     | INT_LITERAL # intLitExpr
     | DECIMAL_LITERAL # decLitExpr
     | CHAR_LITERAL # charLitExpr

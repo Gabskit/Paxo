@@ -1,0 +1,42 @@
+// Prueba de la consola y utilidades básicas: print/println, typeof,
+// colores y estilos de texto, arrays y manejo de archivos.
+
+// --- print / println / typeof ---
+n x = 42
+var saludo = "paxo"
+println("hola ", saludo)
+println("el numero es ", x)
+println(typeof(x))
+println(typeof(.✓))
+println(typeof("cadena"))
+println(typeof(«1, 2, 3»))
+
+// --- colores y estilos (text_color, bg_color, text_type, reset_color) ---
+text_color("red")
+print("rojo")
+text_color("green")
+bg_color("yellow")
+text_type("bold")
+print(" verde sobre amarillo ")
+reset_color()
+println(" normal")
+
+// --- arrays (array_len, array_push) ---
+var nums = «1, 2, 3»
+println("len=", array_len(nums))
+array_push(nums, 9)
+println("len=", array_len(nums), " ultimo=", nums[3])
+
+// --- terminal (init_window, clear_screen, draw_rect) ---
+println(init_window(20, 5))
+clear_screen()
+draw_rect(2, 1, 4, 2)
+
+// --- archivos (file_write, file_read, file_append, file_exists, file_delete) ---
+var ruta = "Src/Testfiles/paxo_print_test.txt"
+println(file_write(ruta, "linea 1"))
+println(file_append(ruta, "\nlinea 2"))
+println(file_exists(ruta))
+println(file_read(ruta))
+file_delete(ruta)
+println(file_exists(ruta))

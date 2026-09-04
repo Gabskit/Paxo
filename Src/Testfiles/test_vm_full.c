@@ -71,22 +71,30 @@ static void emit_push_trit(uint8_t val) {
 
 static void reset(void) { pos = 0; memset(bc, 0, sizeof(bc)); }
 
+static PaxoVar heap_pop_top_for_test(Smart_heap *stack) {
+  if (stack->amount == 0)
+    return LEP_ZERO;
+  stack->amount--;
+  PaxoVar *slot = heap_read(stack, stack->amount);
+  return slot ? *slot : LEP_ZERO;
+}
+
 #define RUN_AND_POP(top) do { \
   VM vm = {0}; vm_init(&vm, bc); \
-  Deque *stack = deque_create(); \
+  Smart_heap stack = create_heap(64); \
   PaxoVar globals[256] = {0}; \
-  vm_run(&vm, stack, globals); \
-  top = deque_pop_back(stack); \
-  deque_free(stack); \
+  vm_run(&vm, &stack, globals); \
+  top = heap_pop_top_for_test(&stack); \
+  free_heap(&stack); \
 } while(0)
 
 #define RUN_STACK_SIZE(sz) do { \
   VM vm = {0}; vm_init(&vm, bc); \
-  Deque *stack = deque_create(); \
+  Smart_heap stack = create_heap(64); \
   PaxoVar globals[256] = {0}; \
-  vm_run(&vm, stack, globals); \
-  sz = stack->size; \
-  deque_free(stack); \
+  vm_run(&vm, &stack, globals); \
+  sz = stack.amount; \
+  free_heap(&stack); \
 } while(0)
 
 #define ASSERT_MSG(cond, msg) do { \

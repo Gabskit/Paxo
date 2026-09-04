@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
   VM vm = {0};
   vm_init(&vm, bytecode, bytecode_size);
 
-  Deque *stack = deque_create();
+  Smart_heap stack = create_heap(64);
   PaxoVar globals[256] = {0};
 
   text_green(stderr);
@@ -54,14 +54,14 @@ int main(int argc, char *argv[]) {
   reset_colors(stderr);
   fprintf(stderr, " Ejecutando %s (%zu bytes)\n", argv[1], bytecode_size);
 
-  vm_run(&vm, stack, globals);
+  vm_run(&vm, &stack, globals);
 
   text_green(stderr);
   fprintf(stderr, "[lepvm]");
   reset_colors(stderr);
   fprintf(stderr, " Terminado OK\n");
 
-  deque_free(stack);
+  free_heap(&stack);
   free(bytecode);
   return 0;
 }

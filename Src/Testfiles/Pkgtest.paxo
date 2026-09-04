@@ -1,0 +1,37 @@
+pkg punto = {
+  pub n x = 98,
+  pub n y = 69
+  local abc secret = "A"
+  pub fx set_secret = (abc character){
+    this.secret = character
+  }
+  pub fx get_secret = (){
+    return this.secret
+  }
+}
+pkg punto2 = punto
+punto2.x = 6
+punto2.y = 4
+punto2.set_secret("uwu")
+
+pkg linea = {
+  pub pkg p1 = punto,
+  pub pkg p2 = punto2,
+}
+
+println(punto2.x)
+println(punto2.y)
+println(punto2.get_secret())
+println(linea.p1.x)
+println(linea.p2.x)
+println(linea.p2.get_secret())
+
+// Paquetes en array + asignación de campo por índice
+var ps = «punto, punto2»
+println(ps[1].x)
+ps[0].x = 7
+println(ps[0].x)
+
+// Funciones en array + llamada con índice
+var fs = «(n a){a × 2}, (n a){a + 7}»
+println(fs[1](35))

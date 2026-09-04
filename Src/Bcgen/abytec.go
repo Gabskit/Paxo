@@ -59,6 +59,9 @@ const (
 	OP_THROW         byte = 43
 	OP_STORE_LOCAL   byte = 44
 	OP_LOAD_LOCAL    byte = 45
+	OP_CALL_METHOD   byte = 46
+	OP_THIS_GET      byte = 47
+	OP_THIS_SET      byte = 48
 )
 
 const (
@@ -311,6 +314,15 @@ func (e *Emitter) emit(b byte) {
 	}
 }
 func (e *Emitter) emit16(v uint16) { e.emit(byte(v)); e.emit(byte(v >> 8)) }
+
+// emitName emite un nombre (longitud u16 + bytes) como operando de un opcode
+// de paquete/campo (OP_PKG_GET/SET, OP_THIS_GET/SET, opcodes de método…).
+func (e *Emitter) emitName(name string) {
+	e.emit16(uint16(len(name)))
+	for _, b := range []byte(name) {
+		e.emit(b)
+	}
+}
 func (e *Emitter) emitI16(v int16) { e.emit(byte(v)); e.emit(byte(v >> 8)) }
 func (e *Emitter) patchI16(off int, val int16) {
 	buf := *e.cur()
@@ -922,6 +934,20 @@ func (cg *CodeGen) ExitVarDeclaration(ctx *VarDeclarationContext) {
 // Assignment
 // ==========================================
 func (cg *CodeGen) EnterAssignment(ctx *AssignmentContext) {
+	if childTokText(ctx, 1) == "." {
+		// this.campo = ... → apila el receiver (ya está en locals[0])
+		if ctx.THIS_SCOPE() != nil {
+			idx, ok := cg.funcLocals["this"]
+			if !ok {
+				cg.reportError("this solo está disponible dentro de un método de package")
+				return
+			}
+			cg.emit(OP_LOAD_LOCAL)
+			cg.emit16(idx)
+		}
+		// pkg.campo = ... → el receiver ya lo apila la sub-expresión del walker
+		return
+	}
 	exprs := ctx.AllExpression()
 	if len(exprs) == 2 {
 		name := ctx.IDENTIFIER().GetText()
@@ -940,6 +966,16 @@ func (cg *CodeGen) EnterAssignment(ctx *AssignmentContext) {
 }
 
 func (cg *CodeGen) ExitAssignment(ctx *AssignmentContext) {
+	if childTokText(ctx, 1) == "." {
+		fieldName := ctx.IDENTIFIER().GetText()
+		if ctx.THIS_SCOPE() != nil {
+			cg.emit(OP_THIS_SET)
+		} else {
+			cg.emit(OP_PKG_SET)
+		}
+		cg.emitName(fieldName)
+		return
+	}
 	name := ctx.IDENTIFIER().GetText()
 	idx, isLocal, ok := cg.resolveIdent(name)
 	if !ok {
@@ -1229,6 +1265,42 @@ func (cg *CodeGen) handleBaseExpression(ctx antlr.ParserRuleContext) {
 		cg.emitDotAccess(expr)
 	case *PkgExprContext:
 		cg.emitPackage(expr.PkgDeclaration())
+	case *ThisScopeExprContext:
+		if _, ok := cg.funcLocals["this"]; !ok {
+			cg.reportError("this solo está disponible dentro de un método de package")
+			return
+		}
+		fieldName := expr.IDENTIFIER().GetText()
+		cg.emit(OP_THIS_GET)
+		cg.emitName(fieldName)
+	case *IndexedCallExprContext:
+		argc := 0
+		if al := expr.ArgumentList(); al != nil {
+			argc = len(al.AllExpression())
+		}
+		cg.emit(OP_CALL_VAR)
+		cg.emit(byte(argc))
+	case *MethodCallExprContext:
+		argc := 0
+		if al := expr.ArgumentList(); al != nil {
+			argc = len(al.AllExpression())
+		}
+		cg.emit(OP_CALL_METHOD)
+		cg.emit(byte(argc))
+	}
+}
+
+// EnterArgumentList — en las llamadas a funciones guardadas en arrays y a
+// métodos de package, el resolver (índice o campo) debe aplicarse justo antes
+// de evaluar los argumentos: aquí la pila es [array, índice] o [pkg].
+func (cg *CodeGen) EnterArgumentList(ctx *ArgumentListContext) {
+	switch parent := ctx.GetParent().(type) {
+	case *IndexedCallExprContext:
+		cg.emit(OP_ARRAY_GET)
+	case *MethodCallExprContext:
+		fieldName := parent.IDENTIFIER().GetText()
+		cg.emit(OP_PKG_GET)
+		cg.emitName(fieldName)
 	}
 }
 
@@ -1460,6 +1532,14 @@ func (cg *CodeGen) EnterFuncExpr(ctx *FuncExprContext) {
 	cg.savedFuncNext = cg.funcNextLocal
 	cg.funcLocals = make(map[string]uint16)
 	cg.funcNextLocal = 0
+
+	// Método de package: el slot 0 lo ocupa 'this' (receiver); la llamada
+	// OP_CALL_METHOD lo deposita en frame->locals[0]. Los parámetros reales
+	// arrancan en el slot 1.
+	if cg.inPkg {
+		cg.funcLocals["this"] = 0
+		cg.funcNextLocal = 1
+	}
 }
 
 func (cg *CodeGen) ExitFuncExpr(ctx *FuncExprContext) {
@@ -1504,10 +1584,7 @@ func (cg *CodeGen) emitArrayLiteral(ctx IArrayLiteralContext) {
 func (cg *CodeGen) emitDotAccess(ctx *DotAccessExprContext) {
 	fieldName := ctx.IDENTIFIER().GetText()
 	cg.emit(OP_PKG_GET)
-	cg.emit16(uint16(len(fieldName)))
-	for _, b := range []byte(fieldName) {
-		cg.emit(b)
-	}
+	cg.emitName(fieldName)
 }
 
 // ==========================================

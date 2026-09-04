@@ -18,7 +18,7 @@ PRE_FILES=(
 
 PAXO_FILES=(
   "$VM_SRC/Calc.c"
-  "$VM_SRC/Deque.c"
+  "$VM_SRC/Smart_heap.c"
   "$VM_SRC/Typecast_and_read.c"
   "$VM_SRC/Functions.c"
   "$VM_SRC/Vm.c"
@@ -249,7 +249,7 @@ generate_lep_full() {
     echo "/* $title - Auto-generado por sh/gen_lep.sh"
     echo " * No editar manualmente." 
     echo " *"
-    echo " * EmbeNe el nucleo de la VM (Calc, Deque, Typecast, Functions, Vm)"
+    echo " * EmbeNe el nucleo de la VM (Calc, Smart_heap, Typecast, Functions, Vm)"
     echo " * junto con las librerias de terceros reales:"
     echo " *   - stb_image/write/resize2/truetype/easy_font/ds (imagenes/fuentes)"
     echo " *   - miniaudio (audio)"
@@ -446,7 +446,7 @@ echo "lep.h generado en $BUILD_DIR/lep.h ($(wc -l < "$BUILD_DIR/lep.h") lineas)"
 {
   echo "/* lep_paxo.h - Auto-generado por sh/gen_lep.sh"
   echo " * No editar manualmente."
-  echo " * Solo el nucleo de la VM (Calc, Deque, Typecast, Functions, Vm)"
+  echo " * Solo el nucleo de la VM (Calc, Smart_heap, Typecast, Functions, Vm)"
   echo " * y termcolor-c.h. Los nativos de terceros degradan a fallback."
   echo " * Usa Build/lep.h si necesitas las librerias reales."
   echo " */"

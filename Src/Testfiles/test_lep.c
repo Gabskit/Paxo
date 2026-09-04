@@ -58,10 +58,10 @@ static void reset(void) {
 static void run_vm(void) {
   VM vm = {0};
   vm_init(&vm, bc);
-  Deque *stack = deque_create();
+  Smart_heap stack = create_heap(64);
   PaxoVar globals[256] = {0};
-  vm_run(&vm, stack, globals);
-  deque_free(stack);
+  vm_run(&vm, &stack, globals);
+  free_heap(&stack);
 }
 
 static void test_add_num8(void) {

@@ -74,6 +74,9 @@ type PaxoListener interface {
 	// EnterNotgateExpr is called when entering the notgateExpr production.
 	EnterNotgateExpr(c *NotgateExprContext)
 
+	// EnterThisScopeExpr is called when entering the thisScopeExpr production.
+	EnterThisScopeExpr(c *ThisScopeExprContext)
+
 	// EnterIntLitExpr is called when entering the intLitExpr production.
 	EnterIntLitExpr(c *IntLitExprContext)
 
@@ -128,8 +131,14 @@ type PaxoListener interface {
 	// EnterBitwiseExpr is called when entering the bitwiseExpr production.
 	EnterBitwiseExpr(c *BitwiseExprContext)
 
+	// EnterIndexedCallExpr is called when entering the indexedCallExpr production.
+	EnterIndexedCallExpr(c *IndexedCallExprContext)
+
 	// EnterIndexedAccessExpr is called when entering the indexedAccessExpr production.
 	EnterIndexedAccessExpr(c *IndexedAccessExprContext)
+
+	// EnterMethodCallExpr is called when entering the methodCallExpr production.
+	EnterMethodCallExpr(c *MethodCallExprContext)
 
 	// EnterDotAccessExpr is called when entering the dotAccessExpr production.
 	EnterDotAccessExpr(c *DotAccessExprContext)
@@ -203,6 +212,9 @@ type PaxoListener interface {
 	// ExitNotgateExpr is called when exiting the notgateExpr production.
 	ExitNotgateExpr(c *NotgateExprContext)
 
+	// ExitThisScopeExpr is called when exiting the thisScopeExpr production.
+	ExitThisScopeExpr(c *ThisScopeExprContext)
+
 	// ExitIntLitExpr is called when exiting the intLitExpr production.
 	ExitIntLitExpr(c *IntLitExprContext)
 
@@ -257,8 +269,14 @@ type PaxoListener interface {
 	// ExitBitwiseExpr is called when exiting the bitwiseExpr production.
 	ExitBitwiseExpr(c *BitwiseExprContext)
 
+	// ExitIndexedCallExpr is called when exiting the indexedCallExpr production.
+	ExitIndexedCallExpr(c *IndexedCallExprContext)
+
 	// ExitIndexedAccessExpr is called when exiting the indexedAccessExpr production.
 	ExitIndexedAccessExpr(c *IndexedAccessExprContext)
+
+	// ExitMethodCallExpr is called when exiting the methodCallExpr production.
+	ExitMethodCallExpr(c *MethodCallExprContext)
 
 	// ExitDotAccessExpr is called when exiting the dotAccessExpr production.
 	ExitDotAccessExpr(c *DotAccessExprContext)

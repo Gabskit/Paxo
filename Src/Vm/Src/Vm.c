@@ -1,7 +1,7 @@
 /* Light Environment Processing VM (LEP-VM) */
 #pragma once
 #include "Calc.c"
-#include "Deque.c"
+#include "Smart_heap.c"
 #include "Functions.c"
 #include "Typecast_and_read.c"
 #include "termcolor-c.h"
@@ -102,6 +102,9 @@ typedef enum {
   OP_THROW,      // pops error value, unwinds to nearest catch handler
   OP_STORE_LOCAL, // [uint16_t index] — stores to frame-local variable
   OP_LOAD_LOCAL,  // [uint16_t index] — loads from frame-local variable
+  OP_CALL_METHOD, // [uint8_t argc] — pops func + args + receiver, jumps to func with locals[0]=receiver
+  OP_THIS_GET,    // [uint16_t name_len] [chars...] — reads private field of frame locals[0]
+  OP_THIS_SET,    // [uint16_t name_len] [chars...] — writes private field of frame locals[0]
 } PaxoOpcode;
 
 void vm_init(VM *vm, const uint8_t *bytecode, size_t bytecode_size) {
@@ -414,8 +417,34 @@ static inline size_t var_to_index(PaxoVar v) {
   }
 }
 
-void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
+// "read" del tope + retirarlo: lee sp-1 con heap_read y decrementa sp.
+// No usa heap->amount como índice (solo contador).
+static inline PaxoVar heap_pop_top(Smart_heap *stack, size_t *sp) {
+  if (*sp == 0)
+    return LEP_ZERO;
+  (*sp)--;
+  PaxoVar *slot = heap_read(stack, *sp);
+  return slot ? *slot : LEP_ZERO;
+}
+
+// Añadir un valor nuevo: reserva más tamaño (si hace falta) y escribe vía
+// heap_write en el índice `sp`. El índice del tope NO es heap->amount.
+#define HEAP_PUSH(v)                                                       \
+  do {                                                                     \
+    if (!heap_reserve(stack, sp + 1)) {                                    \
+      vm_error(vm, "heap sin memoria");                                    \
+      running = false;                                                     \
+      break;                                                               \
+    }                                                                      \
+    heap_write(stack, sp, (v));                                            \
+    sp++;                                                                  \
+  } while (0)
+
+#define HEAP_POP() heap_pop_top(stack, &sp)
+
+void vm_run(VM *vm, Smart_heap *stack, PaxoVar *globals) {
   bool running = true;
+  size_t sp = 0; // tope de la pila de valores (índice, no heap->amount)
 
   while (running) {
     if (vm->ip >= vm->bytecode_size) {
@@ -525,19 +554,19 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         break;
       }
 
-      deque_push_back(stack, val);
+      HEAP_PUSH(val);
       break;
     }
 
     case OP_POP: {
-      deque_pop_back(stack);
+      HEAP_POP();
       break;
     }
 
 #define ARITH_OP(name, op16, op64, opfxp, oppdec, oppcpx)                     \
   case name: {                                                                 \
-    PaxoVar b = deque_pop_back(stack);                                         \
-    PaxoVar a = deque_pop_back(stack);                                         \
+    PaxoVar b = HEAP_POP();                                         \
+    PaxoVar a = HEAP_POP();                                         \
     enum type ta = var_type(a), tb = var_type(b);                              \
     PaxoVar res = LEP_ZERO;                                                   \
     if (var_is_complex_type(ta) || var_is_complex_type(tb)) {                  \
@@ -545,7 +574,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       if (res == LEP_NO_VALUE) {                                              \
         vm_error(vm, "división entre cero en complejo");                        \
         running = false;                                                       \
-        deque_push_back(stack, LEP_ZERO);                                     \
+        HEAP_PUSH(LEP_ZERO);                                     \
         break;                                                                 \
       }                                                                        \
     } else if (var_is_numeric(ta) && var_is_numeric(tb)) {                     \
@@ -581,7 +610,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     } else {                                                                   \
       vm_error(vm, "tipos incompatibles en operación aritmética");             \
     }                                                                          \
-    deque_push_back(stack, res);                                               \
+    HEAP_PUSH(res);                                               \
     break;                                                                     \
   }
 
@@ -594,18 +623,18 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
 
     case OP_LOAD_VAR: {
       uint16_t index = read_u16(vm);
-      deque_push_back(stack, globals[index]);
+      HEAP_PUSH(globals[index]);
       break;
     }
 
     case OP_STORE_VAR: {
       uint16_t index = read_u16(vm);
-      globals[index] = deque_pop_back(stack);
+      globals[index] = HEAP_POP();
       break;
     }
 
     case OP_PRINT: {
-      PaxoVar val = deque_pop_back(stack);
+      PaxoVar val = HEAP_POP();
       const char8_t *str = NULL;
 
       switch (var_type(val)) {
@@ -645,7 +674,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
 
     case OP_JUMP_IF_FALSE: {
       int16_t offset = read_i16(vm);
-      PaxoVar condition = deque_pop_back(stack);
+      PaxoVar condition = HEAP_POP();
 
       bool is_false = false;
       if (var_type(condition) == VBOOL)
@@ -666,11 +695,11 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     }
     case OP_CAST: {
       uint8_t target_type = vm->bytecode[vm->ip++];
-      PaxoVar val = deque_pop_back(stack);
+      PaxoVar val = HEAP_POP();
       enum type src = var_type(val);
 
       if (src == target_type) {
-        deque_push_back(stack, val);
+        HEAP_PUSH(val);
         break;
       }
 
@@ -1019,7 +1048,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         break;
       }
 
-      deque_push_back(stack, res);
+      HEAP_PUSH(res);
       break;
     }
 
@@ -1040,11 +1069,11 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       uint8_t argc = vm->bytecode[vm->ip++];
       PaxoVar args[16];
       for (int i = argc - 1; i >= 0; i--)
-        args[i] = deque_pop_back(stack);
+        args[i] = HEAP_POP();
 
       PaxoVar result = native_call(native_id, args, argc);
       if (result != LEP_NO_VALUE)
-        deque_push_back(stack, result);
+        HEAP_PUSH(result);
       break;
     }
 
@@ -1059,7 +1088,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
 
     case OP_CALL_VAR: {
       uint8_t argc = vm->bytecode[vm->ip++];
-      PaxoVar func_val = deque_pop_back(stack);
+      PaxoVar func_val = HEAP_POP();
       if (var_type(func_val) != FUNC) {
         vm_error(vm, "se esperaba una función");
         running = false;
@@ -1068,7 +1097,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
 
       PaxoVar args[256];
       for (int i = argc - 1; i >= 0; i--)
-        args[i] = deque_pop_back(stack);
+        args[i] = HEAP_POP();
 
       CallFrame *frame = &vm->frames[vm->frame_count++];
       frame->return_ip = vm->ip;
@@ -1079,18 +1108,52 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       break;
     }
 
+    case OP_CALL_METHOD: {
+      uint8_t argc = vm->bytecode[vm->ip++];
+      PaxoVar args[256];
+      for (int i = argc - 1; i >= 0; i--)
+        args[i] = HEAP_POP();
+
+      PaxoVar func_val = HEAP_POP();
+      if (var_type(func_val) != FUNC) {
+        vm_error(vm, "se esperaba una función");
+        running = false;
+        break;
+      }
+
+      PaxoVar receiver = HEAP_POP();
+      if (vm->frame_count >= MAX_FRAMES) {
+        vm_error(vm, "desbordamiento de pila de llamadas");
+        running = false;
+        break;
+      }
+
+      fprintf(stderr, "[dbg] CALL_METHOD receiver type=%d package=%d\n", var_type(receiver), PACKAGE);
+
+      // El método monta su frame con el receiver en locals[0] ('this') y los
+      // argumentos reales a partir de locals[1].
+      CallFrame *frame = &vm->frames[vm->frame_count++];
+      frame->return_ip = vm->ip;
+      frame->locals[0] = receiver;
+      for (int i = 0; i < argc; i++)
+        frame->locals[i + 1] = args[i];
+
+      vm->ip = var_func_id(func_val);
+      break;
+    }
+
     // ==========================================
     // FRAME LOCAL VARIABLES
     // ==========================================
     case OP_STORE_LOCAL: {
       uint16_t index = read_u16(vm);
-      vm->frames[vm->frame_count - 1].locals[index] = deque_pop_back(stack);
+      vm->frames[vm->frame_count - 1].locals[index] = HEAP_POP();
       break;
     }
 
     case OP_LOAD_LOCAL: {
       uint16_t index = read_u16(vm);
-      deque_push_back(stack, vm->frames[vm->frame_count - 1].locals[index]);
+      HEAP_PUSH(vm->frames[vm->frame_count - 1].locals[index]);
       break;
     }
 
@@ -1104,14 +1167,14 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       arr->capacity = count > 0 ? count : 4;
       arr->items = malloc(sizeof(PaxoVar) * arr->capacity);
       for (int i = count - 1; i >= 0; i--)
-        arr->items[i] = deque_pop_back(stack);
-      deque_push_back(stack, var_array(arr));
+        arr->items[i] = HEAP_POP();
+      HEAP_PUSH(var_array(arr));
       break;
     }
 
     case OP_ARRAY_GET: {
-      PaxoVar idx_val = deque_pop_back(stack);
-      PaxoVar arr_val = deque_pop_back(stack);
+      PaxoVar idx_val = HEAP_POP();
+      PaxoVar arr_val = HEAP_POP();
       if (var_type(arr_val) != ARRAY) {
         vm_error(vm, "se esperaba un array");
         running = false;
@@ -1128,14 +1191,14 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         running = false;
         break;
       }
-      deque_push_back(stack, var_array_get(arr_val)->items[idx]);
+      HEAP_PUSH(var_array_get(arr_val)->items[idx]);
       break;
     }
 
     case OP_ARRAY_SET: {
-      PaxoVar value = deque_pop_back(stack);
-      PaxoVar idx_val = deque_pop_back(stack);
-      PaxoVar arr_val = deque_pop_back(stack);
+      PaxoVar value = HEAP_POP();
+      PaxoVar idx_val = HEAP_POP();
+      PaxoVar arr_val = HEAP_POP();
       if (var_type(arr_val) != ARRAY) {
         vm_error(vm, "se esperaba un array");
         running = false;
@@ -1163,7 +1226,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       uint16_t field_count = read_u16(vm);
       PaxoPackageField *head = NULL;
       for (uint16_t i = 0; i < field_count; i++) {
-        PaxoVar val = deque_pop_back(stack);
+        PaxoVar val = HEAP_POP();
         uint16_t name_len = read_u16(vm);
         char *name = malloc(name_len + 1);
         memcpy(name, vm->bytecode + vm->ip, name_len);
@@ -1176,7 +1239,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         field->next = head;
         head = field;
       }
-      deque_push_back(stack, var_pkg(head));
+      HEAP_PUSH(var_pkg(head));
       break;
     }
 
@@ -1186,7 +1249,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       memcpy(name, vm->bytecode + vm->ip, name_len);
       name[name_len] = '\0';
       vm->ip += name_len;
-      PaxoVar pkg_val = deque_pop_back(stack);
+      PaxoVar pkg_val = HEAP_POP();
       if (var_type(pkg_val) != PACKAGE) {
         vm_error(vm, "se esperaba un package");
         running = false;
@@ -1207,7 +1270,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
           running = false;
           break;
         }
-        deque_push_back(stack, f->value);
+        HEAP_PUSH(f->value);
       }
       if (!found) {
         vm_error(vm, "campo no encontrado");
@@ -1223,8 +1286,8 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       memcpy(name, vm->bytecode + vm->ip, name_len);
       name[name_len] = '\0';
       vm->ip += name_len;
-      PaxoVar value = deque_pop_back(stack);
-      PaxoVar pkg_val = deque_pop_back(stack);
+      PaxoVar value = HEAP_POP();
+      PaxoVar pkg_val = HEAP_POP();
       if (var_type(pkg_val) != PACKAGE) {
         vm_error(vm, "se esperaba un package");
         running = false;
@@ -1247,6 +1310,75 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     }
 
     // ==========================================
+    // MÉTODOS — acceso interno a campos (incluidos privados) vía 'this'
+    // El receiver vive en frame->locals[0] (lo depositó OP_CALL_METHOD).
+    // ==========================================
+    case OP_THIS_GET: {
+      uint16_t name_len = read_u16(vm);
+      char name[256];
+      memcpy(name, vm->bytecode + vm->ip, name_len);
+      name[name_len] = '\0';
+      vm->ip += name_len;
+      if (vm->frame_count == 0) {
+        vm_error(vm, "this fuera de un método");
+        running = false;
+        break;
+      }
+      PaxoVar pkg_val = vm->frames[vm->frame_count - 1].locals[0];
+      if (var_type(pkg_val) != PACKAGE) {
+        vm_error(vm, "se esperaba un package");
+        running = false;
+        break;
+      }
+      PaxoPackageField *f = var_pkg_get(pkg_val);
+      while (f) {
+        if (strcmp(f->key, name) == 0) {
+          HEAP_PUSH(f->value);
+          break;
+        }
+        f = f->next;
+      }
+      if (!f) {
+        vm_error(vm, "campo no encontrado");
+        running = false;
+      }
+      break;
+    }
+
+    case OP_THIS_SET: {
+      uint16_t name_len = read_u16(vm);
+      char name[256];
+      memcpy(name, vm->bytecode + vm->ip, name_len);
+      name[name_len] = '\0';
+      vm->ip += name_len;
+      PaxoVar value = HEAP_POP();
+      if (vm->frame_count == 0) {
+        vm_error(vm, "this fuera de un método");
+        running = false;
+        break;
+      }
+      PaxoVar pkg_val = vm->frames[vm->frame_count - 1].locals[0];
+      if (var_type(pkg_val) != PACKAGE) {
+        vm_error(vm, "se esperaba un package");
+        running = false;
+        break;
+      }
+      PaxoPackageField *f = var_pkg_get(pkg_val);
+      while (f) {
+        if (strcmp(f->key, name) == 0) {
+          f->value = value;
+          break;
+        }
+        f = f->next;
+      }
+      if (!f) {
+        vm_error(vm, "campo no encontrado");
+        running = false;
+      }
+      break;
+    }
+
+    // ==========================================
     // TRY / CATCH / THROW
     // ==========================================
     case OP_TRY_SETUP: {
@@ -1258,7 +1390,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       }
       TryFrame *tf = &vm->try_frames[vm->try_frame_count++];
       tf->catch_ip = vm->ip + catch_offset;
-      tf->stack_size = deque_size(stack);
+      tf->stack_size = sp;
       tf->frame_count = vm->frame_count;
       break;
     }
@@ -1272,24 +1404,24 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     }
 
     case OP_THROW: {
-      PaxoVar error_val = deque_pop_back(stack);
+      PaxoVar error_val = HEAP_POP();
       if (vm->try_frame_count == 0) {
         vm_error(vm, "throw sin try/catch");
         running = false;
         break;
       }
       TryFrame *tf = &vm->try_frames[--vm->try_frame_count];
-      while (deque_size(stack) > tf->stack_size)
-        deque_pop_back(stack);
+      while (sp > tf->stack_size)
+        HEAP_POP();
       vm->frame_count = tf->frame_count;
-      deque_push_back(stack, error_val);
+      HEAP_PUSH(error_val);
       vm->ip = tf->catch_ip;
       break;
     }
 
     case OP_JUMP_IF_TRUE: {
       int16_t offset = read_i16(vm);
-      PaxoVar condition = deque_pop_back(stack);
+      PaxoVar condition = HEAP_POP();
 
       if (var_truthy(condition)) {
         vm->ip += offset;
@@ -1320,8 +1452,8 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
   } while (0)
 
     case OP_EQ: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
+      PaxoVar b = HEAP_POP();
+      PaxoVar a = HEAP_POP();
       enum type ta = var_type(a), tb = var_type(b);
       bool result_bool = false;
       if ((var_is_numeric(ta) && var_is_numeric(tb)) ||
@@ -1335,13 +1467,13 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         CMP_BOTH(STRING,
                  strcmp(var_string_get(a), var_string_get(b)) == 0);
       }
-      deque_push_back(stack, var_bool(result_bool));
+      HEAP_PUSH(var_bool(result_bool));
       break;
     }
 
     case OP_NEQ: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
+      PaxoVar b = HEAP_POP();
+      PaxoVar a = HEAP_POP();
       enum type ta = var_type(a), tb = var_type(b);
       bool result_bool = true;
       if (var_is_numeric(ta) && var_is_numeric(tb)) {
@@ -1355,13 +1487,13 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         CMP_BOTH(STRING,
                  strcmp(var_string_get(a), var_string_get(b)) != 0);
       }
-      deque_push_back(stack, var_bool(result_bool));
+      HEAP_PUSH(var_bool(result_bool));
       break;
     }
 
     case OP_LT: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
+      PaxoVar b = HEAP_POP();
+      PaxoVar a = HEAP_POP();
       enum type ta = var_type(a), tb = var_type(b);
       bool result_bool = false;
       if (var_is_numeric(ta) && var_is_numeric(tb)) {
@@ -1369,13 +1501,13 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       } else {
         CMP_BOTH(CHAR, var_char_get(a) < var_char_get(b));
       }
-      deque_push_back(stack, var_bool(result_bool));
+      HEAP_PUSH(var_bool(result_bool));
       break;
     }
 
     case OP_GT: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
+      PaxoVar b = HEAP_POP();
+      PaxoVar a = HEAP_POP();
       enum type ta = var_type(a), tb = var_type(b);
       bool result_bool = false;
       if (var_is_numeric(ta) && var_is_numeric(tb)) {
@@ -1383,13 +1515,13 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       } else {
         CMP_BOTH(CHAR, var_char_get(a) > var_char_get(b));
       }
-      deque_push_back(stack, var_bool(result_bool));
+      HEAP_PUSH(var_bool(result_bool));
       break;
     }
 
     case OP_LTE: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
+      PaxoVar b = HEAP_POP();
+      PaxoVar a = HEAP_POP();
       enum type ta = var_type(a), tb = var_type(b);
       bool result_bool = false;
       if (var_is_numeric(ta) && var_is_numeric(tb)) {
@@ -1397,13 +1529,13 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       } else {
         CMP_BOTH(CHAR, var_char_get(a) <= var_char_get(b));
       }
-      deque_push_back(stack, var_bool(result_bool));
+      HEAP_PUSH(var_bool(result_bool));
       break;
     }
 
     case OP_GTE: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
+      PaxoVar b = HEAP_POP();
+      PaxoVar a = HEAP_POP();
       enum type ta = var_type(a), tb = var_type(b);
       bool result_bool = false;
       if (var_is_numeric(ta) && var_is_numeric(tb)) {
@@ -1411,7 +1543,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       } else {
         CMP_BOTH(CHAR, var_char_get(a) >= var_char_get(b));
       }
-      deque_push_back(stack, var_bool(result_bool));
+      HEAP_PUSH(var_bool(result_bool));
       break;
     }
 
@@ -1428,21 +1560,21 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     // LÓGICOS (VBOOL / TRIT)
     // ==========================================
     case OP_AND: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
-      deque_push_back(stack, var_bool(var_truthy(a) && var_truthy(b)));
+      PaxoVar b = HEAP_POP();
+      PaxoVar a = HEAP_POP();
+      HEAP_PUSH(var_bool(var_truthy(a) && var_truthy(b)));
       break;
     }
 
     case OP_OR: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
-      deque_push_back(stack, var_bool(var_truthy(a) || var_truthy(b)));
+      PaxoVar b = HEAP_POP();
+      PaxoVar a = HEAP_POP();
+      HEAP_PUSH(var_bool(var_truthy(a) || var_truthy(b)));
       break;
     }
 
     case OP_NOT: {
-      PaxoVar a = deque_pop_back(stack);
+      PaxoVar a = HEAP_POP();
       enum type ta = var_type(a);
       bool result_bool = true;
       if (ta == VBOOL)
@@ -1455,7 +1587,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         result_bool = pdec_is_zero(var_pkdec_get(a));
       else if (ta == COMPLEX || ta == COMPLEX16)
         result_bool = var_complex_is_zero(var_complex_get(a));
-      deque_push_back(stack, var_bool(result_bool));
+      HEAP_PUSH(var_bool(result_bool));
       break;
     }
 
@@ -1463,8 +1595,8 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     // BITWISE (VBOOL / TRIT / CHAR)
     // ==========================================
     case OP_BIT_AND: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
+      PaxoVar b = HEAP_POP();
+      PaxoVar a = HEAP_POP();
       PaxoVar res = 0;
       if (var_type(a) == VBOOL && var_type(b) == VBOOL) {
         res = var_bool((int)var_bool_get(a) & (int)var_bool_get(b));
@@ -1477,13 +1609,13 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         res = to_pdec ? pdec_to_var(pdec_from_int64(r, 0))
                       : fxp_to_var(fxp_pack(r, 0));
       }
-      deque_push_back(stack, res);
+      HEAP_PUSH(res);
       break;
     }
 
     case OP_BIT_OR: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
+      PaxoVar b = HEAP_POP();
+      PaxoVar a = HEAP_POP();
       PaxoVar res = 0;
       if (var_type(a) == VBOOL && var_type(b) == VBOOL) {
         res = var_bool((int)var_bool_get(a) | (int)var_bool_get(b));
@@ -1496,12 +1628,12 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         res = to_pdec ? pdec_to_var(pdec_from_int64(r, 0))
                       : fxp_to_var(fxp_pack(r, 0));
       }
-      deque_push_back(stack, res);
+      HEAP_PUSH(res);
       break;
     }
 
     case OP_BIT_NOT: {
-      PaxoVar a = deque_pop_back(stack);
+      PaxoVar a = HEAP_POP();
       PaxoVar res = 0;
       switch (var_type(a)) {
       case VBOOL:
@@ -1527,13 +1659,13 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       default:
         break;
       }
-      deque_push_back(stack, res);
+      HEAP_PUSH(res);
       break;
     }
 
     case OP_BIT_XOR: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
+      PaxoVar b = HEAP_POP();
+      PaxoVar a = HEAP_POP();
       PaxoVar res = 0;
       if (var_type(a) == VBOOL && var_type(b) == VBOOL) {
         res = var_bool(var_bool_get(a) ^ var_bool_get(b));
@@ -1546,13 +1678,13 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         res = to_pdec ? pdec_to_var(pdec_from_int64(r, 0))
                       : fxp_to_var(fxp_pack(r, 0));
       }
-      deque_push_back(stack, res);
+      HEAP_PUSH(res);
       break;
     }
 
     case OP_BIT_SHL: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
+      PaxoVar b = HEAP_POP();
+      PaxoVar a = HEAP_POP();
       PaxoVar res = 0;
       if (var_type(a) == CHAR && var_type(b) == CHAR) {
         res = var_char(var_char_get(a) << var_char_get(b));
@@ -1573,13 +1705,13 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         res = to_pdec ? pdec_to_var(pdec_from_int64(r, 0))
                       : fxp_to_var(fxp_pack(r, 0));
       }
-      deque_push_back(stack, res);
+      HEAP_PUSH(res);
       break;
     }
 
     case OP_BIT_SHR: {
-      PaxoVar b = deque_pop_back(stack);
-      PaxoVar a = deque_pop_back(stack);
+      PaxoVar b = HEAP_POP();
+      PaxoVar a = HEAP_POP();
       PaxoVar res = 0;
       if (var_type(a) == CHAR && var_type(b) == CHAR) {
         res = var_char(var_char_get(a) >> var_char_get(b));
@@ -1600,7 +1732,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
         res = to_pdec ? pdec_to_var(pdec_from_int64(r, 0))
                       : fxp_to_var(fxp_pack(r, 0));
       }
-      deque_push_back(stack, res);
+      HEAP_PUSH(res);
       break;
     }
 
@@ -1608,7 +1740,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
     // INC / DEC
     // ==========================================
     case OP_INC: {
-      PaxoVar a = deque_pop_back(stack);
+      PaxoVar a = HEAP_POP();
       switch (var_type(a)) {
       case NUM16: {
         Num16 one = {0};
@@ -1638,12 +1770,12 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       default:
         break;
       }
-      deque_push_back(stack, a);
+      HEAP_PUSH(a);
       break;
     }
 
     case OP_DEC: {
-      PaxoVar a = deque_pop_back(stack);
+      PaxoVar a = HEAP_POP();
       switch (var_type(a)) {
       case NUM16: {
         Num16 one = {0};
@@ -1673,7 +1805,7 @@ void vm_run(VM *vm, Deque *stack, PaxoVar *globals) {
       default:
         break;
       }
-      deque_push_back(stack, a);
+      HEAP_PUSH(a);
       break;
     }
 
