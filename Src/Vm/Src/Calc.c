@@ -10,8 +10,8 @@ typedef uint8_t PaxoBool;
 
 // ==========================================
 // 1. MOBILE POINT (REVISIÓN MP + NANBOX)
-//    MP16: [s | 2e | 5bc | p3]
-//    MP64: [s | 8e | 25bc | p5]
+//    MP16: [s | 2e | 5bc | p3]   -> v = bc · 2^(-2p) · 10^(exp - 1)
+//    MP64: [s | 8e | 25bc | p5]  -> v = bc · 2^(-2p) · 10^(exp - 127)
 // ==========================================
 
 #define BIAS16 1
@@ -202,9 +202,6 @@ static inline char32_t var_char_get(PaxoVar v) {
   return (char32_t)((v >> LEP_VAL_SHIFT) & 0xFFFFFFFFULL);
 }
 
-// color: RGBA empaquetado en bits [5..36] + flag 11010 (mismo tag que char,
-// distinguido por LEP_COLOR_FLAG en el bit 37; los codepoints utf32 <= 0x1FFFFF
-// nunca lo activan).
 static inline PaxoVar var_color(uint32_t rgba) {
   return (LEP_TAG_CHAR << 62) | LEP_COLOR_FLAG | LEP_MARK_BOX |
          ((PaxoVar)rgba << LEP_VAL_SHIFT);
@@ -214,9 +211,6 @@ static inline uint32_t var_color_get(PaxoVar v) {
   return (uint32_t)((v >> LEP_VAL_SHIFT) & 0xFFFFFFFFULL);
 }
 
-// fixed point / int (marcador 11011, t=0): NO es decimal empaquetado.
-//   t(1)=0 pppp(4) ··(2 pad) s(1) xxxxx(13) ···(30 pad+5 marcador)
-//   value = entero escalado con signo en las 13 bits
 typedef struct {
   int16_t value;  // entero escalado con signo
   uint8_t scale;  // pppp (0..15) dígitos fraccionarios
@@ -246,11 +240,6 @@ static inline PaxoVar var_int_fp(int16_t value, uint8_t scale) {
   return var_fxp((PaxoFxp){.value = value, .scale = scale});
 }
 
-// decimal empaquetado (packed decimal) real — BCD, marcador 11011, t=1:
-// cada dígito decimal vive en un nibble; signo y escala por separado.
-//   t(1)=1 pppp(4) s(1) ·(1 pad) d12..d0 (52 bits = 13 dígitos BCD) 11011
-//   d0 (unidades) en bits 5..8, d12 (la más significativa) en bits 53..56.
-//   valor = (-1)^signo · Σ d_i·10^i · 10^(-pppp)
 #define LEP_PDEC_DIGITS 13
 #define LEP_PDEC_DIG_SHIFT 5
 #define LEP_PDEC_SIGN_SHIFT 58
@@ -262,7 +251,6 @@ typedef struct {
   uint8_t scale;                    // pppp (0..15) dígitos fraccionarios
 } PaxoPdec;
 
-// Empaca 13 dígitos BCD (magnitud) en un marmita nanbox de tipo PKDEC.
 static inline PaxoVar var_pkdec_pack(uint64_t mag, uint8_t signo, uint8_t scale) {
   if (scale > 15)
     scale = 15;
@@ -278,8 +266,6 @@ static inline PaxoVar var_pkdec_pack(uint64_t mag, uint8_t signo, uint8_t scale)
   return out | LEP_MARK_FXPKD;
 }
 
-// Literal / constructor: valor escalado con signo (int16, como lo emite el
-// bytecode) convertido a dígitos BCD.
 static inline PaxoVar var_pkdec(int16_t value, uint8_t scale) {
   uint64_t mag = (value < 0) ? (uint64_t)(-(int32_t)value) : (uint64_t)value;
   return var_pkdec_pack(mag, (value < 0) ? 1 : 0, scale);
@@ -319,7 +305,6 @@ static inline int64_t pdec_value(PaxoPdec d) {
 
 static inline bool pdec_is_zero(PaxoPdec d) { return pdec_magnitude(d) == 0; }
 
-// Construye dígitos BCD desde un entero con signo (clampa a 13 dígitos).
 static inline PaxoPdec pdec_from_int64(int64_t v, uint8_t scale) {
   PaxoPdec d = {0};
   d.scale = scale > 15 ? 15 : scale;
@@ -393,20 +378,12 @@ static inline PaxoVar var_pin(uint32_t id) {
 
 static inline uint32_t var_pin_get(PaxoVar v) { return var_ref_punt_get(v); }
 
-// ==========================================
-// 4. NÚMEROS COMPLEJOS (tipo ni / sni)
-//    Representación: ref a un objeto { re, im } donde cada componente es un
-//    nanbox numérico (num16, num64 o int). La aritmética sigue el sistema de
-//    los operandos: MP64 = ni, MP16 = sni. (El dominio BCD exacto / pdec fue
-//    eliminado al deprecarse el tipo pdec.)
-// ==========================================
-
-#define LEP_COMPLEX_KIND_SNI 0u // componentes num16 (tipo sni)
-#define LEP_COMPLEX_KIND_NI 1u  // componentes num64 (tipo ni)
+#define LEP_COMPLEX_KIND_SNI 0u 
+#define LEP_COMPLEX_KIND_NI 1u  
 #define LEP_COMPLEX_KIND_MASK 0x1FFFu
 
 typedef struct {
-  uint16_t kind; // LEP_COMPLEX_KIND_*
+  uint16_t kind; 
   PaxoVar re;
   PaxoVar im;
 } PaxoComplex;
@@ -428,7 +405,6 @@ static inline uint16_t var_complex_kind(PaxoVar v) {
   return var_ref_aux_get(v) & LEP_COMPLEX_KIND_MASK;
 }
 
-// construye según el tipo declarado: ni → MP64, sni → MP16
 static inline PaxoVar var_complex_ni(Num64 re, Num64 im) {
   PaxoComplex c = {.kind = LEP_COMPLEX_KIND_NI, .re = var_num64(re),
                    .im = var_num64(im)};
@@ -516,9 +492,6 @@ static inline enum type var_type(PaxoVar v) {
   }
 }
 
-// Macro auxiliar para propagar el punto fijo de mayor precision
-#define PROPAGAR_P(a, b) ((a.p > b.p) ? a.p : b.p)
-
 // ==========================================
 // 4. OPERACIONES ARITMÉTICAS: 16 BITS (MP16)
 //    Radix mixto:  v = bc · 2^(-2p) · 10^(exp-BIAS)
@@ -551,13 +524,11 @@ static inline int64_t num16_canon(Num16 n) {
   return n.signo ? -m : m;
 }
 
-// modos de redondeo del reempaquetado
 enum {
   MP16_MEDIO = 0, // al más cercano, .5 lejos de cero
   MP16_ARRIBA = 1 // hacia fuera: primer techo válido del escaneo
 };
 
-// num/den = valor leído en la década s con la frontera p
 static inline void mp16_fraccion(uint64_t mag, int16_t e, int16_t s, uint16_t p,
                                  unsigned __int128 *num,
                                  unsigned __int128 *den) {
@@ -570,10 +541,6 @@ static inline void mp16_fraccion(uint64_t mag, int16_t e, int16_t s, uint16_t p,
     *den *= num16_pow10((uint16_t)(-d));
 }
 
-// Busca la representación más fina de ±V·10^e/1024:
-//  paso 1: si algún (s,p) lo expresa EXACTO — década menor y luego p mayor
-//  paso 2: el más cercano (empate lejos de cero); en modo ARRIBA toma el
-//          primer techo válido del escaneo para subir sin clavarse
 static inline Num16 num16_repack(uint8_t signo, int64_t V, int16_t e,
                                  uint8_t modo) {
   const int16_t e_min = -1, e_max = 3 - (int16_t)BIAS16;
@@ -606,8 +573,6 @@ static inline Num16 num16_repack(uint8_t signo, int64_t V, int16_t e,
   }
 
   // --- paso 2: redondeo ---
-  // El error se mide en unidades canónicas de una década base común
-  // (la más fina del escaneo) para que comparar décadas sea justo
   const int16_t base = e_min;
   unsigned __int128 objetivo = (unsigned __int128)mag;
   for (int16_t i = 0; i < e - base; i++)
@@ -627,7 +592,6 @@ static inline Num16 num16_repack(uint8_t signo, int64_t V, int16_t e,
       if (modo == MP16_ARRIBA)
         return (Num16){signo, (uint16_t)(s + BIAS16), (uint16_t)bc,
                        (uint16_t)p};
-      // |objetivo − canon(bc,p)·10^(s−base)|
       unsigned __int128 valc = (unsigned __int128)bc << (2 * (MP16_FRAC - p));
       for (int16_t i = 0; i < s - base; i++)
         valc *= 10;
@@ -647,7 +611,6 @@ static inline Num16 num16_repack(uint8_t signo, int64_t V, int16_t e,
     return (Num16){signo, (uint16_t)(b_s + BIAS16), (uint16_t)b_bc,
                    (uint16_t)b_p};
 
-  // sin candidato: desborde -> saturación; subflujo -> cero
   mp16_fraccion(mag, e, e_max, 0, &num, &den);
   return ((num + den / 2) > den * (unsigned __int128)bc_max)
              ? (Num16){signo, (uint16_t)(e_max + BIAS16), bc_max, 0}
@@ -664,7 +627,6 @@ static inline Num16 add_num16(Num16 a, Num16 b) {
   int16_t eb = (int16_t)b.exp - BIAS16;
   int16_t e = (ea < eb) ? ea : eb;
 
-  // lleva ambos numeradores canónicos a la década común más fina
   int64_t ma = num16_canon(a), mb = num16_canon(b);
   if (ea > eb)
     ma *= (int64_t)num16_pow10((uint16_t)(ea - eb));
@@ -677,9 +639,6 @@ static inline Num16 add_num16(Num16 a, Num16 b) {
 
   Num16 r = num16_repack(sg, ab, e, MP16_MEDIO);
 
-  // Transición suave en el techo (señales iguales): si el redondeo se
-  // quedó en el escalón del operando dominante pero la suma exacta ya lo
-  // supera, sube al siguiente (1023+1 -> 1025, 1025+1 -> 1027.5, ...)
   if (a.signo == b.signo) {
     uint64_t ama = (ma < 0) ? (uint64_t)-ma : (uint64_t)ma;
     uint64_t amb = (mb < 0) ? (uint64_t)-mb : (uint64_t)mb;
@@ -716,7 +675,6 @@ static inline Num16 mul_num16(Num16 a, Num16 b) {
   uint64_t ua = (va < 0) ? (uint64_t)-va : (uint64_t)va;
   uint64_t ub = (vb < 0) ? (uint64_t)-vb : (uint64_t)vb;
 
-  // canon_a · canon_b / 4^FRAC, redondeo al más cercano (.5 lejos de cero)
   uint64_t prod = ua * ub;
   uint64_t V = (prod >> 10) + ((prod & 1023) >= 512);
   return num16_repack(signo_res, (int64_t)V,
@@ -732,7 +690,6 @@ static inline Num16 div_num16(Num16 a, Num16 b) {
   uint64_t ua = (va < 0) ? (uint64_t)-va : (uint64_t)va;
   uint64_t ub = (vb < 0) ? (uint64_t)-vb : (uint64_t)vb;
 
-  // (canon_a << 10) / canon_b con redondeo al más cercano
   uint64_t numerador = ua << 10;
   uint64_t V = numerador / ub + ((numerador % ub) * 2 >= ub);
   return num16_repack(signo_res, (int64_t)V,
@@ -742,9 +699,164 @@ static inline Num16 div_num16(Num16 a, Num16 b) {
 
 // ==========================================
 // 5. OPERACIONES ARITMÉTICAS: 64 BITS (MP64)
-//    El valor es v = bc · 10^(exp-BIAS-p); p cuenta décadas fraccionarias
-//    y debe entrar en la alineación (no solo exp)
+//    Radix mixto: v = bc · 2^(-2p) · 10^(exp-BIAS)
+//    Mantisa binaria de 50 bits (25 bit-chunks);
+//    el punto salta en celdas de 2 bits y el exponente
+//    cuenta décadas. Dominio canónico de trabajo
+//    (unidades de 1/2^50): canon(n) = bc << 2·(25 - p)
 // ==========================================
+
+#define MP64_FRAC 25 // celdas de 2 bits que puede cruzar el punto
+
+static inline unsigned __int128 mp64_pow4(uint16_t n) {
+  unsigned __int128 r = 1;
+  while (n--)
+    r *= 4;
+  return r;
+}
+
+static inline unsigned __int128 num64_pow10(uint16_t n) {
+  unsigned __int128 r = 1;
+  while (n--)
+    r *= 10;
+  return r;
+}
+
+// numerador canónico con signo en unidades de 1/2^50
+static inline __int128 num64_canon(Num64 n) {
+  __int128 m = (__int128)n.bc << (2 * (MP64_FRAC - n.p));
+  return n.signo ? -m : m;
+}
+
+enum {
+  MP64_MEDIO = 0, // al más cercano, .5 lejos de cero
+  MP64_ARRIBA = 1 // hacia fuera: primer techo válido del escaneo
+};
+
+static inline void mp64_fraccion(unsigned __int128 mag, int16_t e, int16_t s,
+                                 uint16_t p, unsigned __int128 *num,
+                                 unsigned __int128 *den) {
+  int16_t d = e - s;
+  unsigned __int128 shift = (unsigned __int128)1 << (2 * (MP64_FRAC - p));
+  if (d >= 0) {
+    *num = mag * num64_pow10((uint16_t)d);
+    *den = shift;
+  } else {
+    *num = mag;
+    *den = shift * num64_pow10((uint16_t)(-d));
+  }
+}
+
+// Busca la representación más fina de ±V·10^e / 2^50
+static inline Num64 num64_repack(uint8_t signo, __int128 V, int16_t e,
+                                 uint8_t modo) {
+  const int16_t e_min = -127, e_max = 255 - (int16_t)BIAS64;
+  const uint64_t bc_max = bc_max64();
+
+  if (V == 0)
+    return (Num64){0, (uint16_t)BIAS64, 0, 0};
+
+  unsigned __int128 mag =
+      (V < 0) ? (unsigned __int128)(-V) : (unsigned __int128)V;
+  while (mag % 10 == 0) { // décadas exactas fuera del camino
+    mag /= 10;
+    e++;
+  }
+
+  unsigned __int128 num, den;
+
+  int16_t s_start = e - 16;
+  if (s_start < e_min)
+    s_start = e_min;
+  int16_t s_end = e + 16;
+  if (s_end > e_max)
+    s_end = e_max;
+
+  // --- paso 1: ajuste exacto ---
+  for (int16_t s = s_start; s <= s_end; s++) {
+    for (int16_t p = MP64_FRAC; p >= 0; p--) {
+      mp64_fraccion(mag, e, s, (uint16_t)p, &num, &den);
+      if (num % den != 0)
+        continue;
+      unsigned __int128 bc = num / den;
+      if (bc >= 1 && bc <= bc_max)
+        return (Num64){signo, (uint16_t)(s + BIAS64), (uint64_t)bc,
+                       (uint16_t)p};
+      if (bc == 0)
+        break; // con p menores sería aún más pequeño
+    }
+  }
+
+  // --- paso 2: redondeo ---
+  int have = 0;
+  uint64_t b_bc = 0;
+  int16_t b_s = 0, b_p = 0;
+  unsigned __int128 b_Q = 0, b_R = 0, b_D = 1;
+
+  for (int16_t s = s_start; s <= s_end; s++) {
+    for (int16_t p = MP64_FRAC; p >= 0; p--) {
+      mp64_fraccion(mag, e, s, (uint16_t)p, &num, &den);
+      uint64_t bc = (modo == MP64_ARRIBA) ? (uint64_t)((num + den - 1) / den)
+                                          : (uint64_t)((num + den / 2) / den);
+      if (bc < 1 || bc > bc_max)
+        continue;
+      if (modo == MP64_ARRIBA)
+        return (Num64){signo, (uint16_t)(s + BIAS64), (uint16_t)bc,
+                       (uint16_t)p};
+
+      // Cálculo exacto del error normalizado a la década e
+      unsigned __int128 valc = (unsigned __int128)bc << (2 * (MP64_FRAC - p));
+      unsigned __int128 N, D;
+      if (s <= e) {
+        unsigned __int128 target = mag * num64_pow10((uint16_t)(e - s));
+        N = (valc > target) ? (valc - target) : (target - valc);
+        D = num64_pow10((uint16_t)(e - s));
+      } else {
+        unsigned __int128 scaled_val = valc * num64_pow10((uint16_t)(s - e));
+        N = (scaled_val > mag) ? (scaled_val - mag) : (mag - scaled_val);
+        D = 1;
+      }
+
+      unsigned __int128 Q = N / D;
+      unsigned __int128 R = N % D;
+
+      bool better = false;
+      if (!have) {
+        better = true;
+      } else if (Q < b_Q) {
+        better = true;
+      } else if (Q == b_Q) {
+        unsigned __int128 lhs = R * b_D;
+        unsigned __int128 rhs = b_R * D;
+        if (lhs < rhs) {
+          better = true;
+        } else if (lhs == rhs) {
+          if (s < b_s || (s == b_s && (p > b_p || bc > b_bc)))
+            better = true;
+        }
+      }
+
+      if (better) {
+        have = 1;
+        b_bc = bc;
+        b_s = s;
+        b_p = p;
+        b_Q = Q;
+        b_R = R;
+        b_D = D;
+      }
+    }
+  }
+  if (have)
+    return (Num64){signo, (uint16_t)(b_s + BIAS64), (uint64_t)b_bc,
+                   (uint16_t)b_p};
+
+  // sin candidato: desborde -> saturación; subflujo -> cero
+  mp64_fraccion(mag, e, e_max, 0, &num, &den);
+  return ((num + den / 2) > den * (unsigned __int128)bc_max)
+             ? (Num64){signo, (uint16_t)(e_max + BIAS64), bc_max, 0}
+             : (Num64){0, (uint16_t)BIAS64, 0, 0};
+}
 
 Num64 add_num64(Num64 a, Num64 b) {
   if (a.bc == 0)
@@ -752,71 +864,44 @@ Num64 add_num64(Num64 a, Num64 b) {
   if (b.bc == 0)
     return a;
 
-  const int16_t sesgo = BIAS64, exp_max = 255;
-  const uint64_t bc_max = bc_max64();
+  int16_t ea = (int16_t)a.exp - BIAS64;
+  int16_t eb = (int16_t)b.exp - BIAS64;
+  int16_t e = (ea < eb) ? ea : eb;
 
-  // décadas netas de cada operando (exp menos su punto fijo p)
-  int16_t exp_a = (int16_t)a.exp - sesgo - (int16_t)a.p;
-  int16_t exp_b = (int16_t)b.exp - sesgo - (int16_t)b.p;
+  __int128 ma = num64_canon(a), mb = num64_canon(b);
+  if (ea > eb)
+    ma *= num64_pow10((uint16_t)(ea - eb));
+  else if (eb > ea)
+    mb *= num64_pow10((uint16_t)(eb - ea));
 
-  if (exp_a < exp_b) {
-    Num64 temp = a;
-    a = b;
-    b = temp;
-    int16_t exp_temp = exp_a;
-    exp_a = exp_b;
-    exp_b = exp_temp;
+  __int128 suma = ma + mb;
+  uint8_t sg = (suma < 0) ? 1 : 0;
+  __int128 ab = sg ? -suma : suma;
+
+  Num64 r = num64_repack(sg, ab, e, MP64_MEDIO);
+
+  if (a.signo == b.signo) {
+    unsigned __int128 ama =
+        (ma < 0) ? (unsigned __int128)-ma : (unsigned __int128)ma;
+    unsigned __int128 amb =
+        (mb < 0) ? (unsigned __int128)-mb : (unsigned __int128)mb;
+    unsigned __int128 dm = (ama > amb) ? ama : amb;
+    __int128 rc = num64_canon(r);
+    unsigned __int128 rm =
+        (rc < 0) ? (unsigned __int128)-rc : (unsigned __int128)rc;
+    int16_t er = (int16_t)r.exp - BIAS64;
+    unsigned __int128 rv, dv;
+    if (er >= e) {
+      rv = rm * num64_pow10((uint16_t)(er - e));
+      dv = dm;
+    } else {
+      rv = rm;
+      dv = dm * num64_pow10((uint16_t)(e - er));
+    }
+    if (rv <= dv && (unsigned __int128)ab > dm)
+      r = num64_repack(sg, ab, e, MP64_ARRIBA);
   }
-
-  int16_t diff_exp = exp_a - exp_b;
-  if (diff_exp > 15)
-    return (Num64){
-        .signo = a.signo, .exp = a.exp, .bc = a.bc, .p = PROPAGAR_P(a, b)};
-
-  __int128 val_a = (__int128)a.bc;
-  __int128 val_b = (__int128)b.bc;
-
-  for (int16_t i = 0; i < diff_exp; i++)
-    val_a *= 10;
-
-  if (a.signo)
-    val_a = -val_a;
-  if (b.signo)
-    val_b = -val_b;
-
-  __int128 suma = val_a + val_b;
-
-  if (suma == 0)
-    return (Num64){0, (uint64_t)sesgo, 0, PROPAGAR_P(a, b)};
-
-  uint8_t signo_res = (suma < 0) ? 1 : 0;
-  unsigned __int128 abs_suma = (suma < 0) ? -suma : suma;
-  int16_t exp_res = exp_b;
-
-  // Suavizado en el techo: la subida de década redondea con techo para que
-  // sumar 1 siempre avance (sin regresión ni quedarse clavado)
-  while (abs_suma > bc_max) {
-    abs_suma = (abs_suma + 9) / 10;
-    exp_res++;
-  }
-
-  if (abs_suma == 0)
-    return (Num64){0, (uint64_t)sesgo, 0, PROPAGAR_P(a, b)};
-
-  // el p propagado vuelve al exponente almacenado para conservar la década
-  uint16_t p_res = PROPAGAR_P(a, b);
-  int16_t exp_almacenado = exp_res + (int16_t)p_res + sesgo;
-  if (exp_almacenado > exp_max) {
-    exp_almacenado = exp_max;
-    abs_suma = bc_max;
-  }
-  if (exp_almacenado < 0)
-    return (Num64){0, (uint64_t)sesgo, 0, PROPAGAR_P(a, b)};
-
-  return (Num64){.signo = signo_res,
-                 .exp = (uint64_t)exp_almacenado,
-                 .bc = (uint64_t)abs_suma,
-                 .p = p_res};
+  return r;
 }
 
 static inline Num64 sub_num64(Num64 a, Num64 b) {
@@ -828,80 +913,56 @@ static inline Num64 sub_num64(Num64 a, Num64 b) {
 
 static inline Num64 mul_num64(Num64 a, Num64 b) {
   if (a.bc == 0 || b.bc == 0)
-    return (Num64){0, (uint64_t)BIAS64, 0, PROPAGAR_P(a, b)};
-  const int16_t sesgo = BIAS64, exp_max = 255;
-  const uint64_t bc_max = bc_max64();
-
+    return (Num64){0, (uint64_t)BIAS64, 0, 0};
   uint8_t signo_res = (a.signo != b.signo) ? 1 : 0;
-  uint16_t p_res = PROPAGAR_P(a, b);
+  __int128 va = num64_canon(a), vb = num64_canon(b);
+  unsigned __int128 ua =
+      (va < 0) ? (unsigned __int128)-va : (unsigned __int128)va;
+  unsigned __int128 ub =
+      (vb < 0) ? (unsigned __int128)-vb : (unsigned __int128)vb;
 
-  // el producto suma las décadas netas de ambos operandos
-  int16_t exp_res = ((int16_t)a.exp - sesgo - (int16_t)a.p) +
-                    ((int16_t)b.exp - sesgo - (int16_t)b.p);
+  int16_t e_res = (int16_t)((a.exp - BIAS64) + (b.exp - BIAS64));
 
-  unsigned __int128 mult = (unsigned __int128)a.bc * b.bc;
-
-  // Suavizado en el techo: la subida de década redondea con techo
-  while (mult > bc_max) {
-    mult = (mult + 9) / 10;
-    exp_res++;
+  while ((ua >> 50) * (ub >> 50) >= ((unsigned __int128)1 << 60)) {
+    if (ua >= ub)
+      ua = (ua + 5) / 10;
+    else
+      ub = (ub + 5) / 10;
+    e_res++;
   }
 
-  if (mult == 0)
-    return (Num64){0, (uint64_t)sesgo, 0, p_res};
-  // el p propagado vuelve al exponente almacenado para conservar la década
-  int16_t exp_almacenado = exp_res + (int16_t)p_res + sesgo;
-  if (exp_almacenado > exp_max) {
-    exp_almacenado = exp_max;
-    mult = bc_max;
-  }
-  if (exp_almacenado < 0)
-    return (Num64){0, (uint64_t)sesgo, 0, p_res};
+  unsigned __int128 mask50 = ((unsigned __int128)1 << 50) - 1;
+  unsigned __int128 ha = ua >> 50, la = ua & mask50;
+  unsigned __int128 hb = ub >> 50, lb = ub & mask50;
+  unsigned __int128 term0 = (la * lb + ((unsigned __int128)1 << 49)) >> 50;
+  unsigned __int128 term1 = ha * lb + hb * la;
+  unsigned __int128 term2 = ha * hb;
+  unsigned __int128 V = (term2 << 50) + term1 + term0;
 
-  return (Num64){.signo = signo_res,
-                 .exp = (uint64_t)exp_almacenado,
-                 .bc = (uint64_t)mult,
-                 .p = p_res};
+  return num64_repack(signo_res, (__int128)V, e_res, MP64_MEDIO);
 }
 
 static inline Num64 div_num64(Num64 a, Num64 b) {
   if (b.bc == 0 || a.bc == 0)
-    return (Num64){0, (uint64_t)BIAS64, 0, PROPAGAR_P(a, b)};
-  const int16_t sesgo = BIAS64, exp_max = 255, escala = 15;
-  const uint64_t bc_max = bc_max64();
-
+    return (Num64){0, (uint64_t)BIAS64, 0, 0};
   uint8_t signo_res = (a.signo != b.signo) ? 1 : 0;
-  uint16_t p_res = PROPAGAR_P(a, b);
+  __int128 va = num64_canon(a), vb = num64_canon(b);
+  unsigned __int128 ua =
+      (va < 0) ? (unsigned __int128)-va : (unsigned __int128)va;
+  unsigned __int128 ub =
+      (vb < 0) ? (unsigned __int128)-vb : (unsigned __int128)vb;
 
-  // el cociente resta las décadas netas del divisor
-  int16_t exp_res = ((int16_t)a.exp - sesgo - (int16_t)a.p) -
-                    ((int16_t)b.exp - sesgo - (int16_t)b.p) - escala;
+  int16_t e_res = (int16_t)((a.exp - BIAS64) - (b.exp - BIAS64));
 
-  unsigned __int128 num_a =
-      (unsigned __int128)a.bc * 1000000000000000ULL; // 10^15
-  unsigned __int128 div = num_a / b.bc;
-
-  // Suavizado en el techo: la subida de década redondea con techo
-  while (div > bc_max) {
-    div = (div + 9) / 10;
-    exp_res++;
+  while (ua >= ((unsigned __int128)1 << 75)) {
+    ua = (ua + 5) / 10;
+    e_res++;
   }
 
-  if (div == 0)
-    return (Num64){0, (uint64_t)sesgo, 0, p_res};
-  // el p propagado vuelve al exponente almacenado para conservar la década
-  int16_t exp_almacenado = exp_res + (int16_t)p_res + sesgo;
-  if (exp_almacenado > exp_max) {
-    exp_almacenado = exp_max;
-    div = bc_max;
-  }
-  if (exp_almacenado < 0)
-    return (Num64){0, (uint64_t)sesgo, 0, p_res};
+  unsigned __int128 numerador = ua << 50;
+  unsigned __int128 V = numerador / ub + ((numerador % ub) * 2 >= ub);
 
-  return (Num64){.signo = signo_res,
-                 .exp = (uint64_t)exp_almacenado,
-                 .bc = (uint64_t)div,
-                 .p = p_res};
+  return num64_repack(signo_res, (__int128)V, e_res, MP64_MEDIO);
 }
 
 // ==========================================
@@ -919,7 +980,6 @@ static inline int cmp_num16(Num16 a, Num16 b) {
   if (a.signo != b.signo)
     return a.signo ? -1 : 1;
 
-  // compara los valores canónicos llevando ambos a la década mayor
   int16_t ea = (int16_t)a.exp - BIAS16;
   int16_t eb = (int16_t)b.exp - BIAS16;
   int16_t k = (ea > eb) ? ea : eb;
@@ -934,44 +994,48 @@ static inline int cmp_num16(Num16 a, Num16 b) {
 }
 
 static inline int cmp_num64(Num64 a, Num64 b) {
+  if (a.bc == 0 && b.bc == 0)
+    return 0;
+  if (a.bc == 0)
+    return b.signo ? 1 : -1;
+  if (b.bc == 0)
+    return a.signo ? -1 : 1;
   if (a.signo != b.signo)
     return a.signo ? -1 : 1;
 
-  __int128 val_a = (__int128)a.bc;
-  __int128 val_b = (__int128)b.bc;
+  int16_t ea = (int16_t)a.exp - BIAS64;
+  int16_t eb = (int16_t)b.exp - BIAS64;
 
-  // décadas netas: el punto fijo p resta del exponente
-  int16_t bias_a = (int16_t)a.exp - BIAS64 - (int16_t)a.p;
-  int16_t bias_b = (int16_t)b.exp - BIAS64 - (int16_t)b.p;
+  __int128 ca = num64_canon(a);
+  __int128 cb = num64_canon(b);
 
-  if (bias_a > bias_b) {
-    int16_t diff = bias_a - bias_b;
-    for (int16_t i = 0; i < diff && val_a <= (__int128)bc_max64(); i++)
-      val_a *= 10;
-  } else if (bias_b > bias_a) {
-    int16_t diff = bias_b - bias_a;
-    for (int16_t i = 0; i < diff && val_b <= (__int128)bc_max64(); i++)
-      val_b *= 10;
+  if (ea > eb) {
+    int16_t diff = ea - eb;
+    for (int16_t i = 0; i < diff; i++) {
+      ca *= 10;
+      if (ca > ((__int128)1 << 120) || ca < -((__int128)1 << 120)) {
+        return a.signo ? -1 : 1;
+      }
+    }
+  } else if (eb > ea) {
+    int16_t diff = eb - ea;
+    for (int16_t i = 0; i < diff; i++) {
+      cb *= 10;
+      if (cb > ((__int128)1 << 120) || cb < -((__int128)1 << 120)) {
+        return a.signo ? 1 : -1;
+      }
+    }
   }
 
-  if (a.signo) {
-    val_a = -val_a;
-    val_b = -val_b;
-  }
-
-  if (val_a < val_b)
+  if (ca < cb)
     return -1;
-  if (val_a > val_b)
+  if (ca > cb)
     return 1;
   return 0;
 }
 
 // ==========================================
-// 7. ARITMÉTICA DE PUNTO FIJO (INT_FP, PaxoFxp) Y DECIMAL EMPAQUETADO
-//    (PKDEC, PaxoPdec BCD). Son dos representaciones distintas (Nanbox.md §3.6):
-//    - int  = entero escalado con signo en 13 bits (real = value·10^(-scale)).
-//    - pdec = dígitos BCD en nibbles con signo y escala separados (real =
-//             Σ dígitos·10^i · 10^(-scale)); carry/borrow decimal exacto.
+// 7. ARITMÉTICA DE PUNTO FIJO (INT_FP) Y DECIMAL EMPAQUETADO (PKDEC)
 // ==========================================
 
 #define FXP_SCALE_MAX 15
@@ -983,8 +1047,6 @@ static inline int64_t fxp_div10_round(int64_t v) {
   return v < 0 ? -m : m;
 }
 
-// Baja la escala (dividiendo y redondeando) hasta que la magnitud quepa en
-// 13 bits; si incluso en escala 0 desborda, satura al límite del formato.
 static inline PaxoFxp fxp_pack(int64_t r, uint8_t scale) {
   while ((r > FXP_MAG_MAX || r < -FXP_MAG_MAX) && scale > 0) {
     r = fxp_div10_round(r);
@@ -1022,7 +1084,6 @@ static inline PaxoFxp mul_fxp(PaxoFxp a, PaxoFxp b) {
 static inline PaxoFxp div_fxp(PaxoFxp a, PaxoFxp b) {
   if (a.value == 0 || b.value == 0)
     return (PaxoFxp){.value = 0, .scale = 0};
-  // cociente con la mayor escala de los operandos, sin pasarse de 15
   int32_t s = (a.scale > b.scale) ? a.scale : b.scale;
   while (s > 0 && ((int32_t)b.scale - (int32_t)a.scale + s) > FXP_SCALE_MAX)
     s--;
@@ -1034,17 +1095,11 @@ static inline PaxoFxp div_fxp(PaxoFxp a, PaxoFxp b) {
   int64_t rem = num % b.value;
   int64_t rm = rem < 0 ? -rem : rem;
   int64_t dm = b.value < 0 ? -(int64_t)b.value : (int64_t)b.value;
-  if (rm * 2 >= dm) // redondeo .5 lejos de cero
+  if (rm * 2 >= dm)
     q += (q >= 0) ? 1 : -1;
   return fxp_pack(q, (uint8_t)s);
 }
 
-// --- decimal empaquetado (BCD): PaxoPdec -------------------------------------
-// Álgebra decimal exacta: magnitudes alineadas en acumulador de 128 bits y
-// resultado repaqueteado a dígitos BCD (carry/borrow decimal sobre dígitos).
-
-// Lleva una magnitud (escala, signo) a dígitos BCD, saturado a 13 dígitos.
-// No baja la escala: la precisión decimal se conserva al máximo.
 static inline PaxoPdec pdec_from_mag128(unsigned __int128 m, uint8_t scale,
                                         uint8_t signo) {
   PaxoPdec r = {0};
@@ -1059,7 +1114,6 @@ static inline PaxoPdec pdec_from_mag128(unsigned __int128 m, uint8_t scale,
   return r;
 }
 
-// Alinea la magnitud a la escala target multiplicando por 10.
 static inline unsigned __int128 pdec_mag_to_scale(PaxoPdec d, uint8_t target) {
   unsigned __int128 m = (unsigned __int128)pdec_magnitude(d);
   for (uint8_t i = d.scale; i < target; i++)
@@ -1067,7 +1121,6 @@ static inline unsigned __int128 pdec_mag_to_scale(PaxoPdec d, uint8_t target) {
   return m;
 }
 
-// suma (o resta con signo opuesto) decimal exacta.
 static inline PaxoPdec pdec_add(PaxoPdec a, PaxoPdec b) {
   uint8_t s = (a.scale > b.scale) ? a.scale : b.scale;
   unsigned __int128 am = pdec_mag_to_scale(a, s);
@@ -1084,7 +1137,6 @@ static inline PaxoPdec pdec_sub(PaxoPdec a, PaxoPdec b) {
   return pdec_add(a, b);
 }
 
-// Compara dos valores decimales (exacto, sin pasar por num64).
 static inline int pdec_cmp(PaxoPdec a, PaxoPdec b) {
   uint8_t s = (a.scale > b.scale) ? a.scale : b.scale;
   unsigned __int128 av = pdec_mag_to_scale(a, s);
@@ -1096,8 +1148,6 @@ static inline int pdec_cmp(PaxoPdec a, PaxoPdec b) {
   return (av > bv) ? (a.signo ? -1 : 1) : (a.signo ? 1 : -1);
 }
 
-// multiplicación decimal: producto de magnitudes, escala sumada; baja la
-// escala solo si pasa de 15 (redondeando el dígito perdido).
 static inline PaxoPdec pdec_mul(PaxoPdec a, PaxoPdec b) {
   unsigned __int128 m = (unsigned __int128)pdec_magnitude(a) *
                         (unsigned __int128)pdec_magnitude(b);
@@ -1109,7 +1159,6 @@ static inline PaxoPdec pdec_mul(PaxoPdec a, PaxoPdec b) {
   return pdec_from_mag128(m, (uint8_t)s, a.signo ^ b.signo);
 }
 
-// división decimal con redondeo .5 lejos de cero, a la mayor escala.
 static inline PaxoPdec pdec_div(PaxoPdec a, PaxoPdec b) {
   uint8_t signo = a.signo ^ b.signo;
   if (pdec_is_zero(a) || pdec_is_zero(b))
@@ -1124,7 +1173,7 @@ static inline PaxoPdec pdec_div(PaxoPdec a, PaxoPdec b) {
   unsigned __int128 dm = (unsigned __int128)pdec_magnitude(b);
   unsigned __int128 q = num / dm;
   unsigned __int128 rem = num % dm;
-  if ((rem * 2) >= dm) // redondeo .5 lejos de cero
+  if ((rem * 2) >= dm)
     q++;
   return pdec_from_mag128(q, (uint8_t)s, signo);
 }
@@ -1150,7 +1199,6 @@ static inline PaxoFxp abs_fxp(PaxoFxp a) {
   return a;
 }
 
-// Compara valores escalados llevando ambos a la mayor escala.
 static inline int cmp_fxp(PaxoFxp a, PaxoFxp b) {
   uint8_t s = (a.scale > b.scale) ? a.scale : b.scale;
   int64_t av = (int64_t)a.value * num16_pow10((uint16_t)(s - a.scale));
