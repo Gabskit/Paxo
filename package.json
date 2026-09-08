@@ -19,7 +19,7 @@
 	"license": "ISC",
 	"description": "Ecosistema de lenguaje y VM con aritmética Mobile Point (MP)",
 	"dependencies": {
-		"alpinejs": "^3.16.3",
+		"alpinejs": "^3.17.1",
 		"flyonui": "^2.4.1"
 	},
 	"devDependencies": {
