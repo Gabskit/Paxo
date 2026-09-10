@@ -2,17 +2,20 @@
 	"name": "paxo",
 	"version": "3.14.16",
 	"type": "module",
+	"bin": {
+		"paxocc": "./Build/paxocc.js"
+	},
 	"scripts": {
 		"antlr": "antlr-ng -Dlanguage=JavaScript -o ./Src/Bcgen ./Src/Bcgen/Paxo.g4",
-		"build:bcg": "npx shx mkdir -p ./Build && go build -o ./Build/Bcg ./Src/Bcgen/cmd/paxocc/",
+		"build:bcg": "npm run antlr && mkdir -p ./Build && esbuild ./Src/Bcgen/cli.js --bundle --platform=node --format=esm --banner:js=\"#!/usr/bin/env node\" --outfile=./Build/paxocc.js",
 		"build:vm": "bash ./sh/build_vm.sh",
-		"build": "npm run antlr && npm run build:bcg && npm run build:vm && npm run gen:lep",
 		"gen:lep": "bash sh/gen_lep.sh",
+		"build": "npm run build:bcg && npm run build:vm && npm run gen:lep",
+		"test:bcg": "node --test ./Src/Bcgen/test/**/*.test.js",
 		"test:vm": "npm run gen:lep && mkdir -p ./Build && gcc -Wall -Wextra -std=gnu23 -I./Build -o ./Build/test_vm_full ./Src/Test/test_vm_full.c -lm && ./Build/test_vm_full",
 		"test:vm:fxp": "npm run gen:lep && mkdir -p ./Build && gcc -Wall -Wextra -std=gnu23 -I./Build -o ./Build/test_vm_fxp ./Src/Test/test_vm_fxp.c -lm && ./Build/test_vm_fxp",
 		"test:vm:old": "npm run gen:lep && mkdir -p ./Build && gcc -Wall -Wextra -std=gnu23 -I./Build -o ./Build/test_lep ./Src/Test/test_lep.c -lm && ./Build/test_lep",
-		"test:bcg": "go test -v ./Src/Bcgen/",
-		"test": "npm run test:vm && npm run test:vm:fxp && npm run test:bcg"
+		"test": "npm run test:bcg && npm run test:vm && npm run test:vm:fxp"
 	},
 	"keywords": [],
 	"author": "",
@@ -24,6 +27,7 @@
 	},
 	"devDependencies": {
 		"antlr-ng": "^1.0.10",
-		"antlr4": "^4.13.2"
+		"antlr4": "^4.13.2",
+		"esbuild": "^0.20.0"
 	}
 }
