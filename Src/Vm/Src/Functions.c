@@ -48,13 +48,6 @@
 #define LEP_HAS_PHYS 1
 #endif
 
-// --- PDF (pdfio + zlib, fuentes en third_party/pdfio) ---
-#if __has_include("third_party/pdfio/pdfio.h")
-#include "third_party/pdfio/pdfio-content.h"
-#include "third_party/pdfio/pdfio.h"
-#define LEP_HAS_PDF 1
-#endif
-
 // Gráficos (sokol + NanoVG, opcional: LEP_ENABLE_NVG). Se activa solo si se
 // compila con -DLEP_ENABLE_NVG y los headers sokol/nanovg están disponibles.
 // Las implementaciones de sokol (app/gfx/time) y del backend GL3 de NanoVG
@@ -158,62 +151,49 @@ typedef enum {
   NATIVE_PHYS_FREE_SPACE,
   // Ventana/gráficos. Los IDs DEBEN coincidir con los que emite el
   // compilador (abytec.go): win_*/tex_* = 58..75, pdf_* = 76..87.
-  NATIVE_WIN_OPEN = 58,       // -> sokol_init
-  NATIVE_WIN_CLOSE = 59,      // -> sokol_shutdown
-  NATIVE_WIN_COLOR = 60,      // -> sokol_color
-  NATIVE_WIN_CLEAR = 61,      // -> sokol_clear
-  NATIVE_WIN_RECT = 62,       // -> nvg_rect
-  NATIVE_WIN_LINE = 63,       // -> nvg_line
-  NATIVE_WIN_CIRCLE = 64,     // -> nvg_circle
-  NATIVE_WIN_TEXT = 65,       // -> nvg_text
-  NATIVE_TEX_LOAD = 66,       // -> tex_load (textura desde píxeles)
-  NATIVE_TEX_DRAW = 67,       // -> tex_draw
-  NATIVE_TEX_FREE = 68,       // -> tex_free
-  NATIVE_WIN_SHOW = 69,       // -> sokol_show (bucle de eventos)
-  NATIVE_WIN_POLL = 70,       // -> sokol_poll
-  NATIVE_WIN_KEY = 71,        // -> sokol_key
-  NATIVE_WIN_MOUSE = 72,      // -> sokol_mouse
-  NATIVE_WIN_MOUSEDOWN = 73,  // -> sokol_mousedown
-  NATIVE_WIN_TIME = 74,       // -> sokol_time
-  NATIVE_WIN_DELAY = 75,      // -> sokol_delay
-  // PDF (pdfio)
-  NATIVE_PDF_OPEN = 76,
-  NATIVE_PDF_NEW = 77,
-  NATIVE_PDF_PAGES = 78,
-  NATIVE_PDF_PAGE_SIZE = 79,
-  NATIVE_PDF_TEXT = 80,
-  NATIVE_PDF_FONT = 81,
-  NATIVE_PDF_PAGE_BEGIN = 82,
-  NATIVE_PDF_COLOR = 83,
-  NATIVE_PDF_WRITE_RECT = 84,
-  NATIVE_PDF_WRITE_LINE = 85,
-  NATIVE_PDF_WRITE_TEXT = 86,
-  NATIVE_PDF_CLOSE = 87,
+  NATIVE_WIN_OPEN,       // -> sokol_init
+  NATIVE_WIN_CLOSE,      // -> sokol_shutdown
+  NATIVE_WIN_COLOR,      // -> sokol_color
+  NATIVE_WIN_CLEAR,      // -> sokol_clear
+  NATIVE_WIN_RECT,       // -> nvg_rect
+  NATIVE_WIN_LINE,       // -> nvg_line
+  NATIVE_WIN_CIRCLE,     // -> nvg_circle
+  NATIVE_WIN_TEXT,       // -> nvg_text
+  NATIVE_TEX_LOAD,       // -> tex_load (textura desde píxeles)
+  NATIVE_TEX_DRAW,       // -> tex_draw
+  NATIVE_TEX_FREE,       // -> tex_free
+  NATIVE_WIN_SHOW,       // -> sokol_show (bucle de eventos)
+  NATIVE_WIN_POLL,       // -> sokol_poll
+  NATIVE_WIN_KEY,        // -> sokol_key
+  NATIVE_WIN_MOUSE,      // -> sokol_mouse
+  NATIVE_WIN_MOUSEDOWN,  // -> sokol_mousedown
+  NATIVE_WIN_TIME,       // -> sokol_time
+  NATIVE_WIN_DELAY,      // -> sokol_delay
   // Nativos adicionales de sokol/NanoVG (no emitidos por el compilador).
-  NATIVE_SOKOL_INIT = 88,
-  NATIVE_SOKOL_SHUTDOWN = 89,
-  NATIVE_SOKOL_CLEAR = 90,
-  NATIVE_SOKOL_COLOR = 91,
-  NATIVE_SOKOL_SHOW = 92,
-  NATIVE_SOKOL_POLL = 93,
-  NATIVE_SOKOL_KEY = 94,
-  NATIVE_SOKOL_MOUSE = 95,
-  NATIVE_SOKOL_MOUSEDOWN = 96,
-  NATIVE_SOKOL_TIME = 97,
-  NATIVE_SOKOL_DELAY = 98,
-  NATIVE_NVG_CREATE = 99,
-  NATIVE_NVG_CANCEL_FRAME = 100,
-  NATIVE_NVG_BEGIN_FRAME = 101,
-  NATIVE_NVG_END_FRAME = 102,
-  NATIVE_NVG_RECT = 103,
-  NATIVE_NVG_LINE = 104,
-  NATIVE_NVG_CIRCLE = 105,
-  NATIVE_NVG_TEXT = 106,
-  NATIVE_NVG_FILL_COLOR = 107,
-  NATIVE_NVG_STROKE_COLOR = 108,
-  NATIVE_NVG_STROKE_WIDTH = 109,
-  NATIVE_NVG_FILL = 110,
-  NATIVE_NVG_STROKE = 111,
+  NATIVE_SOKOL_INIT,
+  NATIVE_SOKOL_SHUTDOWN,
+  NATIVE_SOKOL_CLEAR,
+  NATIVE_SOKOL_COLOR,
+  NATIVE_SOKOL_SHOW,
+  NATIVE_SOKOL_POLL,
+  NATIVE_SOKOL_KEY,
+  NATIVE_SOKOL_MOUSE,
+  NATIVE_SOKOL_MOUSEDOWN,
+  NATIVE_SOKOL_TIME,
+  NATIVE_SOKOL_DELAY,
+  NATIVE_NVG_CREATE,
+  NATIVE_NVG_CANCEL_FRAME,
+  NATIVE_NVG_BEGIN_FRAME,
+  NATIVE_NVG_END_FRAME,
+  NATIVE_NVG_RECT,
+  NATIVE_NVG_LINE,
+  NATIVE_NVG_CIRCLE,
+  NATIVE_NVG_TEXT,
+  NATIVE_NVG_FILL_COLOR,
+  NATIVE_NVG_STROKE_COLOR,
+  NATIVE_NVG_STROKE_WIDTH,
+  NATIVE_NVG_FILL,
+  NATIVE_NVG_STROKE,
   NATIVE_ID_COUNT
 } NativeId;
 
@@ -227,13 +207,10 @@ static void print_pkdec(PaxoPdec d) { printf("%s", (const char *)readpdec(d)); }
 
 static void print_var_inline(PaxoVar elem) {
   switch (var_type(elem)) {
-  case NUM16:
+  case NUM:
     printf("%s", (const char *)readnum16(var_num16_get(elem), 1));
     break;
-  case NUM64:
-    printf("%s", (const char *)readnum64(var_num64_get(elem), 1));
-    break;
-  case VBOOL:
+  case BOOL:
     printf("%s", var_bool_get(elem) ? "true" : "false");
     break;
   case TRIT:
@@ -242,17 +219,10 @@ static void print_var_inline(PaxoVar elem) {
   case CHAR:
     printf("'%s'", (const char *)readchar32(var_char_get(elem)));
     break;
-  case INT_FP:
-    print_intfp(var_fxp_get(elem));
-    break;
-  case PKDEC:
-    print_pkdec(var_pkdec_get(elem));
-    break;
   case COLOR:
     printf("#%08X", var_color_get(elem));
     break;
   case COMPLEX:
-  case COMPLEX16:
     printf("%s", (const char *)readcomplex(var_complex_get(elem)));
     break;
   case STRING:
@@ -316,13 +286,10 @@ static PaxoVar native_typeof(PaxoVar *args, uint8_t argc) {
     return LEP_ZERO;
   const char *type_name = "unknown";
   switch (var_type(args[0])) {
-  case NUM16:
-    type_name = "num16";
+  case NUM:
+    type_name = "num";
     break;
-  case NUM64:
-    type_name = "num64";
-    break;
-  case VBOOL:
+  case BOOL:
     type_name = "bool";
     break;
   case TRIT:
@@ -346,20 +313,11 @@ static PaxoVar native_typeof(PaxoVar *args, uint8_t argc) {
   case PACKAGE:
     type_name = "package";
     break;
-  case INT_FP:
-    type_name = "int";
-    break;
-  case PKDEC:
-    type_name = "pdec";
-    break;
   case COLOR:
     type_name = "col";
     break;
   case COMPLEX:
     type_name = "ni";
-    break;
-  case COMPLEX16:
-    type_name = "sni";
     break;
   }
 

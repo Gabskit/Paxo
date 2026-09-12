@@ -9,71 +9,69 @@ typedef unsigned char char8_t;
 typedef uint32_t char32_t;
 
 // ==========================================
-// SESGOS DE EXPONENTE (MP REVISIÓN)
-// Num16: exp:2  -> Bias = 1
-// Num64: exp:8  -> Bias = 127
+// SESGOS DE EXPONENTE num bias 7
 // ==========================================
 
 // Conversión que PRESERVA EL VALOR decimal:
 //   v = bc · 2^(-2p) · 10^(e) = (bc · 25^p) · 10^(e - 2p)
-static inline Num64 num16tonum64(Num16 num) {
+static inline Number num16tonum64(Num16 num) {
   static const uint64_t pow25[MP16_FRAC + 1] = {1,     25,     625,
-                                                15625, 390625, 9765625};
-  Num64 result = {0};
-  result.signo = num.signo;
-  if (num.bc == 0)
-    return result;
-
-  int16_t g = (int16_t)((int16_t)num.exp - BIAS16 - 2 * (int16_t)num.p);
-  uint64_t bc = (uint64_t)num.bc * pow25[num.p];
-  uint16_t p64 = 0;
-  if (g >= 0) {
-    bc *= num16_pow10((uint16_t)g);
-  } else {
-    int16_t falta = -g;
-    p64 = (falta > 25) ? 25 : (uint16_t)falta; // límite de p en Num64
-    bc *= num16_pow10((uint16_t)(falta - p64));
-  }
-  while (bc % 10 == 0 && p64 > 0) { // normaliza ceros finales
-    bc /= 10;
-    p64--;
-  }
-  result.bc = bc;
-  result.p = p64;
-  result.exp = (uint64_t)BIAS64;
-  return result;
-}
-
-// Conversión que PRESERVA EL VALOR decimal: lleva el Num64 a unidades de
-// 1/1024 y reempaqueta buscando la representación más fina
-static inline Num16 num64tonum16(Num64 num) {
-  if (num.bc == 0)
-    return (Num16){0, (uint16_t)BIAS16, 0, 0};
-
-  uint64_t bc = num.bc;
-  int16_t e = (int16_t)((int64_t)num.exp - (int64_t)BIAS64 - (int64_t)num.p);
-  while (bc % 10 == 0 && e < 32767) { // décadas exactas fuera del camino
-    bc /= 10;
-    e++;
-  }
-  while (bc > ((uint64_t)1 << 50)) { // cabe en el reempaquetado
-    bc = (bc + 5) / 10;
-    e++;
-  }
-  return num16_repack(num.signo, (int64_t)(bc << 10), e, MP16_MEDIO);
-}
-
-// --- CONVERSIÓN CON TRIT / VBOOL ---
-
-static inline Num16 trittonum16(PaxoBool trit) {
-  Num16 result = {0};
-  result.exp = BIAS16; // 10^0
-  result.bc = (uint16_t)trit;
-  return result;
-}
-
-static inline Num64 trittonum64(uint8_t trit) {
-  Num64 result = {0};
+                                                  15625, 390625, 9765625};
+                                                    Num64 result = {0};
+                                                      result.signo = num.signo;
+                                                        if (num.bc == 0)
+                                                            return result;
+                                                            
+                                                              int16_t g = (int16_t)((int16_t)num.exp - BIAS16 - 2 * (int16_t)num.p);
+                                                                uint64_t bc = (uint64_t)num.bc * pow25[num.p];
+                                                                  uint16_t p64 = 0;
+                                                                    if (g >= 0) {
+                                                                        bc *= num16_pow10((uint16_t)g);
+                                                                          } else {
+                                                                              int16_t falta = -g;
+                                                                                  p64 = (falta > 25) ? 25 : (uint16_t)falta; // límite de p en Num64
+                                                                                      bc *= num16_pow10((uint16_t)(falta - p64));
+                                                                                        }
+                                                                                          while (bc % 10 == 0 && p64 > 0) { // normaliza ceros finales
+                                                                                              bc /= 10;
+                                                                                                  p64--;
+                                                                                                    }
+                                                                                                      result.bc = bc;
+                                                                                                        result.p = p64;
+                                                                                                          result.exp = (uint64_t)BIAS64;
+                                                                                                            return result;
+                                                                                                            }
+                                                                                                            
+                                                                                                            // Conversión que PRESERVA EL VALOR decimal: lleva el Num64 a unidades de
+                                                                                                            // 1/1024 y reempaqueta buscando la representación más fina
+                                                                                                            static inline Num16 num64tonum16(Num64 num) {
+                                                                                                              if (num.bc == 0)
+                                                                                                                  return (Num16){0, (uint16_t)BIAS16, 0, 0};
+                                                                                                                  
+                                                                                                                    uint64_t bc = num.bc;
+                                                                                                                      int16_t e = (int16_t)((int64_t)num.exp - (int64_t)BIAS64 - (int64_t)num.p);
+                                                                                                                        while (bc % 10 == 0 && e < 32767) { // décadas exactas fuera del camino
+                                                                                                                            bc /= 10;
+                                                                                                                                e++;
+                                                                                                                                  }
+                                                                                                                                    while (bc > ((uint64_t)1 << 50)) { // cabe en el reempaquetado
+                                                                                                                                        bc = (bc + 5) / 10;
+                                                                                                                                            e++;
+                                                                                                                                              }
+                                                                                                                                                return num16_repack(num.signo, (int64_t)(bc << 10), e, MP16_MEDIO);
+                                                                                                                                                }
+                                                                                                                                                
+                                                                                                                                                // --- CONVERSIÓN CON TRIT / VBOOL ---
+                                                                                                                                                
+                                                                                                                                                static inline Num16 trittonum16(PaxoBool trit) {
+                                                                                                                                                  Num16 result = {0};
+                                                                                                                                                    result.exp = BIAS16; // 10^0
+                                                                                                                                                      result.bc = (uint16_t)trit;
+                                                                                                                                                        return result;
+                                                                                                                                                        }
+                                                                                                                                                        
+                                                                                                                                                        static inline Num64 trittonum64(uint8_t trit) {
+                                                                                                                                                          Num64 result = {0};
   result.exp = BIAS64; // 10^0
   result.bc = (uint64_t)trit;
   return result;
