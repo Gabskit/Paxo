@@ -28,7 +28,7 @@ varDeclaration
     ;
 
 type
-		: VAR_TYPE | NUM_TYPE | CHARA_TYPE | POINTER_TYPE | TRIT_TYPE | BOOLEAN_TYPE | FUNC_TYPE | PKG_TYPE | INT_TYPE | PKDEC_TYPE | COLOR_TYPE | COMPLEX_TYPE ;
+		: VAR_TYPE | NUM_TYPE | CHARA_TYPE | POINTER_TYPE | TRIT_TYPE | BOOLEAN_TYPE | FUNC_TYPE | PKG_TYPE | COLOR_TYPE | COMPLEX_TYPE ;
 
 scope
 	: GLOBAL | LOCAL ;
@@ -138,17 +138,15 @@ arrayLiteral
 // 2. REGLAS DEL LEXER (Tokens con Aliases Móvil/ASCII)
 // ==========================================
 
-VAR_TYPE: 'var' | '📥' | 'svar' | 's📥' ;
-NUM_TYPE: 'n' | 'sn' ;
-COMPLEX_TYPE: 'ni' | 'sni' ;
+VAR_TYPE: 'var' | '📥' ;
+NUM_TYPE: 'n';
+COMPLEX_TYPE: 'ni';
 CHARA_TYPE: 'abc' ;
 TRIT_TYPE: 'trit' ;
 BOOLEAN_TYPE: 'bool' ;
 POINTER_TYPE: 'pin' ;
 FUNC_TYPE: 'fx' ;
 PKG_TYPE: '📦' | 'pkg' ;
-INT_TYPE: 'int' ;
-PKDEC_TYPE: 'pdec' ;
 COLOR_TYPE: 'col' ;
 
 // DEPRECADOS: no cambian el comportamiento (todo vive en un array flat de

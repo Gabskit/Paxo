@@ -13,7 +13,7 @@
 
 typedef struct {
   size_t return_ip;
-  PaxoVar locals[256];
+  LEPVar locals[256];
 } CallFrame;
 
 typedef struct {
