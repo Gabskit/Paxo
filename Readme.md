@@ -8,28 +8,26 @@ Lenguaje de programación de tipado dinámico, multiparadigma, con VM propia. Di
 Paxo/
 ├── Src/
 │   ├── Bcgen/          # Compilador a bytecode (Go + ANTLR)
-│   │   ├── cmd/paxocc/ # Entry point del compilador
+│   │   ├── main.js # Entry point del compilador
 │   │   ├── Paxo.g4     # Gramática ANTLR
-│   │   └── abytec.go   # Generador de bytecode
+│   │   └── abytec.js   # Generador de bytecode
 │   └── Vm/Src/         # Virtual Machine (C)
 │       ├── Main.c      # Entry point de la VM (lepvm)
 │       ├── Vm.c        # Intérprete de bytecode
 │       ├── Functions.c # Funciones nativas (print, colores, etc.)
 │       ├── Calc.c      # Tipos y estructuras de datos (incluye arrays, packages)
-│       ├── Deque.c     # Deque (pila doble)
+│       ├── Smart_heap.c     # Smart heap (registros extensibles)
 │       ├── Typecast_and_read.c # Conversión de tipos
 │       └── termcolor-c.h       # Colores ANSI en terminal
 ├── sh/
 │   └── gen_lep.sh      # Genera lep.h (single-header)
 ├── Build/              # Binarios generados
-├── go.mod
 ├── package.json
 └── Readme.md
 ```
 
 ## Requisitos
 
-- [Go](https://go.dev/) >= 1.23
 - [Clang](https://clang.llvm.org/) (con soporte `-std=gnu23`)
 - [Node.js](https://nodejs.org/) (para ANTLR y scripts de build)
 - [ANTLR](https://www.antlr.org/) (`npm install` instala `antlr-ng`)
@@ -65,7 +63,6 @@ npm run antlr        # Regenerar parser desde Paxo.g4
 ```
 var foo = 6.7          // número (inferido, siempre num64)
 n foo = 6.7
-sn foo = 3.14
 
 var foo = •            // trit (ternario: •, ↑, ↓)
 trit foo = •
@@ -82,15 +79,8 @@ pin goo = @foo
 var foo = .×            // booleano bit (.× = false, .✓ = true)
 bool foo = .×
 
-int foo = 45            // entero / punto fijo (nanbox 11011, t=0)
-pdec foo = 6.50         // decimal empaquetado (nanbox 11011, t=1)
 col foo = #FF8000       // color RGBA (nanbox 11010 + flag); #RRGGBB o #RRGGBBAA
 ```
-
-Los literales numéricos se empaquetan como **num64** por defecto. Los tipos
-`int`, `pdec` y `col` se empaquetan en el nanbox con su marcador propio (ver
-[Nanbox.md](Nanbox.md)) y no califican como "num relajado" para aritmética
-directa (uso `typeof(x)` para comprobarlo).
 
 ## Arrays
 
@@ -156,7 +146,7 @@ println(datos[2]);    // true
 Los bloques `{}` declaran paquetes con campos propios. Se accede a los campos con notación de punto (`pkg.campo`):
 
 ```
-var persona = {
+pkg persona = {
     var nombre = "Paxo";
     var edad = 25;
     var activo = .✓;
@@ -171,7 +161,7 @@ println(typeof(persona));   // package
 Los campos pueden contener arrays u otros tipos:
 
 ```
-var config = {
+pkg config = {
     var lang = "paxo";
     var version = 2;
     var debug = .✓;
@@ -186,7 +176,7 @@ El acceso encadenado funciona: `obj.tags[0]`, `obj.tags[1]`, etc.
 ## Funciones
 
 ```
-var foo = () {
+fx foo = () {
     var goo = "Esto es una función"
     return goo;
 }
@@ -195,7 +185,7 @@ var foo = () {
 Las funciones pueden declarar tipo de retorno con `: tipo` después de los paréntesis:
 
 ```
-📥 sumar = (n a, n b) : n {
+fx sumar = (n a, n b) : n {
     return a + b;
 }
 ```
@@ -210,7 +200,7 @@ return;              // retorna sin valor
 **Ejemplo con cond:**
 
 ```
-📥 buscar = (n x) : bool {
+fx buscar = (n x) : bool {
     (x) ? 42 -> {
         return .✓;
     } : _ -> {
@@ -227,7 +217,15 @@ pub var      // global
 🌎 var       // global (alias)
 ```
 
-> **Nota:** Actualmente `local` y `pub` no separan scopes reales. Todas las variables se almacenan en un array flat de globals. Las variables dentro de funciones o bloques `{}` son accesibles desde afuera.
+```
+pkg uno = {
+	local n secret = 0
+	pub bool bit = .✓
+	pub fx mod_secret = (n: num){
+		this.secret = num
+	}
+}
+```
 
 ## Condicionales
 
@@ -246,7 +244,7 @@ El condicional compara la condición con cada valor usando igualdad (`==`). El c
 **Ejemplo:**
 
 ```
-local n x = 5
+n x = 5
 (x) ? 5 -> {
     println("x es 5");
 } : _ -> {
@@ -257,7 +255,7 @@ local n x = 5
 **Múltiples casos:**
 
 ```
-local 📥 dia = "lunes"
+📥 dia = "lunes"
 (dia) ? "lunes" -> {
     println("Inicio de semana");
 } : "viernes" -> {
@@ -278,8 +276,7 @@ local 📥 dia = "lunes"
 - `⏸️` | `||`: ejecuta hasta que la condición sea verdadera (while not)
 - `▶️` | `|>`: ejecuta mientras la condición sea verdadera (while)
 
-El cuerpo es un **bloque**: llaves `{ ... }` o el formato alternativo
-`:` ... `🏁`:
+El cuerpo es un **bloque**
 
 ```
 (condicion): ⏸️ :
@@ -287,11 +284,17 @@ El cuerpo es un **bloque**: llaves `{ ... }` o el formato alternativo
 🏁
 ```
 
-> **Deprecado:** los delimitadores explícitos `|:` / `:|` (o sus variantes
-> `𝄆` / `𝄇`) ya no son la forma recomendada de abrir/cerrar el bucle. Todavía se
-> aceptan por retrocompatibilidad, pero el compilador emite un aviso
-> `el delimitador de bucle '|:' está deprecado; usa el nuevo formato de bloque`.
-> Usa la sintaxis de bloque (`{ ... }` o `: ... 🏁`) para código nuevo.
+```
+(condicion): || :
+	//codigo
+;
+```
+
+```
+(condicion): |> 
+	//codigo
+end
+```
 
 ## Manejo de errores
 
@@ -338,7 +341,7 @@ println("hola mundo");
 println("nota: ", 8.5);
 print("suma: ", 2 + 3);
 
-local 📥 nombre = ""
+📥 nombre = ""
 nombre = scan()
 println("Hola ", nombre);
 ```
@@ -527,36 +530,6 @@ win_delay(ms)
 
 **Ejemplo:** ver `Src/Testfiles/libs_win.paxo`.
 
-### PDF (pdfio)
-
-Siempre disponible: las fuentes oficiales se venden en
-`Src/Vm/Src/third_party/pdfio` (+ zlib en `third_party/zlib`) y se
-compilan junto a la VM. Coordenadas en puntos desde la esquina
-inferior izquierda.
-
-```
-pdf_open(ruta)                    // abre para lectura -> handle o 0
-pdf_new(ruta [, ancho, alto])     // crea para escritura -> handle o 0
-                                  // (tamaño por defecto: carta 612x792)
-pdf_pages(doc)                    // cantidad de páginas (lectura)
-pdf_page_size(doc, pagina)        // -> [ancho, alto]
-pdf_text(doc, pagina)             // extrae el texto plano de una página
-pdf_font(doc, "Helvetica")        // registra fuente base14 ("Courier",
-                                  //  "Times-Roman", ...); retorna índice
-pdf_page_begin(doc)               // comienza una página (escritura)
-pdf_color(doc, r, g, b)           // color relleno/trazo 0..255
-pdf_write_rect(doc, x, y, w, h)   // rectángulo relleno
-pdf_write_line(doc, x1, y1, x2, y2)
-pdf_write_text(doc, x, y, tam, texto)
-pdf_close(doc)                    // guarda (escritura) o libera (lectura)
-```
-
-**Ejemplo:** ver `Src/Testfiles/libs_pdf.paxo`.
-
-> Los handles retornados por física/audio/fuentes/texturas/PDF son números;
-> usar un handle inválido (0 o liberado) hace que la función retorne `.×`,
-> 0 o un array vacío según corresponda, sin romper la VM.
-
 ### Información de tipos
 
 ```
@@ -610,7 +583,7 @@ println("color normal")
 
 ```
 // Arrays mixtos
-local var arr = «1, 2, 3»
+var arr = «1, 2, 3»
 array_push(arr, 4);
 println("Array: ", arr);
 println("Len: ", array_len(arr));
@@ -620,24 +593,24 @@ arr[0] = 100
 println("arr[0]=100: ", arr);
 
 // Nested arrays
-local var nested = ««1, 2», «3, 4»»
+var nested = ««1, 2», «3, 4»»
 println("nested[0]: ", nested[0]);
 
 // Paquetes con dot-access
-local var persona = {
-    local var nombre = "Paxo"
-    local var edad = 25
+pkg persona = {
+    pub abc nombre = "Paxo"
+    pub n edad = 25
 }
 println("nombre: ", persona.nombre);
 
 // Funciones con return
-local 📥 sumar = (n a, n b) : n {
+fx sumar = (n a, n b) : n {
     return a + b
 }
 println("Suma: ", sumar(3, 4));
 
 // Scan + cond
-local 📥 entrada = ""
+var entrada = ""
 entrada = scan()
 (entrada) ? entrada == "si" -> {
     println("Aceptado");
@@ -650,7 +623,6 @@ entrada = scan()
 
 El script `sh/gen_lep.sh` genera dos single-headers de la VM como librería C para uso externo:
 - `Build/lep.h` — versión completa, incluye las librerías de terceros (miniaudio, nanovg, simple2d, gl3_compat).
-- `Build/lep_paxo.h` — versión reducida con solo los fuentes de Paxo, sin las librerías de terceros.
 
 ```bash
 npm run gen:lep
@@ -666,97 +638,6 @@ npm run test:bcg    # Tests del compilador (Go)
 
 ## Changelog reciente
 
-### Funciones nativas de librerías (nuevo)
-- Nuevas familias de funciones nativas: imágenes (`img_*`), fuentes
-  (`font_*`), audio (`audio_*`), física 2D (`phys_*`), ventana/gráficos
-  SDL3 (`win_*`, `tex_*`) y PDF (`pdf_*`). Ver sección "Funciones nativas"
-- Chipmunk2D, pdfio y zlib se venden como **fuentes completas** en
-  `Src/Vm/Src/third_party/` y se compilan junto a la VM (`sh/build_vm.sh`);
-  no requieren instalación
-- stb_image / stb_truetype / miniaudio siguen siendo header-only
-- SDL3 es opcional: si `pkg-config` la detecta, el build habilita las
-  funciones de ventana con `-DPAXO_ENABLE_SDL3`; si no, degradan sin romper
-
-### Condicionales anidados (corregido)
-- `(x) ? caso -> {...}` comparaba mal: saltaba según la veracidad del
-  valor del caso en vez de compararlo con la condición; ahora emite
-  `LOAD tmp; valor; EQ; JIF` correctamente
-- Los condicionales son reentrantes: cada instancia usa su propio frame
-  (variable temporal y bloques capturados), así que anidarlos dentro de
-  otros condicionales o bucles ya no corrompe el bytecode
-
-### Bucles anidados (corregido)
-- El cierre del cuerpo del bucle se identifica por bloque exacto
-  (no por profundidad), evitando cierres prematuros con bloques anidados
-
-### Paquetes con dot-access (nuevo)
-- `{ var campo = valor; }` crea objetos PACKAGE con campos propios
-- `pkg.campo` accede a campos via notación de punto
-- `typeof(pkg)` retorna `"package"`
-
-### Asignación por índice (nuevo)
-- `arr[i] = expr;` asigna valores en índices específicos
-- Soporta expresiones: `arr[i] = arr[0] + arr[1]`
-
-### Arrays (nuevo)
-- Tipos `«»` para crear arrays con elementos mixtos
-- Acceso por índice: `arr[i]`
-- Nativas: `array_len()`, `array_push()`
-- Soporte para arrays anidados: `««1,2», «3,4»»`
-- Opcodes: `OP_ARRAY_NEW`, `OP_ARRAY_GET`, `OP_ARRAY_SET`
-
-### Return (nuevo)
-- Palabra clave `return` para retornar valores de funciones
-- Funciona dentro de condicionales y bucles anidados
-
-### typeof (corregido)
-- Ahora retorna un string completo (`"num"`, `"bool"`, etc.) en vez de solo el primer carácter
-
-### scan (nuevo)
-- `scan()` lee una línea de stdin y la retorna como string
-
-### Literales numéricos (corregido)
-- Los literales enteros siempre se empaquetan como num64 para evitar pérdida de precisión del formato base-20
-
-### NaN-boxing (nuevo)
-- Los valores de la VM ahora son palabras de 64 bits NaN-boxed (`PaxoVar = uint64_t`)
-- Formato num64 según especificación: `[s | 8e | 25bc(50b) | p5]`, bias 127
-- Marcador `11010` en los 5 bits bajos para valores boxeados; tags en bits [63:62]: bit, trit, char utf32, ref
-- num16 embebido via marcador reservado `11011`: `(raw16 << 5) | 27`
-- Referencias (string/array/package/func/pin) con subtag en aux16 y tabla global de objetos para punteros reales
-
-### Dark backgrounds (nuevo)
-- `bg_color()` soporta variantes oscuras: `"dark red"`, `"dark cyan"`, etc.
-
-### Dependencias vendidas (nuevo)
-- Headers de Chipmunk2D (`chipmunk*.h`, `cp*.h`), NanoVG (`nanovg.h`) y SDL3
-  (`SDL3/`, `SDL3_image/`, `SDL3_mixer/`, `SDL3_ttf/`) ahora viven en `Src/Vm/Src/`
-- Los includes de librerías externas se activan solos con `__has_include`
-  cuando sus dependencias están disponibles; la VM compila con o sin ellas
-- Para usar las funciones reales de estas libs hace falta linkear los `.so`
-  (p. ej. `-lSDL3 -lchipmunk -lnanovg`); hoy solo se usan sus declaraciones
-
-## Changelog reciente
-
-### Deprecación del tipo `pdec`
-- El tipo `pdec` (decimal empaquetado) quedó deprecado: ya no garantiza números
-  únicos sin error. Sigue funcionando por retrocompatibilidad, pero el compilador
-  emite un aviso y se recomienda usar `int` (punto fijo) o `var` en su lugar.
-
-### Tipos nuevos: `int`, `pdec`, `col`
-- Se añadieron los tipos `int` (entero / punto fijo) y `pdec` (decimal
-  empaquetado), ambos empaquetados en el marcador nanbox `11011` (0x1B), y `col`
-  (color RGBA), empaquetado en el marcador `11010` con el flag de color.
-- Literales de color: `#RRGGBB` o `#RRGGBBAA`.
-- El nanbox se actualizó según `Nanbox.md`: MP16 pasó del marcador `11011` al
-  `11100` (0x1C) para dejar `11011` a los nuevos tipos.
-
-### Deprecación de los delimitadores de bucle `|:` / `:|`
-- Los delimitadores `|:` / `:|` (y `𝄆` / `𝄇`) quedaron deprecados. Siguen
-  funcionando por retrocompatibilidad, pero el compilador emite un aviso y se
-  recomienda usar la sintaxis de bloque (`{ ... }` o `: ... 🏁`).
-- Esto libera el bloque `: ... 🏁` como forma alternativa de cuerpo de bucle.
-
 ## Licencia
 
 ISC
@@ -770,5 +651,4 @@ Vendidas como headers en `Src/Vm/Src/`:
 [stb image, truetype, image_write, image_resize2] [https://github.com/nothings/stb.git]
 [miniaudio] [https://miniaud.io/]
 [Chipmunk2D headers] [https://codeberg.org/slembcke/Chipmunk2D]
-[PDF io header] [https://github.com/michaelrsweet/pdfio.git]
 [sokol] [https://github.com/floooh/sokol/tree/master]

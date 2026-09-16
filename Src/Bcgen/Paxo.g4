@@ -102,6 +102,7 @@ argumentList
 
 expression
     : IDENTIFIER '(' argumentList? ')' # callExpr
+    | '(' expression ')'	#parenExpr
     | expression '[' expression ']' '(' argumentList ')' # indexedCallExpr
     | expression '[' expression ']'                        # indexedAccessExpr
     | expression '.' IDENTIFIER '(' argumentList ')' # methodCallExpr

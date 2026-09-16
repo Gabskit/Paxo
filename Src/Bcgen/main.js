@@ -4,7 +4,7 @@ import { Compile } from './abytec.js';
 async function main() {
 	const args = process.argv.slice(2);
 	if (args.length < 1) {
-		console.error("Uso: node main.js <archivo.paxo> [output.pbc] [-d]");
+		console.error("Uso: node paxocc.js <archivo.paxo> [output.pbc] [-d]");
 		process.exit(1);
 	}
 
@@ -23,9 +23,11 @@ async function main() {
 	try {
 		await Compile(inputFile, outputFile, dump);
 	} catch (err) {
-		console.error(err.message);
-		process.exit(1);
-	}
+		console.error(err.message)
+		console.log("--------")
+    console.error(err.stack || err);
+    process.exit(1);
+}
 }
 
 main();

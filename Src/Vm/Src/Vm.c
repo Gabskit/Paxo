@@ -1,4 +1,5 @@
 /* Light Environment Processing VM (LEP-VM) */
+/* Funcionamiento smart_heap: Arreglo dinámico indexado, no una pila */
 #pragma once
 #include "Calc.c"
 #include "Smart_heap.c"
@@ -8,6 +9,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
+
 #define MAX_FRAMES 128
 #define MAX_TRY_FRAMES 64
 
@@ -32,25 +35,11 @@ typedef struct {
   size_t try_frame_count;
 } VM;
 
-// El tipo pdec (decimal empaquetado) está deprecado. Avisamos una sola vez por
-// proceso cuando se ejecuta una operación sobre un valor pdec; el tipo sigue
-// funcionando (retrocompatibilidad) pero recomienda usar int/var.
-static int pdec_deprecation_warned = 0;
-static void vm_warn_pdec(void) {
-  if (pdec_deprecation_warned)
-    return;
-  pdec_deprecation_warned = 1;
-  text_yellow(stderr);
-  fprintf(stderr, "[lepvm aviso]");
-  reset_colors(stderr);
-  fprintf(stderr, " el tipo 'pdec' (decimal empaquetado) está deprecado: ya no "
-                  "garantiza números únicos sin error y quedará sin soporte. "
-                  "Usa 'int' (punto fijo) o 'var'.\n");
-}
-
 typedef enum {
-  OP_PUSH,
-  OP_POP,
+  OP_WRITE,
+  OP_READ,
+  OP_EXPAND,
+  OP_COLAPSE,
   OP_ADD,
   OP_SUB,
   OP_MUL,
@@ -65,7 +54,7 @@ typedef enum {
   OP_HALT,
   OP_CALL,
   OP_CALL_NATIVE,
-  // --- Comparación (push VBOOL) ---
+  // --- Comparación (writeBOOL) ---
   OP_EQ,
   OP_NEQ,
   OP_LT,
@@ -89,28 +78,42 @@ typedef enum {
   OP_RETURN,
   OP_CALL_VAR,
   // --- Arrays ---
-  OP_ARRAY_NEW,  // [uint16_t count] — pops count elements, pushes ARRAY
-  OP_ARRAY_GET,  // pops index (NUM64) + array, pushes element
-  OP_ARRAY_SET,  // pops value + index (NUM64) + array, sets element
+  OP_ARRAY_NEW,  // [uint16_t count]
+  OP_ARRAY_GET,  
+  OP_ARRAY_SET,  
   // --- Packages ---
-  OP_PKG_NEW,    // [uint16_t field_count] — pops field_count name/value pairs, pushes PACKAGE
-  OP_PKG_GET,    // [uint16_t name_len] [chars...] — pops package, pushes field value
-  OP_PKG_SET,    // [uint16_t name_len] [chars...] — pops value + package, sets field
+  OP_PKG_NEW,    // [uint16_t field_count]
+  OP_PKG_GET,    // [uint16_t name_len] [chars...]
+  OP_PKG_SET,    // [uint16_t name_len] [chars...]
   // --- Try/Catch ---
-  OP_TRY_SETUP,  // [int16_t catch_offset] — pushes try frame, catch target = ip + catch_offset
-  OP_TRY_END,    // pops try frame, jumps past catch block
-  OP_THROW,      // pops error value, unwinds to nearest catch handler
-  OP_STORE_LOCAL, // [uint16_t index] — stores to frame-local variable
-  OP_LOAD_LOCAL,  // [uint16_t index] — loads from frame-local variable
-  OP_CALL_METHOD, // [uint8_t argc] — pops func + args + receiver, jumps to func with locals[0]=receiver
-  OP_THIS_GET,    // [uint16_t name_len] [chars...] — reads private field of frame locals[0]
-  OP_THIS_SET,    // [uint16_t name_len] [chars...] — writes private field of frame locals[0]
+  OP_TRY_SETUP,  // [int16_t catch_offset]
+  OP_TRY_END,    
+  OP_THROW,      
+  OP_STORE_LOCAL, // [uint16_t index]
+  OP_LOAD_LOCAL,  // [uint16_t index]
+  OP_CALL_METHOD, // [uint8_t argc]
+  OP_THIS_GET,    // [uint16_t name_len] [chars...]
+  OP_THIS_SET,    // [uint16_t name_len] [chars...]
 } PaxoOpcode;
 
 void vm_init(VM *vm, const uint8_t *bytecode, size_t bytecode_size) {
   vm->bytecode = bytecode;
   vm->bytecode_size = bytecode_size;
   vm->ip = 0;
+  vm->frame_count = 1; // Frame 0 es el entorno global inicial
+  vm->try_frame_count = 0;
+  memset(vm->frames, 0, sizeof(vm->frames));
+  memset(vm->try_frames, 0, sizeof(vm->try_frames));
+}
+
+void vm_error(VM *vm, const char *msg) {
+  text_red(stderr);
+  fprintf(stderr, "[LEP-VM Error en IP %zu]: %s\n", vm->ip, msg);
+  reset_colors(stderr);
+}
+
+static inline uint8_t read_u8(VM *vm) {
+    return vm->bytecode[vm->ip++];
 }
 
 // Helpers seguros para lectura sin problemas de alineación
@@ -122,329 +125,163 @@ static inline uint16_t read_u16(VM *vm) {
 }
 
 static inline int16_t read_i16(VM *vm) {
-  int16_t val;
-  memcpy(&val, vm->bytecode + vm->ip, sizeof(int16_t));
-  vm->ip += sizeof(int16_t);
+    // Si ya tienes un helper para leer 1 byte y avanzar vm->ip:
+    uint16_t low = (uint16_t)read_u8(vm);
+    uint16_t high = (uint16_t)read_u8(vm);
+    
+    return (int16_t)(low | (high << 8));
+}
+
+static inline uint32_t read_u32(VM *vm) {
+  uint32_t val;
+  memcpy(&val, vm->bytecode + vm->ip, sizeof(uint32_t));
+  vm->ip += sizeof(uint32_t);
   return val;
 }
 
-void vm_error(VM *vm, const char *msg);
-
-static inline bool var_is_num_type(enum type t) {
-  return t == NUM16 || t == NUM64;
+static inline uint64_t read_u64(VM *vm) {
+  uint64_t val;
+  memcpy(&val, vm->bytecode + vm->ip, sizeof(uint64_t));
+  vm->ip += sizeof(uint64_t);
+  return val;
 }
 
-static inline bool var_is_fxp_type(enum type t) {
-  return t == INT_FP || t == PKDEC;
-}
-
-static inline bool var_is_numeric(enum type t) {
-  return var_is_num_type(t) || var_is_fxp_type(t);
-}
-
-static inline Num64 var_num_as64(PaxoVar v) {
-  return (var_type(v) == NUM16) ? num16tonum64(var_num16_get(v))
-                                : var_num64_get(v);
-}
-
-static inline PaxoVar fxp_to_var(PaxoFxp f) {
-  return var_int_fp(f.value, f.scale);
-}
-
-// Lleva un operando al dominio de punto fijo (int) de la escala pedida
-// (num → fxp; INT_FP se mantiene tal cual).
-static inline PaxoFxp var_as_fxp(PaxoVar v, uint8_t scale) {
-  switch (var_type(v)) {
-  case NUM16:
-    return num64_to_fxp(num16tonum64(var_num16_get(v)), scale);
-  case NUM64:
-    return num64_to_fxp(var_num64_get(v), scale);
-  case INT_FP:
-    return var_fxp_get(v);
-  default:
-    return fxp_pack(0, scale);
-  }
-}
-
-// Lleva un operando al dominio BCD (pdec). MP se redondea a la escala
-// pedida; INT_FP se convierte sin pérdida (mantiene su propia escala).
-static inline PaxoPdec var_to_pdec(PaxoVar v, uint8_t num_scale) {
-  switch (var_type(v)) {
-  case PKDEC:
-    return var_pkdec_get(v);
-  case INT_FP: {
-    PaxoFxp f = var_fxp_get(v);
-    return pdec_from_int64((int64_t)f.value, f.scale);
-  }
-  case NUM16:
-    return num64_to_pdec(num16tonum64(var_num16_get(v)), num_scale);
-  case NUM64:
-    return num64_to_pdec(var_num64_get(v), num_scale);
-  default:
-    return pdec_from_int64(0, 0);
-  }
-}
-
-// Valor entero (con signo) de un operando para operaciones bit a bit; los MP
-// se redondean a entero y los fxp/pdec usan su entero escalado (mantissa).
-static inline int64_t var_bit_value(PaxoVar v) {
-  switch (var_type(v)) {
-  case INT_FP:
-    return (int64_t)var_fxp_get(v).value;
-  case PKDEC:
-    return pdec_value(var_pkdec_get(v));
-  case NUM16: {
-    long double rl = roundl((long double)var_num16_get(v).bc *
-                            powl(10.0L, (long double)((int)var_num16_get(v).exp -
-                                                       (int)BIAS16 -
-                                                       (int)var_num16_get(v).p)));
-    return (int64_t)rl;
-  }
-  case NUM64:
-    return (int64_t)roundl((long double)var_num64_get(v).bc *
-                           powl(10.0L, (long double)((int)var_num64_get(v).exp -
-                                                     (int)BIAS64 -
-                                                     (int)var_num64_get(v).p)));
-  default:
-    return 0;
-  }
-}
-
-static inline bool var_is_complex_type(enum type t) {
-  return t == COMPLEX || t == COMPLEX16;
-}
-
-// Representa un operando como par (re, im); un escalar se trata como (x + 0i)
-// conservando su sistema numérico (num16/num64) — el tipo deprecado pdec se
-// lleva al dominio MP64.
-static inline PaxoComplex complex_of_operand(PaxoVar v) {
-  if (var_is_complex_type(var_type(v)))
-    return var_complex_get(v);
-  PaxoComplex c = {.re = v, .im = 0};
-  switch (var_type(v)) {
-  case INT_FP:
-    c.kind = LEP_COMPLEX_KIND_NI;
-    c.im = var_num64((Num64){0, BIAS64, 0, 0});
-    break;
-  case PKDEC:
-    c.kind = LEP_COMPLEX_KIND_NI;
-    c.im = var_num64((Num64){0, BIAS64, 0, 0});
-    break;
-  case NUM64:
-    c.kind = LEP_COMPLEX_KIND_NI;
-    c.im = var_num64((Num64){0, BIAS64, 0, 0});
-    break;
-  default:
-    c.kind = LEP_COMPLEX_KIND_SNI;
-    c.im = var_num16((Num16){0, BIAS16, 0, 0});
-    break;
-  }
-  return c;
-}
-
-// Sistema del resultado: MP64 (ni) domina, luego MP16 (sni).
-static inline int complex_domain(PaxoComplex a, PaxoComplex b) {
-  int da = (a.kind == LEP_COMPLEX_KIND_SNI) ? 0 : 1;
-  int db = (b.kind == LEP_COMPLEX_KIND_SNI) ? 0 : 1;
-  return (da > db ? da : db) ? LEP_COMPLEX_KIND_NI : LEP_COMPLEX_KIND_SNI;
-}
-
-// Empaqueta (re, im) en el sistema elegido
-static inline PaxoVar complex_pack(int domain, long double re, long double im) {
-  if (domain == LEP_COMPLEX_KIND_NI)
-    return var_complex_ni(num64_from_ld(re), num64_from_ld(im));
-  return var_complex_sni(num64tonum16(num64_from_ld(re)),
-                         num64tonum16(num64_from_ld(im)));
-}
-
-static inline PaxoVar complex_add(PaxoVar a, PaxoVar b) {
-  PaxoComplex ca = complex_of_operand(a), cb = complex_of_operand(b);
-  int dom = complex_domain(ca, cb);
-  return complex_pack(dom, var_to_ld(ca.re) + var_to_ld(cb.re),
-                      var_to_ld(ca.im) + var_to_ld(cb.im));
-}
-
-static inline PaxoVar complex_sub(PaxoVar a, PaxoVar b) {
-  PaxoComplex ca = complex_of_operand(a), cb = complex_of_operand(b);
-  int dom = complex_domain(ca, cb);
-  return complex_pack(dom, var_to_ld(ca.re) - var_to_ld(cb.re),
-                      var_to_ld(ca.im) - var_to_ld(cb.im));
-}
-
-static inline PaxoVar complex_mul(PaxoVar a, PaxoVar b) {
-  PaxoComplex ca = complex_of_operand(a), cb = complex_of_operand(b);
-  int dom = complex_domain(ca, cb);
-  long double ar = var_to_ld(ca.re), ai = var_to_ld(ca.im);
-  long double br = var_to_ld(cb.re), bi = var_to_ld(cb.im);
-  return complex_pack(dom, ar * br - ai * bi, ar * bi + ai * br);
-}
-
-// División: (a+bi)/(c+di) = (ac+bd)/(c²+d²) + (bc-ad)/(c²+d²)i.
-// Devuelve LEP_NO_VALUE si el divisor es cero (para vm_error en el intérprete).
-static inline PaxoVar complex_div(PaxoVar a, PaxoVar b) {
-  PaxoComplex ca = complex_of_operand(a), cb = complex_of_operand(b);
-  int dom = complex_domain(ca, cb);
-  long double ar = var_to_ld(ca.re), ai = var_to_ld(ca.im);
-  long double br = var_to_ld(cb.re), bi = var_to_ld(cb.im);
-  long double denom = br * br + bi * bi;
-  if (denom == 0.0L)
-    return LEP_NO_VALUE;
-  return complex_pack(dom, (ar * br + ai * bi) / denom,
-                      (ai * br - ar * bi) / denom);
-}
-
-static inline Num64 zero_num64(void) {
-  Num64 z = {0};
-  z.exp = BIAS64;
-  return z;
-}
-static inline Num16 zero_num16(void) {
-  Num16 z = {0};
-  z.exp = BIAS16;
+static inline Number zero_num(void) {
+  Number z = {0};
+  z.exp = BIASNUM;
   return z;
 }
 
-// Escalar completo (MP16/MP64/int/pdec/bool/trit/char) → MP64
-static inline Num64 scalar_to64(PaxoVar v) {
-  switch (var_type(v)) {
-  case VBOOL:
-    return booltonum64(var_bool_get(v));
-  case TRIT:
-    return trittonum64(var_trit_get(v));
-  case CHAR: {
-    Num64 c = {0};
-    c.bc = (uint64_t)var_char_get(v);
-    c.exp = BIAS64;
-    return c;
-  }
-  default:
-    return complex_comp64(v);
-  }
+/* Despachador de funciones nativas */
+static LEPVar lep_call_native(uint16_t id, LEPVar *args, uint8_t argc) {
+  typedef LEPVar (*NativeFn)(LEPVar *, uint8_t);
+  static const NativeFn table[NATIVE_ID_COUNT] = {
+    [NATIVE_PRINT]            = native_print,
+    [NATIVE_PRINTLN]          = native_println,
+    [NATIVE_TYPEOF]           = native_typeof,
+    [NATIVE_SET_COLOR_TEXT]   = native_set_text_color,
+    [NATIVE_SET_TYPE_TEXT]    = native_set_text_type,
+    [NATIVE_SET_COLOR_BACK]   = native_set_bg_color,
+    [NATIVE_RESET_COLOR]      = native_reset_color,
+    [NATIVE_SCAN]             = native_scan,
+    [NATIVE_ARRAY_LEN]        = native_array_len,
+    [NATIVE_ARRAY_PUSH]       = native_array_push,
+    [NATIVE_INIT_WINDOW]      = native_init_window,
+    [NATIVE_CLEAR_SCREEN]     = native_clear_screen,
+    [NATIVE_DRAW_RECT]        = native_draw_rect,
+    [NATIVE_FILE_READ]        = native_file_read,
+    [NATIVE_FILE_WRITE]       = native_file_write,
+    [NATIVE_FILE_APPEND]      = native_file_append,
+    [NATIVE_FILE_EXISTS]      = native_file_exists,
+    [NATIVE_FILE_DELETE]      = native_file_delete,
+    [NATIVE_IMG_LOAD]         = native_img_load,
+    [NATIVE_IMG_INFO]         = native_img_info,
+    [NATIVE_IMG_SAVE_PNG]     = native_img_save_png,
+    [NATIVE_IMG_SAVE_JPG]     = native_img_save_jpg,
+    [NATIVE_IMG_SAVE_BMP]     = native_img_save_bmp,
+    [NATIVE_IMG_RESIZE]       = native_img_resize,
+    [NATIVE_FONT_LOAD]        = native_font_load,
+    [NATIVE_FONT_GLYPH]       = native_font_glyph,
+    [NATIVE_FONT_METRICS]     = native_font_metrics,
+    [NATIVE_FONT_FREE]        = native_font_free,
+    [NATIVE_AUDIO_INIT]       = native_audio_init,
+    [NATIVE_AUDIO_QUIT]       = native_audio_quit,
+    [NATIVE_AUDIO_PLAY]       = native_audio_play,
+    [NATIVE_AUDIO_PAUSE]      = native_audio_pause,
+    [NATIVE_AUDIO_RESUME]     = native_audio_resume,
+    [NATIVE_AUDIO_STOP]       = native_audio_stop,
+    [NATIVE_AUDIO_VOLUME]     = native_audio_volume,
+    [NATIVE_AUDIO_PLAYING]    = native_audio_playing,
+    [NATIVE_PHYS_SPACE]       = native_phys_space,
+    [NATIVE_PHYS_GRAVITY]     = native_phys_gravity,
+    [NATIVE_PHYS_STEP]        = native_phys_step,
+    [NATIVE_PHYS_BODY]        = native_phys_body,
+    [NATIVE_PHYS_BODY_STATIC] = native_phys_body_static,
+    [NATIVE_PHYS_POS]         = native_phys_pos,
+    [NATIVE_PHYS_VEL]         = native_phys_vel,
+    [NATIVE_PHYS_SET_POS]     = native_phys_set_pos,
+    [NATIVE_PHYS_SET_VEL]     = native_phys_set_vel,
+    [NATIVE_PHYS_ANGLE]       = native_phys_angle,
+    [NATIVE_PHYS_SET_ANGLE]   = native_phys_set_angle,
+    [NATIVE_PHYS_FORCE]       = native_phys_force,
+    [NATIVE_PHYS_IMPULSE]     = native_phys_impulse,
+    [NATIVE_PHYS_CIRCLE]      = native_phys_circle,
+    [NATIVE_PHYS_BOX]         = native_phys_box,
+    [NATIVE_PHYS_SEGMENT]     = native_phys_segment,
+    [NATIVE_PHYS_ELASTICITY]  = native_phys_elasticity,
+    [NATIVE_PHYS_FRICTION]    = native_phys_friction,
+    [NATIVE_PHYS_COLLIDE]     = native_phys_collide,
+    [NATIVE_PHYS_FREE_SHAPE]  = native_phys_free_shape,
+    [NATIVE_PHYS_FREE_BODY]   = native_phys_free_body,
+    [NATIVE_PHYS_FREE_SPACE]  = native_phys_free_space,
+    [NATIVE_WIN_OPEN]         = native_win_open,
+    [NATIVE_WIN_CLOSE]        = native_win_close,
+    [NATIVE_WIN_COLOR]        = native_win_color,
+    [NATIVE_WIN_CLEAR]        = native_win_clear,
+    [NATIVE_WIN_RECT]         = native_win_rect,
+    [NATIVE_WIN_LINE]         = native_win_line,
+    [NATIVE_WIN_CIRCLE]       = native_win_circle,
+    [NATIVE_WIN_TEXT]         = native_win_text,
+    [NATIVE_TEX_LOAD]         = native_tex_load,
+    [NATIVE_TEX_DRAW]         = native_tex_draw,
+    [NATIVE_TEX_FREE]         = native_tex_free,
+    [NATIVE_WIN_SHOW]         = native_win_show,
+    [NATIVE_WIN_POLL]         = native_win_poll,
+    [NATIVE_WIN_KEY]          = native_win_key,
+    [NATIVE_WIN_MOUSE]        = native_win_mouse,
+    [NATIVE_WIN_MOUSEDOWN]    = native_win_mousedown,
+    [NATIVE_WIN_TIME]         = native_win_time,
+    [NATIVE_WIN_DELAY]        = native_win_delay,
+    [NATIVE_SOKOL_INIT]       = native_sokol_init,
+    [NATIVE_SOKOL_SHUTDOWN]   = native_sokol_shutdown,
+    [NATIVE_SOKOL_CLEAR]      = native_sokol_clear,
+    [NATIVE_SOKOL_COLOR]      = native_sokol_color,
+    [NATIVE_SOKOL_SHOW]       = native_sokol_show,
+    [NATIVE_SOKOL_POLL]       = native_sokol_poll,
+    [NATIVE_SOKOL_KEY]        = native_sokol_key,
+    [NATIVE_SOKOL_MOUSE]      = native_sokol_mouse,
+    [NATIVE_SOKOL_MOUSEDOWN]  = native_sokol_mousedown,
+    [NATIVE_SOKOL_TIME]       = native_sokol_time,
+    [NATIVE_SOKOL_DELAY]      = native_sokol_delay,
+    [NATIVE_NVG_CREATE]       = native_nvg_create,
+    [NATIVE_NVG_CANCEL_FRAME] = native_nvg_cancel_frame,
+    [NATIVE_NVG_BEGIN_FRAME]  = native_nvg_begin_frame,
+    [NATIVE_NVG_END_FRAME]    = native_nvg_end_frame,
+    [NATIVE_NVG_RECT]         = native_nvg_rect,
+    [NATIVE_NVG_LINE]         = native_nvg_line,
+    [NATIVE_NVG_CIRCLE]       = native_nvg_circle,
+    [NATIVE_NVG_TEXT]         = native_nvg_text,
+    [NATIVE_NVG_FILL_COLOR]   = native_nvg_fill_color,
+    [NATIVE_NVG_STROKE_COLOR] = native_nvg_stroke_color,
+    [NATIVE_NVG_STROKE_WIDTH] = native_nvg_stroke_width,
+    [NATIVE_NVG_FILL]         = native_nvg_fill,
+    [NATIVE_NVG_STROKE]       = native_nvg_stroke,
+  };
+  if (id >= NATIVE_ID_COUNT || !table[id]) return LEP_ZERO;
+  return table[id](args, argc);
 }
 
-// Escalar completo → MP16 (aproxima)
-static inline Num16 scalar_to16(PaxoVar v) {
-  return num64tonum16(scalar_to64(v));
+#define FRAME (vm->frames[vm->frame_count - 1])
+
+#define AS_BOOL(v) ( \
+    (v).type == BOOL ? var_bool_get(v) \
+  : (v).type == NUM  ? numtobool(var_num_get(v)) \
+  : (v).type == TRIT ? trittobool(var_trit_get(v)) \
+  : ((v).payload != 0) )
+
+/* Helpers rápidos para leer/escribir registros en el smart_heap */
+static inline LEPVar heap_get(Smart_heap *heap, size_t idx) {
+  LEPVar *v = heap_read(heap, idx);
+  return v ? *v : LEP_ZERO;
 }
 
-// Comparación numérica entre dos operadores (MP16/MP64/int/pdec), exacta en
-// el dominio de los tipos nuevos; los pdec y los int se comparan entre sí
-// decimalmente y contra MP se promueven a MP64.
-static inline int cmp_any(PaxoVar a, PaxoVar b) {
-  enum type ta = var_type(a), tb = var_type(b);
-  if (var_is_complex_type(ta) || var_is_complex_type(tb)) {
-    PaxoComplex ca = complex_of_operand(a), cb = complex_of_operand(b);
-    int r = cmp_any(ca.re, cb.re);
-    if (r)
-      return r;
-    return cmp_any(ca.im, cb.im);
-  }
-  if (ta == PKDEC || tb == PKDEC) {
-    vm_warn_pdec();
-    if (ta == PKDEC && tb == PKDEC)
-      return pdec_cmp(var_pkdec_get(a), var_pkdec_get(b));
-    if (ta == INT_FP)
-      return pdec_cmp(pdec_from_int64((int64_t)var_fxp_get(a).value,
-                                      var_fxp_get(a).scale),
-                      var_pkdec_get(b));
-    if (tb == INT_FP)
-      return pdec_cmp(var_pkdec_get(a),
-                      pdec_from_int64((int64_t)var_fxp_get(b).value,
-                                      var_fxp_get(b).scale));
-    a = var_num64(pdec_to_num64(var_pkdec_get(a)));
-    b = var_num64(pdec_to_num64(var_pkdec_get(b)));
-    ta = tb = NUM64;
-  } else if (var_is_fxp_type(ta) && var_is_fxp_type(tb)) {
-    return cmp_fxp(var_fxp_get(a), var_fxp_get(b));
-  }
-  if (var_is_fxp_type(ta))
-    a = var_num64(fxp_to_num64(var_fxp_get(a)));
-  if (var_is_fxp_type(tb))
-    b = var_num64(fxp_to_num64(var_fxp_get(b)));
-  ta = var_type(a);
-  tb = var_type(b);
-  if (ta == NUM64 || tb == NUM64)
-    return cmp_num64(var_num_as64(a), var_num_as64(b));
-  return cmp_num16(var_num16_get(a), var_num16_get(b));
+static inline void heap_set(Smart_heap *heap, size_t idx, LEPVar val) {
+  heap_reserve(heap, idx + 1);
+  heap_write(heap, idx, val);
 }
 
-static inline bool var_truthy(PaxoVar v) {
-  switch (var_type(v)) {
-  case VBOOL:
-    return var_bool_get(v);
-  case TRIT:
-    return var_trit_get(v) == 1;
-  case INT_FP:
-    return var_fxp_get(v).value != 0;
-  case PKDEC:
-    return !pdec_is_zero(var_pkdec_get(v));
-  case COMPLEX:
-  case COMPLEX16:
-    return !var_complex_is_zero(var_complex_get(v));
-  default:
-    return false;
-  }
-}
-
-static inline size_t var_to_index(PaxoVar v) {
-  switch (var_type(v)) {
-  case NUM16:
-    return (size_t)var_num16_get(v).bc;
-  case NUM64:
-    return (size_t)var_num64_get(v).bc;
-  case INT_FP:
-  case PKDEC: {
-    // trunca el valor escalado a entero: pdec(2500,3)=2.500 -> índice 2
-    int64_t value;
-    uint8_t scale;
-    if (var_type(v) == INT_FP) {
-      value = (int64_t)var_fxp_get(v).value;
-      scale = var_fxp_get(v).scale;
-    } else {
-      value = pdec_magnitude(var_pkdec_get(v));
-      scale = var_pkdec_get(v).scale;
-    }
-    uint64_t div = 1;
-    for (uint8_t i = 0; i < scale; i++)
-      div *= 10;
-    if (value < 0)
-      value = -value;
-    value /= (int64_t)div;
-    return (value > 0) ? (size_t)value : 0;
-  }
-  default:
-    return 0;
-  }
-}
-
-// "read" del tope + retirarlo: lee sp-1 con heap_read y decrementa sp.
-// No usa heap->amount como índice (solo contador).
-static inline PaxoVar heap_pop_top(Smart_heap *stack, size_t *sp) {
-  if (*sp == 0)
-    return LEP_ZERO;
-  (*sp)--;
-  PaxoVar *slot = heap_read(stack, *sp);
-  return slot ? *slot : LEP_ZERO;
-}
-
-// Añadir un valor nuevo: reserva más tamaño (si hace falta) y escribe vía
-// heap_write en el índice `sp`. El índice del tope NO es heap->amount.
-#define HEAP_PUSH(v)                                                       \
-  do {                                                                     \
-    if (!heap_reserve(stack, sp + 1)) {                                    \
-      vm_error(vm, "heap sin memoria");                                    \
-      running = false;                                                     \
-      break;                                                               \
-    }                                                                      \
-    heap_write(stack, sp, (v));                                            \
-    sp++;                                                                  \
-  } while (0)
-
-#define HEAP_POP() heap_pop_top(stack, &sp)
-
-void vm_run(VM *vm, Smart_heap *stack, PaxoVar *globals) {
+void vm_run(VM *vm, Smart_heap *stack) {
   bool running = true;
-  size_t sp = 0; // tope de la pila de valores (índice, no heap->amount)
 
   while (running) {
     if (vm->ip >= vm->bytecode_size) {
@@ -453,1373 +290,701 @@ void vm_run(VM *vm, Smart_heap *stack, PaxoVar *globals) {
     }
     uint8_t op = vm->bytecode[vm->ip++];
 
-    switch (op) {
-    case OP_PUSH: {
-      uint8_t var_type_tag = vm->bytecode[vm->ip++];
-      PaxoVar val = 0;
+    switch ((PaxoOpcode)op) {
 
-      switch (var_type_tag) {
-      case NUM16: {
-        uint16_t raw;
-        memcpy(&raw, vm->bytecode + vm->ip, sizeof(raw));
-        vm->ip += sizeof(raw);
-        val = var_num16(num16_unpack(raw));
-        break;
+    case OP_WRITE: {
+      uint8_t t = vm->bytecode[vm->ip++];
+      uint16_t target_reg = read_u16(vm);
+      LEPVar v = LEP_ZERO;
+      
+      switch ((LEPType)t) {
+        case NUM: {
+          uint64_t raw = read_u64(vm);
+          v = (LEPVar){.type = NUM, .payload = raw & 0x0FFFFFFFFFFFFFFFULL};
+          break;
+        }
+        case BOOL:
+          v = var_bool(vm->bytecode[vm->ip++] != 0);
+          break;
+        case TRIT:
+          v = var_trit(vm->bytecode[vm->ip++] & 0x3u);
+          break;
+        case CHAR:
+          v = var_char(read_u32(vm));
+          break;
+        case COLOR:
+          v = var_color(read_u32(vm));
+          break;
+        case COMPLEX: {
+          uint64_t raw = read_u64(vm);
+          v = (LEPVar){.type = COMPLEX, .payload = raw & 0x0FFFFFFFFFFFFFFFULL};
+          break;
+        }
+        case STRING: {
+          uint16_t len = read_u16(vm);
+          char *s = malloc(len + 1);
+          memcpy(s, vm->bytecode + vm->ip, len);
+          s[len] = '\0';
+          vm->ip += len;
+          v = var_string(s);
+          break;
+        }
+        case POINT: {
+          uint32_t func_ip = read_u32(vm);
+          uint8_t param_count = vm->bytecode[vm->ip++];
+          v = var_func(func_ip, param_count);
+          break;
+        }
+        default:
+          vm_error(vm, "OP_WRITE: tipo desconocido");
+          running = false;
+          break;
       }
-      case NUM64: {
-        uint64_t raw;
-        memcpy(&raw, vm->bytecode + vm->ip, sizeof(raw));
-        vm->ip += sizeof(raw);
-        val = var_num64((Num64){.signo = raw & 1,
-                                .exp = (raw >> 1) & 0xFF,
-                                .bc = (raw >> 9) & bc_max64(),
-                                .p = (raw >> 59)});
-        break;
-      }
-      case VBOOL:
-        val = var_bool(vm->bytecode[vm->ip++] != 0);
-        break;
-      case TRIT:
-        val = var_trit(vm->bytecode[vm->ip++] & 0x3);
-        break;
-      case CHAR:
-        val = var_char((char32_t)vm->bytecode[vm->ip++]);
-        break;
-      case COLOR: {
-        uint8_t r = vm->bytecode[vm->ip++];
-        uint8_t g = vm->bytecode[vm->ip++];
-        uint8_t b = vm->bytecode[vm->ip++];
-        uint8_t a = vm->bytecode[vm->ip++];
-        val = var_color(((uint32_t)r << 24) | ((uint32_t)g << 16) |
-                        ((uint32_t)b << 8) | a);
-        break;
-      }
-      case INT_FP:
-      case PKDEC: {
-        uint8_t scale = vm->bytecode[vm->ip++];
-        int16_t raw;
-        memcpy(&raw, vm->bytecode + vm->ip, sizeof(raw));
-        vm->ip += sizeof(raw);
-        val = (var_type_tag == INT_FP) ? var_int_fp(raw, scale)
-                                        : var_pkdec(raw, scale);
-        break;
-      }
-      case POINT: {
-        uint64_t raw;
-        memcpy(&raw, vm->bytecode + vm->ip, sizeof(raw));
-        vm->ip += sizeof(raw);
-        val = var_pin((uint32_t)raw);
-        break;
-      }
-      case COMPLEX: {
-        uint64_t raw_re, raw_im;
-        memcpy(&raw_re, vm->bytecode + vm->ip, sizeof(raw_re));
-        memcpy(&raw_im, vm->bytecode + vm->ip + sizeof(raw_re),
-               sizeof(raw_im));
-        vm->ip += sizeof(raw_re) + sizeof(raw_im);
-        val = var_complex_ni((Num64){.signo = raw_re & 1,
-                                     .exp = (raw_re >> 1) & 0xFF,
-                                     .bc = (raw_re >> 9) & bc_max64(),
-                                     .p = (raw_re >> 59)},
-                             (Num64){.signo = raw_im & 1,
-                                     .exp = (raw_im >> 1) & 0xFF,
-                                     .bc = (raw_im >> 9) & bc_max64(),
-                                     .p = (raw_im >> 59)});
-        break;
-      }
-      case COMPLEX16: {
-        uint16_t raw_re, raw_im;
-        memcpy(&raw_re, vm->bytecode + vm->ip, sizeof(raw_re));
-        memcpy(&raw_im, vm->bytecode + vm->ip + sizeof(raw_re),
-               sizeof(raw_im));
-        vm->ip += sizeof(raw_re) + sizeof(raw_im);
-        val = var_complex_sni(num16_unpack(raw_re), num16_unpack(raw_im));
-        break;
-      }
-      case STRING: {
-        uint16_t len = read_u16(vm);
-        val = var_string((const char *)(vm->bytecode + vm->ip));
-        vm->ip += len + 1;
-        break;
-      }
-      case FUNC: {
-        uint16_t offset = read_u16(vm);
-        uint8_t param_count = vm->bytecode[vm->ip++];
-        val = var_func(offset, param_count);
-        break;
-      }
-      default:
-        vm_error(vm, "tipo de valor desconocido en bytecode");
-        running = false;
-        break;
-      }
-
-      HEAP_PUSH(val);
+      heap_set(stack, target_reg, v);
       break;
     }
 
-    case OP_POP: {
-      HEAP_POP();
+    case OP_READ: {
+      uint16_t src_reg = read_u16(vm);
+      uint16_t dest_reg = read_u16(vm);
+      heap_set(stack, dest_reg, heap_get(stack, src_reg));
       break;
     }
 
-#define ARITH_OP(name, op16, op64, opfxp, oppdec, oppcpx)                     \
-  case name: {                                                                 \
-    PaxoVar b = HEAP_POP();                                         \
-    PaxoVar a = HEAP_POP();                                         \
-    enum type ta = var_type(a), tb = var_type(b);                              \
-    PaxoVar res = LEP_ZERO;                                                   \
-    if (var_is_complex_type(ta) || var_is_complex_type(tb)) {                  \
-      res = oppcpx(a, b);                                                      \
-      if (res == LEP_NO_VALUE) {                                              \
-        vm_error(vm, "división entre cero en complejo");                        \
-        running = false;                                                       \
-        HEAP_PUSH(LEP_ZERO);                                     \
-        break;                                                                 \
-      }                                                                        \
-    } else if (var_is_numeric(ta) && var_is_numeric(tb)) {                     \
-      if (ta == PKDEC || tb == PKDEC) {                                        \
-        /* decimal empaquetado (BCD): deprecado, opera en el dominio pdec */    \
-        vm_warn_pdec();                                                        \
-        uint8_t scale = (ta == PKDEC) ? var_pkdec_get(a).scale                 \
-                                      : var_pkdec_get(b).scale;                \
-        PaxoPdec pa = var_to_pdec(a, scale);                                   \
-        PaxoPdec pb = var_to_pdec(b, scale);                                   \
-        res = pdec_to_var(oppdec(pa, pb));                                     \
-      } else if (ta == INT_FP || tb == INT_FP) {                               \
-        /* punto fijo / entero: opera siempre en el dominio fxp */             \
-        if (ta == INT_FP && tb == INT_FP) {                                    \
-          PaxoFxp r = opfxp(var_fxp_get(a), var_fxp_get(b));                   \
-          res = fxp_to_var(r);                                                 \
-        } else {                                                               \
-          /* mixto int + MP: promueve el número a la escala del int */         \
-          uint8_t scale = (ta == INT_FP) ? var_fxp_get(a).scale                \
-                                          : var_fxp_get(b).scale;              \
-          PaxoFxp fa = var_as_fxp(a, scale);                                   \
-          PaxoFxp fb = var_as_fxp(b, scale);                                   \
-          PaxoFxp r = opfxp(fa, fb);                                           \
-          res = fxp_to_var(r);                                                 \
-        }                                                                      \
-      } else if (ta == NUM64 || tb == NUM64) {                                 \
-        Num64 r = op64(var_num_as64(a), var_num_as64(b));                      \
-        res = var_num64(r);                                                    \
-      } else {                                                                 \
-        Num16 r = op16(var_num16_get(a), var_num16_get(b));                    \
-        res = var_num16(r);                                                    \
-      }                                                                        \
-    } else {                                                                   \
-      vm_error(vm, "tipos incompatibles en operación aritmética");             \
-    }                                                                          \
-    HEAP_PUSH(res);                                               \
-    break;                                                                     \
-  }
+    case OP_EXPAND: {
+      uint16_t src_reg = read_u16(vm);
+      uint16_t base_dest_reg = read_u16(vm);
+      LEPVar arr = heap_get(stack, src_reg);
+      if (arr.type == POINT && var_ref_sub_get(arr) == REF_SUB_ARRAY) {
+        LEPArray *a = var_array_get(arr);
+        if (a) {
+          for (size_t i = 0; i < a->len; i++) {
+            heap_set(stack, base_dest_reg + i, a->items[i]);
+          }
+        }
+      }
+      break;
+    }
 
-    ARITH_OP(OP_ADD, add_num16, add_num64, add_fxp, pdec_add, complex_add)
-    ARITH_OP(OP_SUB, sub_num16, sub_num64, sub_fxp, pdec_sub, complex_sub)
-    ARITH_OP(OP_MUL, mul_num16, mul_num64, mul_fxp, pdec_mul, complex_mul)
-    ARITH_OP(OP_DIV, div_num16, div_num64, div_fxp, pdec_div, complex_div)
+    case OP_COLAPSE: {
+      uint16_t count = read_u16(vm);
+      uint16_t src_base_reg = read_u16(vm);
+      uint16_t dest_reg = read_u16(vm);
+      LEPArray *arr = malloc(sizeof(LEPArray));
+      arr->capacity = count ? count : 1;
+      arr->len = count;
+      arr->items = malloc(sizeof(LEPVar) * arr->capacity);
+      for (uint16_t i = 0; i < count; i++) {
+        arr->items[i] = heap_get(stack, src_base_reg + i);
+      }
+      heap_set(stack, dest_reg, var_array(arr));
+      break;
+    }
 
-#undef ARITH_OP
+    case OP_ADD: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      LEPVar a = heap_get(stack, r_a);
+      LEPVar b = heap_get(stack, r_b);
+      if (a.type == NUM && b.type == NUM)
+        heap_set(stack, r_dst, var_num(add_num(var_num_get(a), var_num_get(b))));
+      else if (a.type == COMPLEX && b.type == COMPLEX)
+        heap_set(stack, r_dst, var_complex(add_complex(var_complex_get(a), var_complex_get(b))));
+      else
+        vm_error(vm, "OP_ADD: tipos incompatibles");
+      break;
+    }
+
+    case OP_SUB: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      LEPVar a = heap_get(stack, r_a);
+      LEPVar b = heap_get(stack, r_b);
+      if (a.type == NUM && b.type == NUM)
+        heap_set(stack, r_dst, var_num(sub_num(var_num_get(a), var_num_get(b))));
+      else if (a.type == COMPLEX && b.type == COMPLEX)
+        heap_set(stack, r_dst, var_complex(sub_complex(var_complex_get(a), var_complex_get(b))));
+      else
+        vm_error(vm, "OP_SUB: tipos incompatibles");
+      break;
+    }
+
+    case OP_MUL: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      LEPVar a = heap_get(stack, r_a);
+      LEPVar b = heap_get(stack, r_b);
+      if (a.type == NUM && b.type == NUM)
+        heap_set(stack, r_dst, var_num(mul_num(var_num_get(a), var_num_get(b))));
+      else if (a.type == COMPLEX && b.type == COMPLEX)
+        heap_set(stack, r_dst, var_complex(mul_complex(var_complex_get(a), var_complex_get(b))));
+      else
+        vm_error(vm, "OP_MUL: tipos incompatibles");
+      break;
+    }
+
+    case OP_DIV: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      LEPVar a = heap_get(stack, r_a);
+      LEPVar b = heap_get(stack, r_b);
+      if (a.type == NUM && b.type == NUM) {
+        Number nb = var_num_get(b);
+        if (nb.mantisa == 0) { vm_error(vm, "Division por cero"); break; }
+        heap_set(stack, r_dst, var_num(div_num(var_num_get(a), nb)));
+      } else if (a.type == COMPLEX && b.type == COMPLEX) {
+        heap_set(stack, r_dst, var_complex(div_complex(var_complex_get(a), var_complex_get(b))));
+      } else {
+        vm_error(vm, "OP_DIV: tipos incompatibles");
+      }
+      break;
+    }
+
+    case OP_CAST: {
+      uint8_t target = vm->bytecode[vm->ip++];
+      uint16_t r_src = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      LEPVar v = heap_get(stack, r_src);
+      LEPVar result = LEP_ZERO;
+      switch ((LEPType)target) {
+        case NUM:
+          if (v.type == BOOL) result = var_num(booltonum(var_bool_get(v)));
+          else if (v.type == TRIT) result = var_num(trittonum(var_trit_get(v)));
+          else if (v.type == CHAR) result = var_num((Number){0, BIASNUM, (uint64_t)var_char_get(v)});
+          else result = v;
+          break;
+        case BOOL:
+          if (v.type == NUM) result = var_bool(numtobool(var_num_get(v)));
+          else if (v.type == TRIT) result = var_bool(trittobool(var_trit_get(v)));
+          else result = v;
+          break;
+        case TRIT:
+          if (v.type == NUM) result = var_trit(numtotrit(var_num_get(v)));
+          else if (v.type == BOOL) result = var_trit(booltotrit(var_bool_get(v)));
+          else result = v;
+          break;
+        case CHAR:
+          if (v.type == NUM) result = var_char(numtochar(var_num_get(v)));
+          else result = v;
+          break;
+        default:
+          result = v;
+          break;
+      }
+      heap_set(stack, r_dst, result);
+      break;
+    }
 
     case OP_LOAD_VAR: {
-      uint16_t index = read_u16(vm);
-      HEAP_PUSH(globals[index]);
+      uint16_t global_idx = read_u16(vm);
+      uint16_t dest_reg = read_u16(vm);
+      heap_set(stack, dest_reg, vm->frames[0].locals[global_idx]);
       break;
     }
 
     case OP_STORE_VAR: {
-      uint16_t index = read_u16(vm);
-      globals[index] = HEAP_POP();
+      uint16_t src_reg = read_u16(vm);
+      uint16_t global_idx = read_u16(vm);
+      vm->frames[0].locals[global_idx] = heap_get(stack, src_reg);
       break;
     }
 
     case OP_PRINT: {
-      PaxoVar val = HEAP_POP();
-      const char8_t *str = NULL;
-
-      switch (var_type(val)) {
-      case NUM16:
-        str = readnum16(var_num16_get(val), 1);
-        break;
-      case NUM64:
-        str = readnum64(var_num64_get(val), 1);
-        break;
-      case VBOOL:
-        str = readbool(var_bool_get(val));
-        break;
-      case CHAR:
-        str = readchar32(var_char_get(val));
-        break;
-      case INT_FP:
-        str = readint(var_fxp_get(val));
-        break;
-      case PKDEC:
-        str = readpdec(var_pkdec_get(val));
-        break;
-      default:
-        break;
-      }
-
-      if (str) {
-        printf("%s\n", (const char *)str);
-      }
+      uint16_t src_reg = read_u16(vm);
+      print_var_full(heap_get(stack, src_reg));
+      putchar('\n');
       break;
     }
 
     case OP_JUMP: {
-      int16_t offset = read_i16(vm);
-      vm->ip += offset;
-      break;
+    int16_t off = read_i16(vm);
+    ssize_t target_ip = (ssize_t)vm->ip + off;
+    if (target_ip >= 0 && target_ip < (ssize_t)vm->bytecode_size) {
+        vm->ip = (size_t)target_ip;
+    } else {
+        vm_error(vm, "OP_JUMP target out of bounds");
+        running = false;
     }
+    break;
+}
 
-    case OP_JUMP_IF_FALSE: {
-      int16_t offset = read_i16(vm);
-      PaxoVar condition = HEAP_POP();
-
-      bool is_false = false;
-      if (var_type(condition) == VBOOL)
-        is_false = !var_bool_get(condition);
-      else if (var_type(condition) == TRIT)
-        is_false = (var_trit_get(condition) == 0);
-      else if (var_type(condition) == INT_FP)
-        is_false = (var_fxp_get(condition).value == 0);
-      else if (var_type(condition) == PKDEC)
-        is_false = pdec_is_zero(var_pkdec_get(condition));
-      else if (var_type(condition) == COMPLEX || var_type(condition) == COMPLEX16)
-        is_false = var_complex_is_zero(var_complex_get(condition));
-
-      if (is_false) {
-        vm->ip += offset;
-      }
-      break;
+case OP_JUMP_IF_FALSE: {
+    uint16_t cond_reg = read_u16(vm);
+    int16_t off = read_i16(vm);
+    if (!AS_BOOL(heap_get(stack, cond_reg))) {
+        ssize_t target_ip = (ssize_t)vm->ip + off;
+        if (target_ip >= 0 && target_ip < (ssize_t)vm->bytecode_size) {
+            vm->ip = (size_t)target_ip;
+        } else {
+            vm_error(vm, "OP_JUMP_IF_FALSE target out of bounds");
+            running = false;
+        }
     }
-    case OP_CAST: {
-      uint8_t target_type = vm->bytecode[vm->ip++];
-      PaxoVar val = HEAP_POP();
-      enum type src = var_type(val);
+    break;
+}
 
-      if (src == target_type) {
-        HEAP_PUSH(val);
-        break;
-      }
-
-      PaxoVar res = 0;
-      if (target_type == POINT)
-        res = var_pin(0);
-
-      switch (src) {
-      case NUM16: {
-        Num16 n = var_num16_get(val);
-        switch (target_type) {
-        case NUM64:
-          res = var_num64(num16tonum64(n));
-          break;
-        case VBOOL:
-          res = var_bool(num16tobool(n));
-          break;
-        case TRIT:
-          res = var_trit(num16totrit(n));
-          break;
-        case CHAR:
-          res = var_char((char32_t)(n.bc > bc_max16() ? bc_max16() : n.bc));
-          break;
-        case INT_FP: {
-          Num64 u = num16tonum64(n);
-          res = fxp_to_var(num64_to_fxp(u, 0));
-          break;
+case OP_JUMP_IF_TRUE: {
+    uint16_t cond_reg = read_u16(vm);
+    int16_t off = read_i16(vm);
+    if (AS_BOOL(heap_get(stack, cond_reg))) {
+        ssize_t target_ip = (ssize_t)vm->ip + off;
+        if (target_ip >= 0 && target_ip < (ssize_t)vm->bytecode_size) {
+            vm->ip = (size_t)target_ip;
+        } else {
+            vm_error(vm, "OP_JUMP_IF_TRUE target out of bounds");
+            running = false;
         }
-        case PKDEC: {
-          Num64 u = num16tonum64(n);
-          uint8_t sc = (u.p < 15) ? (uint8_t)u.p : 15;
-          res = pdec_to_var(num64_to_pdec(u, sc));
-          break;
-        }
-        case COMPLEX:
-          res = var_complex_ni(num16tonum64(n), zero_num64());
-          break;
-        case COMPLEX16:
-          res = var_complex_sni(n, zero_num16());
-          break;
-        case COLOR: {
-          uint32_t rgba = ((uint32_t)n.bc & 0xFFFFFFu);
-          res = var_color((rgba << 8) | 0xFFu);
-          break;
-        }
-        default:
-          break;
-        }
-        break;
-      }
-      case NUM64: {
-        Num64 n = var_num64_get(val);
-        switch (target_type) {
-        case NUM16:
-          res = var_num16(num64tonum16(n));
-          break;
-        case VBOOL:
-          res = var_bool(num64tobool(n));
-          break;
-        case TRIT:
-          res = var_trit(num64totrit(n));
-          break;
-        case CHAR:
-          res = var_char((char32_t)(n.bc & 0xFF));
-          break;
-        case INT_FP:
-          res = fxp_to_var(num64_to_fxp(n, 0));
-          break;
-        case PKDEC: {
-          uint8_t sc = (n.p < 15) ? (uint8_t)n.p : 15;
-          res = pdec_to_var(num64_to_pdec(n, sc));
-          break;
-        }
-        case COLOR: {
-          uint32_t rgba = (uint32_t)(n.bc & 0xFFFFFFFFULL);
-          res = var_color((rgba << 8) | 0xFFu);
-          break;
-        }
-        case COMPLEX:
-          res = var_complex_ni(n, zero_num64());
-          break;
-        case COMPLEX16:
-          res = var_complex_sni(num64tonum16(n), zero_num16());
-          break;
-        default:
-          break;
-        }
-        break;
-      }
-      case VBOOL: {
-        bool b = var_bool_get(val);
-        switch (target_type) {
-        case NUM16:
-          res = var_num16(booltonum16(b));
-          break;
-        case NUM64:
-          res = var_num64(booltonum64(b));
-          break;
-        case TRIT:
-          res = var_trit(booltotrit(b));
-          break;
-        case INT_FP:
-          res = fxp_to_var(num64_to_fxp(booltonum64(b), 0));
-          break;
-        case PKDEC:
-          res = pdec_to_var(num64_to_pdec(booltonum64(b), 0));
-          break;
-        case COMPLEX:
-          res = var_complex_ni(booltonum64(b), zero_num64());
-          break;
-        case COMPLEX16:
-          res = var_complex_sni(booltonum16(b), zero_num16());
-          break;
-        default:
-          break;
-        }
-        break;
-      }
-      case TRIT: {
-        uint8_t t = var_trit_get(val);
-        switch (target_type) {
-        case NUM16:
-          res = var_num16(trittonum16(t));
-          break;
-        case NUM64:
-          res = var_num64(trittonum64(t));
-          break;
-        case VBOOL:
-          res = var_bool(trittobool(t));
-          break;
-        case INT_FP:
-          res = fxp_to_var(num64_to_fxp(trittonum64(t), 0));
-          break;
-        case PKDEC:
-          res = pdec_to_var(num64_to_pdec(trittonum64(t), 0));
-          break;
-        case COMPLEX:
-          res = var_complex_ni(trittonum64(t), zero_num64());
-          break;
-        case COMPLEX16:
-          res = var_complex_sni(trittonum16(t), zero_num16());
-          break;
-        default:
-          break;
-        }
-        break;
-      }
-      case CHAR: {
-        char32_t c = var_char_get(val);
-        switch (target_type) {
-        case NUM16: {
-          Num16 conv = {0};
-          conv.bc = (c > bc_max16()) ? bc_max16() : (uint16_t)c;
-          conv.exp = BIAS16;
-          conv.p = 0;
-          res = var_num16(conv);
-          break;
-        }
-        case NUM64: {
-          Num64 conv = {0};
-          conv.bc = (uint64_t)c;
-          conv.exp = BIAS64;
-          conv.p = 0;
-          res = var_num64(conv);
-          break;
-        }
-        case VBOOL:
-          res = var_bool(c != 0);
-          break;
-        case TRIT:
-          res = var_trit(c < 3 ? (uint8_t)c : 0);
-          break;
-        case INT_FP: {
-          Num64 conv = {0};
-          conv.bc = (uint64_t)c;
-          conv.exp = BIAS64;
-          res = fxp_to_var(num64_to_fxp(conv, 0));
-          break;
-        }
-        case PKDEC: {
-          Num64 conv = {0};
-          conv.bc = (uint64_t)c;
-          conv.exp = BIAS64;
-          res = pdec_to_var(num64_to_pdec(conv, 0));
-          break;
-        }
-        case COMPLEX:
-        case COMPLEX16: {
-          Num64 conv = {0};
-          conv.bc = (uint64_t)c;
-          conv.exp = BIAS64;
-          res = (target_type == COMPLEX)
-                    ? var_complex_ni(conv, zero_num64())
-                    : var_complex_sni(num64tonum16(conv), zero_num16());
-          break;
-        }
-        default:
-          break;
-        }
-        break;
-      }
-      case STRING: {
-        if (target_type == CHAR) {
-          const char *s = var_string_get(val);
-          res = var_char((s && s[0]) ? (char32_t)(uint8_t)s[0] : 0);
-        }
-        break;
-      }
-      case INT_FP: {
-        PaxoFxp f = var_fxp_get(val);
-        switch (target_type) {
-        case NUM64:
-          res = var_num64(fxp_to_num64(f));
-          break;
-        case NUM16:
-          res = var_num16(fxp_to_num16(f));
-          break;
-        case PKDEC:
-          // int → pdec: convierte el entero escalado a dígitos BCD (exacto)
-          res = pdec_to_var(pdec_from_int64((int64_t)f.value, f.scale));
-          break;
-        case VBOOL:
-          res = var_bool(num64tobool(fxp_to_num64(f)));
-          break;
-        case TRIT:
-          res = var_trit(num64totrit(fxp_to_num64(f)));
-          break;
-        case CHAR: {
-          Num64 conv = fxp_to_num64(f);
-          res = var_char((char32_t)(conv.bc & 0xFF));
-          break;
-        }
-        case COMPLEX:
-          res = var_complex_ni(fxp_to_num64(f), zero_num64());
-          break;
-        case COMPLEX16:
-          res = var_complex_sni(fxp_to_num16(f), zero_num16());
-          break;
-        default:
-          break;
-        }
-        break;
-      }
-      case PKDEC: {
-        PaxoPdec d = var_pkdec_get(val);
-        switch (target_type) {
-        case NUM64:
-          res = var_num64(pdec_to_num64(d));
-          break;
-        case NUM16:
-          res = var_num16(num64tonum16(pdec_to_num64(d)));
-          break;
-        case INT_FP:
-          // pdec → int: redondea a entero (mismo criterio que num64 → int)
-          res = fxp_to_var(num64_to_fxp(pdec_to_num64(d), 0));
-          break;
-        case VBOOL: {
-          Num64 n = pdec_to_num64(d);
-          res = var_bool(num64tobool(n));
-          break;
-        }
-        case TRIT: {
-          Num64 n = pdec_to_num64(d);
-          res = var_trit(num64totrit(n));
-          break;
-        }
-        case CHAR: {
-          Num64 n = pdec_to_num64(d);
-          res = var_char((char32_t)(n.bc & 0xFF));
-          break;
-        }
-        case COMPLEX: {
-          Num64 n = pdec_to_num64(d);
-          res = var_complex_ni(n, zero_num64());
-          break;
-        }
-        case COMPLEX16: {
-          Num64 n = pdec_to_num64(d);
-          res = var_complex_sni(num64tonum16(n), zero_num16());
-          break;
-        }
-        default:
-          break;
-        }
-        break;
-      }
-      case COLOR: {
-        uint32_t rgba = var_color_get(val);
-        switch (target_type) {
-        case NUM64: {
-          Num64 conv = {0};
-          conv.bc = (uint64_t)rgba;
-          conv.exp = BIAS64;
-          conv.p = 0;
-          res = var_num64(conv);
-          break;
-        }
-        default:
-          break;
-        }
-        break;
-      }
-      case COMPLEX:
-      case COMPLEX16: {
-        PaxoComplex c = var_complex_get(val);
-        if (target_type == COMPLEX) { // sni → ni (ni → ni ya filtrado arriba)
-          res = var_complex_ni(complex_comp64(c.re), complex_comp64(c.im));
-          break;
-        }
-        if (target_type == COMPLEX16) { // ni → sni
-          res = var_complex_sni(complex_comp16(c.re), complex_comp16(c.im));
-          break;
-        }
-        // complejo → escalar: usa la parte real
-        Num64 re = complex_comp64(c.re);
-        switch (target_type) {
-        case NUM64:
-          res = var_num64(re);
-          break;
-        case NUM16:
-          res = var_num16(num64tonum16(re));
-          break;
-        case INT_FP:
-          res = fxp_to_var(num64_to_fxp(re, 0));
-          break;
-        case PKDEC: {
-          uint8_t sc = (re.p < 15) ? (uint8_t)re.p : 15;
-          res = pdec_to_var(num64_to_pdec(re, sc));
-          break;
-        }
-        case VBOOL:
-          res = var_bool(num64tobool(re));
-          break;
-        case TRIT:
-          res = var_trit(num64totrit(re));
-          break;
-        case CHAR:
-          res = var_char((char32_t)(re.bc & 0xFF));
-          break;
-        default:
-          break;
-        }
-        break;
-      }
-      default:
-        break;
-      }
-
-      HEAP_PUSH(res);
-      break;
     }
+    break;
+}
+
+    case OP_HALT:
+      running = false;
+      break;
 
     case OP_CALL: {
-      uint16_t target_ip = read_u16(vm);
-      if (vm->frame_count >= MAX_FRAMES) {
-        vm_error(vm, "desbordamiento de pila de llamadas");
+      uint16_t func_reg = read_u16(vm);
+      uint8_t argc = vm->bytecode[vm->ip++];
+      uint16_t args_base_reg = read_u16(vm);
+      LEPVar func = heap_get(stack, func_reg);
+      if (func.type != POINT || var_ref_sub_get(func) != REF_SUB_FUNC) {
+        vm_error(vm, "OP_CALL: El registro no contiene una funcion valida");
         running = false;
         break;
       }
-      vm->frames[vm->frame_count++] = (CallFrame){.return_ip = vm->ip};
-      vm->ip = target_ip;
+      CallFrame *frame = &vm->frames[vm->frame_count++];
+      frame->return_ip = vm->ip;
+      for (uint8_t i = 0; i < argc; i++) {
+        frame->locals[i] = heap_get(stack, args_base_reg + i);
+      }
+      vm->ip = (size_t)var_func_id(func);
       break;
     }
 
     case OP_CALL_NATIVE: {
-      uint16_t native_id = read_u16(vm);
+      uint16_t func_id = read_u16(vm);
       uint8_t argc = vm->bytecode[vm->ip++];
-      PaxoVar args[16];
-      for (int i = argc - 1; i >= 0; i--)
-        args[i] = HEAP_POP();
+      uint16_t args_base_reg = read_u16(vm);
+      uint16_t dest_reg = read_u16(vm);
+      LEPVar native_args[256];
+      for (uint8_t i = 0; i < argc; i++) {
+        native_args[i] = heap_get(stack, args_base_reg + i);
+      }
+      heap_set(stack, dest_reg, lep_call_native(func_id, native_args, argc));
+      break;
+    }
 
-      PaxoVar result = native_call(native_id, args, argc);
-      if (result != LEP_NO_VALUE)
-        HEAP_PUSH(result);
+    case OP_EQ: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      LEPVar a = heap_get(stack, r_a);
+      LEPVar b = heap_get(stack, r_b);
+      bool eq;
+      if (a.type == NUM && b.type == NUM) eq = cmp_num(var_num_get(a), var_num_get(b)) == 0;
+      else if (a.type == BOOL && b.type == BOOL) eq = var_bool_get(a) == var_bool_get(b);
+      else if (a.type == CHAR && b.type == CHAR) eq = var_char_get(a) == var_char_get(b);
+      else if (a.type == TRIT && b.type == TRIT) eq = var_trit_get(a) == var_trit_get(b);
+      else if (a.type == POINT && var_ref_sub_get(a) == REF_SUB_STRING &&
+               b.type == POINT && var_ref_sub_get(b) == REF_SUB_STRING)
+        eq = strcmp(var_string_get(a), var_string_get(b)) == 0;
+      else eq = (a.type == b.type && a.payload == b.payload);
+      heap_set(stack, r_dst, var_bool(eq));
+      break;
+    }
+
+    case OP_NEQ: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      LEPVar a = heap_get(stack, r_a);
+      LEPVar b = heap_get(stack, r_b);
+      bool eq;
+      if (a.type == NUM && b.type == NUM) eq = cmp_num(var_num_get(a), var_num_get(b)) == 0;
+      else if (a.type == BOOL && b.type == BOOL) eq = var_bool_get(a) == var_bool_get(b);
+      else if (a.type == CHAR && b.type == CHAR) eq = var_char_get(a) == var_char_get(b);
+      else if (a.type == TRIT && b.type == TRIT) eq = var_trit_get(a) == var_trit_get(b);
+      else if (a.type == POINT && var_ref_sub_get(a) == REF_SUB_STRING &&
+               b.type == POINT && var_ref_sub_get(b) == REF_SUB_STRING)
+        eq = strcmp(var_string_get(a), var_string_get(b)) == 0;
+      else eq = (a.type == b.type && a.payload == b.payload);
+      heap_set(stack, r_dst, var_bool(!eq));
+      break;
+    }
+
+    case OP_LT: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      heap_set(stack, r_dst, var_bool(cmp_num(var_num_get(heap_get(stack, r_a)), var_num_get(heap_get(stack, r_b))) < 0));
+      break;
+    }
+
+    case OP_GT: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      heap_set(stack, r_dst, var_bool(cmp_num(var_num_get(heap_get(stack, r_a)), var_num_get(heap_get(stack, r_b))) > 0));
+      break;
+    }
+
+    case OP_LTE: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      heap_set(stack, r_dst, var_bool(cmp_num(var_num_get(heap_get(stack, r_a)), var_num_get(heap_get(stack, r_b))) <= 0));
+      break;
+    }
+
+    case OP_GTE: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      heap_set(stack, r_dst, var_bool(cmp_num(var_num_get(heap_get(stack, r_a)), var_num_get(heap_get(stack, r_b))) >= 0));
+      break;
+    }
+
+    case OP_AND: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      heap_set(stack, r_dst, var_bool(AS_BOOL(heap_get(stack, r_a)) && AS_BOOL(heap_get(stack, r_b))));
+      break;
+    }
+
+    case OP_OR: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      heap_set(stack, r_dst, var_bool(AS_BOOL(heap_get(stack, r_a)) || AS_BOOL(heap_get(stack, r_b))));
+      break;
+    }
+
+    case OP_NOT: {
+      uint16_t r_src = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      heap_set(stack, r_dst, var_bool(!AS_BOOL(heap_get(stack, r_src))));
+      break;
+    }
+
+    case OP_BIT_AND: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      heap_set(stack, r_dst, var_num((Number){0, BIASNUM, (var_num_get(heap_get(stack, r_a)).mantisa & var_num_get(heap_get(stack, r_b)).mantisa) & 0x3FFFFFFFFFFFFFULL}));
+      break;
+    }
+
+    case OP_BIT_OR: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      heap_set(stack, r_dst, var_num((Number){0, BIASNUM, (var_num_get(heap_get(stack, r_a)).mantisa | var_num_get(heap_get(stack, r_b)).mantisa) & 0x3FFFFFFFFFFFFFULL}));
+      break;
+    }
+
+    case OP_BIT_XOR: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      heap_set(stack, r_dst, var_num((Number){0, BIASNUM, (var_num_get(heap_get(stack, r_a)).mantisa ^ var_num_get(heap_get(stack, r_b)).mantisa) & 0x3FFFFFFFFFFFFFULL}));
+      break;
+    }
+
+    case OP_BIT_NOT: {
+      uint16_t r_src = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      heap_set(stack, r_dst, var_num((Number){0, BIASNUM, (~var_num_get(heap_get(stack, r_src)).mantisa) & 0x3FFFFFFFFFFFFFULL}));
+      break;
+    }
+
+    case OP_BIT_SHL: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      uint64_t shift = var_num_get(heap_get(stack, r_b)).mantisa;
+      uint64_t res = shift < 54 ? (var_num_get(heap_get(stack, r_a)).mantisa << shift) : 0;
+      heap_set(stack, r_dst, var_num((Number){0, BIASNUM, res & 0x3FFFFFFFFFFFFFULL}));
+      break;
+    }
+
+    case OP_BIT_SHR: {
+      uint16_t r_a = read_u16(vm);
+      uint16_t r_b = read_u16(vm);
+      uint16_t r_dst = read_u16(vm);
+      uint64_t shift = var_num_get(heap_get(stack, r_b)).mantisa;
+      uint64_t res = shift < 54 ? (var_num_get(heap_get(stack, r_a)).mantisa >> shift) : 0;
+      heap_set(stack, r_dst, var_num((Number){0, BIASNUM, res}));
+      break;
+    }
+
+    case OP_INC: {
+      uint16_t r_reg = read_u16(vm);
+      heap_set(stack, r_reg, var_num(add_num(var_num_get(heap_get(stack, r_reg)), (Number){0, BIASNUM, 1})));
+      break;
+    }
+
+    case OP_DEC: {
+      uint16_t r_reg = read_u16(vm);
+      heap_set(stack, r_reg, var_num(sub_num(var_num_get(heap_get(stack, r_reg)), (Number){0, BIASNUM, 1})));
       break;
     }
 
     case OP_RETURN: {
-      if (vm->frame_count == 0) {
-        running = false;
-        break;
-      }
-      vm->ip = vm->frames[--vm->frame_count].return_ip;
+      uint16_t ret_val_reg = read_u16(vm);
+      uint16_t dest_caller_reg = read_u16(vm);
+      LEPVar result = heap_get(stack, ret_val_reg);
+      if (vm->frame_count <= 1) { running = false; break; }
+      vm->frame_count--;
+      vm->ip = vm->frames[vm->frame_count].return_ip;
+      heap_set(stack, dest_caller_reg, result);
       break;
     }
 
     case OP_CALL_VAR: {
+      uint16_t local_func_idx = read_u16(vm);
       uint8_t argc = vm->bytecode[vm->ip++];
-      PaxoVar func_val = HEAP_POP();
-      if (var_type(func_val) != FUNC) {
-        vm_error(vm, "se esperaba una función");
+      uint16_t args_base_reg = read_u16(vm);
+      LEPVar func = FRAME.locals[local_func_idx];
+      if (func.type != POINT || var_ref_sub_get(func) != REF_SUB_FUNC) {
+        vm_error(vm, "OP_CALL_VAR: Variable local no es funcion");
         running = false;
         break;
       }
-
-      PaxoVar args[256];
-      for (int i = argc - 1; i >= 0; i--)
-        args[i] = HEAP_POP();
-
       CallFrame *frame = &vm->frames[vm->frame_count++];
       frame->return_ip = vm->ip;
-      for (int i = 0; i < argc; i++)
-        frame->locals[i] = args[i];
-
-      vm->ip = var_func_id(func_val);
-      break;
-    }
-
-    case OP_CALL_METHOD: {
-      uint8_t argc = vm->bytecode[vm->ip++];
-      PaxoVar args[256];
-      for (int i = argc - 1; i >= 0; i--)
-        args[i] = HEAP_POP();
-
-      PaxoVar func_val = HEAP_POP();
-      if (var_type(func_val) != FUNC) {
-        vm_error(vm, "se esperaba una función");
-        running = false;
-        break;
+      for (uint8_t i = 0; i < argc; i++) {
+        frame->locals[i] = heap_get(stack, args_base_reg + i);
       }
-
-      PaxoVar receiver = HEAP_POP();
-      if (vm->frame_count >= MAX_FRAMES) {
-        vm_error(vm, "desbordamiento de pila de llamadas");
-        running = false;
-        break;
-      }
-
-      fprintf(stderr, "[dbg] CALL_METHOD receiver type=%d package=%d\n", var_type(receiver), PACKAGE);
-
-      // El método monta su frame con el receiver en locals[0] ('this') y los
-      // argumentos reales a partir de locals[1].
-      CallFrame *frame = &vm->frames[vm->frame_count++];
-      frame->return_ip = vm->ip;
-      frame->locals[0] = receiver;
-      for (int i = 0; i < argc; i++)
-        frame->locals[i + 1] = args[i];
-
-      vm->ip = var_func_id(func_val);
+      vm->ip = (size_t)var_func_id(func);
       break;
     }
 
-    // ==========================================
-    // FRAME LOCAL VARIABLES
-    // ==========================================
-    case OP_STORE_LOCAL: {
-      uint16_t index = read_u16(vm);
-      vm->frames[vm->frame_count - 1].locals[index] = HEAP_POP();
-      break;
-    }
-
-    case OP_LOAD_LOCAL: {
-      uint16_t index = read_u16(vm);
-      HEAP_PUSH(vm->frames[vm->frame_count - 1].locals[index]);
-      break;
-    }
-
-    // ==========================================
-    // ARRAYS
-    // ==========================================
     case OP_ARRAY_NEW: {
       uint16_t count = read_u16(vm);
-      PaxoArray *arr = malloc(sizeof(PaxoArray));
+      uint16_t src_base_reg = read_u16(vm);
+      uint16_t dest_reg = read_u16(vm);
+      LEPArray *arr = malloc(sizeof(LEPArray));
+      arr->capacity = count ? count : 1;
       arr->len = count;
-      arr->capacity = count > 0 ? count : 4;
-      arr->items = malloc(sizeof(PaxoVar) * arr->capacity);
-      for (int i = count - 1; i >= 0; i--)
-        arr->items[i] = HEAP_POP();
-      HEAP_PUSH(var_array(arr));
+      arr->items = malloc(sizeof(LEPVar) * arr->capacity);
+      for (uint16_t i = 0; i < count; i++) {
+        arr->items[i] = heap_get(stack, src_base_reg + i);
+      }
+      heap_set(stack, dest_reg, var_array(arr));
       break;
     }
 
     case OP_ARRAY_GET: {
-      PaxoVar idx_val = HEAP_POP();
-      PaxoVar arr_val = HEAP_POP();
-      if (var_type(arr_val) != ARRAY) {
-        vm_error(vm, "se esperaba un array");
-        running = false;
-        break;
+      uint16_t arr_reg = read_u16(vm);
+      uint16_t idx_reg = read_u16(vm);
+      uint16_t dest_reg = read_u16(vm);
+      LEPVar arr_v = heap_get(stack, arr_reg);
+      LEPVar idx_v = heap_get(stack, idx_reg);
+      if (arr_v.type == POINT && var_ref_sub_get(arr_v) == REF_SUB_ARRAY) {
+        LEPArray *arr = var_array_get(arr_v);
+        size_t idx = (idx_v.type == NUM) ? (size_t)var_num_get(idx_v).mantisa : 0;
+        if (arr && idx < arr->len) heap_set(stack, dest_reg, arr->items[idx]);
       }
-      if (var_is_complex_type(var_type(idx_val))) {
-        vm_error(vm, "los complejos no pueden indexar arrays");
-        running = false;
-        break;
-      }
-      size_t idx = var_to_index(idx_val);
-      if (idx >= var_array_get(arr_val)->len) {
-        vm_error(vm, "índice fuera de rango");
-        running = false;
-        break;
-      }
-      HEAP_PUSH(var_array_get(arr_val)->items[idx]);
       break;
     }
 
     case OP_ARRAY_SET: {
-      PaxoVar value = HEAP_POP();
-      PaxoVar idx_val = HEAP_POP();
-      PaxoVar arr_val = HEAP_POP();
-      if (var_type(arr_val) != ARRAY) {
-        vm_error(vm, "se esperaba un array");
-        running = false;
-        break;
+      uint16_t arr_reg = read_u16(vm);
+      uint16_t idx_reg = read_u16(vm);
+      uint16_t val_reg = read_u16(vm);
+      LEPVar arr_v = heap_get(stack, arr_reg);
+      LEPVar idx_v = heap_get(stack, idx_reg);
+      if (arr_v.type == POINT && var_ref_sub_get(arr_v) == REF_SUB_ARRAY) {
+        LEPArray *arr = var_array_get(arr_v);
+        size_t idx = (idx_v.type == NUM) ? (size_t)var_num_get(idx_v).mantisa : 0;
+        if (arr && idx < arr->len) arr->items[idx] = heap_get(stack, val_reg);
       }
-      if (var_is_complex_type(var_type(idx_val))) {
-        vm_error(vm, "los complejos no pueden indexar arrays");
-        running = false;
-        break;
-      }
-      size_t idx = var_to_index(idx_val);
-      if (idx >= var_array_get(arr_val)->len) {
-        vm_error(vm, "índice fuera de rango");
-        running = false;
-        break;
-      }
-      var_array_get(arr_val)->items[idx] = value;
       break;
     }
 
-    // ==========================================
-    // PACKAGES
-    // ==========================================
     case OP_PKG_NEW: {
       uint16_t field_count = read_u16(vm);
-      PaxoPackageField *head = NULL;
+      uint16_t src_base_pairs = read_u16(vm);
+      uint16_t dest_reg = read_u16(vm);
+      LEPPackageField *head = NULL;
       for (uint16_t i = 0; i < field_count; i++) {
-        PaxoVar val = HEAP_POP();
-        uint16_t name_len = read_u16(vm);
-        char *name = malloc(name_len + 1);
-        memcpy(name, vm->bytecode + vm->ip, name_len);
-        name[name_len] = '\0';
-        vm->ip += name_len;
-        PaxoPackageField *field = malloc(sizeof(PaxoPackageField));
-        field->key = name;
-        field->value = val;
-        field->hidden = vm->bytecode[vm->ip++] != 0; // flag de visibilidad
-        field->next = head;
-        head = field;
+        LEPVar name_v = heap_get(stack, src_base_pairs + (i * 2));
+        LEPVar val_v = heap_get(stack, src_base_pairs + (i * 2) + 1);
+        const char *key = (name_v.type == POINT && var_ref_sub_get(name_v) == REF_SUB_STRING) ? var_string_get(name_v) : "?";
+        LEPPackageField *f = malloc(sizeof(LEPPackageField));
+        f->key = strdup(key);
+        f->value = val_v;
+        f->hidden = false;
+        f->next = head;
+        head = f;
       }
-      HEAP_PUSH(var_pkg(head));
+      heap_set(stack, dest_reg, var_pkg(head));
       break;
     }
 
     case OP_PKG_GET: {
-      uint16_t name_len = read_u16(vm);
+      uint16_t nlen = read_u16(vm);
       char name[256];
-      memcpy(name, vm->bytecode + vm->ip, name_len);
-      name[name_len] = '\0';
-      vm->ip += name_len;
-      PaxoVar pkg_val = HEAP_POP();
-      if (var_type(pkg_val) != PACKAGE) {
-        vm_error(vm, "se esperaba un package");
-        running = false;
-        break;
-      }
-      PaxoPackageField *f = var_pkg_get(pkg_val);
-      bool found = false;
-      while (f) {
-        if (strcmp(f->key, name) == 0) {
-          found = true;
-          break;
+      size_t clen = nlen < 255 ? nlen : 255;
+      memcpy(name, vm->bytecode + vm->ip, clen); name[clen] = '\0';
+      vm->ip += nlen;
+      uint16_t pkg_reg = read_u16(vm);
+      uint16_t dest_reg = read_u16(vm);
+      LEPVar pkg_v = heap_get(stack, pkg_reg);
+      if (pkg_v.type == POINT && var_ref_sub_get(pkg_v) == REF_SUB_PKG) {
+        LEPVar result = LEP_ZERO;
+        for (LEPPackageField *f = var_pkg_get(pkg_v); f; f = f->next) {
+          if (strcmp(f->key, name) == 0) { result = f->value; break; }
         }
-        f = f->next;
-      }
-      if (found) {
-        if (f->hidden) {
-          vm_error(vm, "campo privado");
-          running = false;
-          break;
-        }
-        HEAP_PUSH(f->value);
-      }
-      if (!found) {
-        vm_error(vm, "campo no encontrado");
-        running = false;
-        break;
+        heap_set(stack, dest_reg, result);
       }
       break;
     }
 
     case OP_PKG_SET: {
-      uint16_t name_len = read_u16(vm);
+      uint16_t nlen = read_u16(vm);
       char name[256];
-      memcpy(name, vm->bytecode + vm->ip, name_len);
-      name[name_len] = '\0';
-      vm->ip += name_len;
-      PaxoVar value = HEAP_POP();
-      PaxoVar pkg_val = HEAP_POP();
-      if (var_type(pkg_val) != PACKAGE) {
-        vm_error(vm, "se esperaba un package");
-        running = false;
-        break;
-      }
-      PaxoPackageField *f = var_pkg_get(pkg_val);
-      while (f) {
-        if (strcmp(f->key, name) == 0) {
-          if (f->hidden) {
-            vm_error(vm, "campo privado");
-            running = false;
-            break;
-          }
-          f->value = value;
-          break;
+      size_t clen = nlen < 255 ? nlen : 255;
+      memcpy(name, vm->bytecode + vm->ip, clen); name[clen] = '\0';
+      vm->ip += nlen;
+      uint16_t pkg_reg = read_u16(vm);
+      uint16_t val_reg = read_u16(vm);
+      LEPVar pkg_v = heap_get(stack, pkg_reg);
+      if (pkg_v.type == POINT && var_ref_sub_get(pkg_v) == REF_SUB_PKG) {
+        bool found = false;
+        for (LEPPackageField *f = var_pkg_get(pkg_v); f; f = f->next) {
+          if (strcmp(f->key, name) == 0) { f->value = heap_get(stack, val_reg); found = true; break; }
         }
-        f = f->next;
+        if (!found) {
+          LEPPackageField *nf = malloc(sizeof(LEPPackageField));
+          nf->key = strdup(name);
+          nf->value = heap_get(stack, val_reg);
+          nf->hidden = false;
+          nf->next = var_pkg_get(pkg_v);
+          LEP_objects[var_ref_punt_get(pkg_v)].ptr = nf;
+        }
       }
       break;
     }
 
-    // ==========================================
-    // MÉTODOS — acceso interno a campos (incluidos privados) vía 'this'
-    // El receiver vive en frame->locals[0] (lo depositó OP_CALL_METHOD).
-    // ==========================================
-    case OP_THIS_GET: {
-      uint16_t name_len = read_u16(vm);
-      char name[256];
-      memcpy(name, vm->bytecode + vm->ip, name_len);
-      name[name_len] = '\0';
-      vm->ip += name_len;
-      if (vm->frame_count == 0) {
-        vm_error(vm, "this fuera de un método");
-        running = false;
-        break;
-      }
-      PaxoVar pkg_val = vm->frames[vm->frame_count - 1].locals[0];
-      if (var_type(pkg_val) != PACKAGE) {
-        vm_error(vm, "se esperaba un package");
-        running = false;
-        break;
-      }
-      PaxoPackageField *f = var_pkg_get(pkg_val);
-      while (f) {
-        if (strcmp(f->key, name) == 0) {
-          HEAP_PUSH(f->value);
-          break;
-        }
-        f = f->next;
-      }
-      if (!f) {
-        vm_error(vm, "campo no encontrado");
-        running = false;
-      }
-      break;
-    }
-
-    case OP_THIS_SET: {
-      uint16_t name_len = read_u16(vm);
-      char name[256];
-      memcpy(name, vm->bytecode + vm->ip, name_len);
-      name[name_len] = '\0';
-      vm->ip += name_len;
-      PaxoVar value = HEAP_POP();
-      if (vm->frame_count == 0) {
-        vm_error(vm, "this fuera de un método");
-        running = false;
-        break;
-      }
-      PaxoVar pkg_val = vm->frames[vm->frame_count - 1].locals[0];
-      if (var_type(pkg_val) != PACKAGE) {
-        vm_error(vm, "se esperaba un package");
-        running = false;
-        break;
-      }
-      PaxoPackageField *f = var_pkg_get(pkg_val);
-      while (f) {
-        if (strcmp(f->key, name) == 0) {
-          f->value = value;
-          break;
-        }
-        f = f->next;
-      }
-      if (!f) {
-        vm_error(vm, "campo no encontrado");
-        running = false;
-      }
-      break;
-    }
-
-    // ==========================================
-    // TRY / CATCH / THROW
-    // ==========================================
     case OP_TRY_SETUP: {
-      int16_t catch_offset = read_i16(vm);
-      if (vm->try_frame_count >= MAX_TRY_FRAMES) {
-        vm_error(vm, "demasiados try/catch anidados");
-        running = false;
-        break;
-      }
+      int16_t off = read_i16(vm);
+      if (vm->try_frame_count >= MAX_TRY_FRAMES) { vm_error(vm, "Try stack overflow"); break; }
       TryFrame *tf = &vm->try_frames[vm->try_frame_count++];
-      tf->catch_ip = vm->ip + catch_offset;
-      tf->stack_size = sp;
+      tf->catch_ip = (size_t)((ssize_t)vm->ip + off);
+      tf->stack_size = stack->amount; /* Guardamos el estado del Smart_heap indexado*/
       tf->frame_count = vm->frame_count;
       break;
     }
 
     case OP_TRY_END: {
-      int16_t end_offset = read_i16(vm);
-      if (vm->try_frame_count > 0)
-        vm->try_frame_count--;
-      vm->ip += end_offset;
+      if (vm->try_frame_count > 0) vm->try_frame_count--;
       break;
     }
 
     case OP_THROW: {
-      PaxoVar error_val = HEAP_POP();
+      uint16_t err_reg = read_u16(vm);
+      uint16_t dest_catch_reg = read_u16(vm);
+      LEPVar err = heap_get(stack, err_reg);
       if (vm->try_frame_count == 0) {
-        vm_error(vm, "throw sin try/catch");
-        running = false;
-        break;
+        text_red(stderr); fprintf(stderr, "[lepvm] Excepcion no capturada"); reset_colors(stderr);
+        if (err.type == POINT && var_ref_sub_get(err) == REF_SUB_STRING) fprintf(stderr, ": %s", var_string_get(err));
+        fprintf(stderr, "\n"); running = false; break;
       }
       TryFrame *tf = &vm->try_frames[--vm->try_frame_count];
-      while (sp > tf->stack_size)
-        HEAP_POP();
+      stack->amount = (int)tf->stack_size;
       vm->frame_count = tf->frame_count;
-      HEAP_PUSH(error_val);
       vm->ip = tf->catch_ip;
+      heap_set(stack, dest_catch_reg, err);
       break;
     }
 
-    case OP_JUMP_IF_TRUE: {
-      int16_t offset = read_i16(vm);
-      PaxoVar condition = HEAP_POP();
+    case OP_STORE_LOCAL: {
+      uint16_t src_reg = read_u16(vm);
+      uint16_t local_idx = read_u16(vm);
+      FRAME.locals[local_idx] = heap_get(stack, src_reg);
+      break;
+    }
 
-      if (var_truthy(condition)) {
-        vm->ip += offset;
+    case OP_LOAD_LOCAL: {
+      uint16_t local_idx = read_u16(vm);
+      uint16_t dest_reg = read_u16(vm);
+      heap_set(stack, dest_reg, FRAME.locals[local_idx]);
+      break;
+    }
+
+    case OP_CALL_METHOD: {
+      uint16_t func_reg = read_u16(vm);
+      uint8_t argc = vm->bytecode[vm->ip++];
+      uint16_t args_base_reg = read_u16(vm);
+      uint16_t receiver_reg = read_u16(vm);
+      LEPVar func = heap_get(stack, func_reg);
+      LEPVar recv = heap_get(stack, receiver_reg);
+      if (func.type != POINT || var_ref_sub_get(func) != REF_SUB_FUNC) {
+        vm_error(vm, "OP_CALL_METHOD: No es funcion"); running = false; break;
+      }
+      CallFrame *frame = &vm->frames[vm->frame_count++];
+      frame->return_ip = vm->ip;
+      frame->locals[0] = recv; /* locals[0] es 'me'*/
+      for (uint8_t i = 0; i < argc; i++) {
+        frame->locals[i + 1] = heap_get(stack, args_base_reg + i);
+      }
+      vm->ip = (size_t)var_func_id(func);
+      break;
+    }
+
+    case OP_THIS_GET: {
+      uint16_t nlen = read_u16(vm);
+      char name[256];
+      size_t clen = nlen < 255 ? nlen : 255;
+      memcpy(name, vm->bytecode + vm->ip, clen); name[clen] = '\0';
+      vm->ip += nlen;
+      uint16_t dest_reg = read_u16(vm);
+      LEPVar self = FRAME.locals[0];
+      if (self.type == POINT && var_ref_sub_get(self) == REF_SUB_PKG) {
+        LEPVar result = LEP_ZERO;
+        for (LEPPackageField *f = var_pkg_get(self); f; f = f->next) {
+          if (strcmp(f->key, name) == 0) { result = f->value; break; }
+        }
+        heap_set(stack, dest_reg, result);
       }
       break;
     }
 
-    // ==========================================
-    // COMPARACIONES (result -> VBOOL)
-    // ==========================================
-#define c_eq(c)  ((c) == 0)
-#define c_neq(c) ((c) != 0)
-#define c_lt(c)  ((c) < 0)
-#define c_gt(c)  ((c) > 0)
-#define c_lte(c) ((c) <= 0)
-#define c_gte(c) ((c) >= 0)
-
-#define CMP_NUMBERS(chose)                                                    \
-  do {                                                                        \
-    int c = cmp_any(a, b);                                                    \
-    result_bool = chose(c);                                                   \
-  } while (0)
-
-#define CMP_BOTH(same_kind, expr)                                             \
-  do {                                                                        \
-    if (ta == tb && ta == same_kind)                                          \
-      result_bool = (expr);                                                   \
-  } while (0)
-
-    case OP_EQ: {
-      PaxoVar b = HEAP_POP();
-      PaxoVar a = HEAP_POP();
-      enum type ta = var_type(a), tb = var_type(b);
-      bool result_bool = false;
-      if ((var_is_numeric(ta) && var_is_numeric(tb)) ||
-          var_is_complex_type(ta) || var_is_complex_type(tb)) {
-        CMP_NUMBERS(c_eq);
-      } else {
-        CMP_BOTH(VBOOL, var_bool_get(a) == var_bool_get(b));
-        CMP_BOTH(TRIT, var_trit_get(a) == var_trit_get(b));
-        CMP_BOTH(CHAR, var_char_get(a) == var_char_get(b));
-        CMP_BOTH(POINT, var_pin_get(a) == var_pin_get(b));
-        CMP_BOTH(STRING,
-                 strcmp(var_string_get(a), var_string_get(b)) == 0);
+    case OP_THIS_SET: {
+      uint16_t nlen = read_u16(vm);
+      char name[256];
+      size_t clen = nlen < 255 ? nlen : 255;
+      memcpy(name, vm->bytecode + vm->ip, clen); name[clen] = '\0';
+      vm->ip += nlen;
+      uint16_t val_reg = read_u16(vm);
+      LEPVar self = FRAME.locals[0];
+      if (self.type == POINT && var_ref_sub_get(self) == REF_SUB_PKG) {
+        bool found = false;
+        for (LEPPackageField *f = var_pkg_get(self); f; f = f->next) {
+          if (strcmp(f->key, name) == 0) { f->value = heap_get(stack, val_reg); found = true; break; }
+        }
+        if (!found) {
+          LEPPackageField *nf = malloc(sizeof(LEPPackageField));
+          nf->key = strdup(name);
+          nf->value = heap_get(stack, val_reg);
+          nf->hidden = true;
+          nf->next = var_pkg_get(self);
+          LEP_objects[var_ref_punt_get(self)].ptr = nf;
+        }
       }
-      HEAP_PUSH(var_bool(result_bool));
       break;
     }
 
-    case OP_NEQ: {
-      PaxoVar b = HEAP_POP();
-      PaxoVar a = HEAP_POP();
-      enum type ta = var_type(a), tb = var_type(b);
-      bool result_bool = true;
-      if (var_is_numeric(ta) && var_is_numeric(tb)) {
-        CMP_NUMBERS(c_neq);
-      } else if (ta == tb) {
-        result_bool = false;
-        CMP_BOTH(VBOOL, var_bool_get(a) != var_bool_get(b));
-        CMP_BOTH(TRIT, var_trit_get(a) != var_trit_get(b));
-        CMP_BOTH(CHAR, var_char_get(a) != var_char_get(b));
-        CMP_BOTH(POINT, var_pin_get(a) != var_pin_get(b));
-        CMP_BOTH(STRING,
-                 strcmp(var_string_get(a), var_string_get(b)) != 0);
-      }
-      HEAP_PUSH(var_bool(result_bool));
-      break;
-    }
-
-    case OP_LT: {
-      PaxoVar b = HEAP_POP();
-      PaxoVar a = HEAP_POP();
-      enum type ta = var_type(a), tb = var_type(b);
-      bool result_bool = false;
-      if (var_is_numeric(ta) && var_is_numeric(tb)) {
-        CMP_NUMBERS(c_lt);
-      } else {
-        CMP_BOTH(CHAR, var_char_get(a) < var_char_get(b));
-      }
-      HEAP_PUSH(var_bool(result_bool));
-      break;
-    }
-
-    case OP_GT: {
-      PaxoVar b = HEAP_POP();
-      PaxoVar a = HEAP_POP();
-      enum type ta = var_type(a), tb = var_type(b);
-      bool result_bool = false;
-      if (var_is_numeric(ta) && var_is_numeric(tb)) {
-        CMP_NUMBERS(c_gt);
-      } else {
-        CMP_BOTH(CHAR, var_char_get(a) > var_char_get(b));
-      }
-      HEAP_PUSH(var_bool(result_bool));
-      break;
-    }
-
-    case OP_LTE: {
-      PaxoVar b = HEAP_POP();
-      PaxoVar a = HEAP_POP();
-      enum type ta = var_type(a), tb = var_type(b);
-      bool result_bool = false;
-      if (var_is_numeric(ta) && var_is_numeric(tb)) {
-        CMP_NUMBERS(c_lte);
-      } else {
-        CMP_BOTH(CHAR, var_char_get(a) <= var_char_get(b));
-      }
-      HEAP_PUSH(var_bool(result_bool));
-      break;
-    }
-
-    case OP_GTE: {
-      PaxoVar b = HEAP_POP();
-      PaxoVar a = HEAP_POP();
-      enum type ta = var_type(a), tb = var_type(b);
-      bool result_bool = false;
-      if (var_is_numeric(ta) && var_is_numeric(tb)) {
-        CMP_NUMBERS(c_gte);
-      } else {
-        CMP_BOTH(CHAR, var_char_get(a) >= var_char_get(b));
-      }
-      HEAP_PUSH(var_bool(result_bool));
-      break;
-    }
-
-#undef CMP_BOTH
-#undef CMP_NUMBERS
-#undef c_eq
-#undef c_neq
-#undef c_lt
-#undef c_gt
-#undef c_lte
-#undef c_gte
-
-    // ==========================================
-    // LÓGICOS (VBOOL / TRIT)
-    // ==========================================
-    case OP_AND: {
-      PaxoVar b = HEAP_POP();
-      PaxoVar a = HEAP_POP();
-      HEAP_PUSH(var_bool(var_truthy(a) && var_truthy(b)));
-      break;
-    }
-
-    case OP_OR: {
-      PaxoVar b = HEAP_POP();
-      PaxoVar a = HEAP_POP();
-      HEAP_PUSH(var_bool(var_truthy(a) || var_truthy(b)));
-      break;
-    }
-
-    case OP_NOT: {
-      PaxoVar a = HEAP_POP();
-      enum type ta = var_type(a);
-      bool result_bool = true;
-      if (ta == VBOOL)
-        result_bool = !var_bool_get(a);
-      else if (ta == TRIT)
-        result_bool = (var_trit_get(a) == 0);
-      else if (ta == INT_FP)
-        result_bool = (var_fxp_get(a).value == 0);
-      else if (ta == PKDEC)
-        result_bool = pdec_is_zero(var_pkdec_get(a));
-      else if (ta == COMPLEX || ta == COMPLEX16)
-        result_bool = var_complex_is_zero(var_complex_get(a));
-      HEAP_PUSH(var_bool(result_bool));
-      break;
-    }
-
-    // ==========================================
-    // BITWISE (VBOOL / TRIT / CHAR)
-    // ==========================================
-    case OP_BIT_AND: {
-      PaxoVar b = HEAP_POP();
-      PaxoVar a = HEAP_POP();
-      PaxoVar res = 0;
-      if (var_type(a) == VBOOL && var_type(b) == VBOOL) {
-        res = var_bool((int)var_bool_get(a) & (int)var_bool_get(b));
-      } else if (var_type(a) == TRIT && var_type(b) == TRIT) {
-        res = var_trit(var_trit_get(a) & var_trit_get(b));
-      } else if (var_is_fxp_type(var_type(a)) || var_is_fxp_type(var_type(b))) {
-        bool to_pdec = (var_type(a) == PKDEC || var_type(b) == PKDEC);
-        if (to_pdec) vm_warn_pdec();
-        int64_t r = var_bit_value(a) & var_bit_value(b);
-        res = to_pdec ? pdec_to_var(pdec_from_int64(r, 0))
-                      : fxp_to_var(fxp_pack(r, 0));
-      }
-      HEAP_PUSH(res);
-      break;
-    }
-
-    case OP_BIT_OR: {
-      PaxoVar b = HEAP_POP();
-      PaxoVar a = HEAP_POP();
-      PaxoVar res = 0;
-      if (var_type(a) == VBOOL && var_type(b) == VBOOL) {
-        res = var_bool((int)var_bool_get(a) | (int)var_bool_get(b));
-      } else if (var_type(a) == TRIT && var_type(b) == TRIT) {
-        res = var_trit(var_trit_get(a) | var_trit_get(b));
-      } else if (var_is_fxp_type(var_type(a)) || var_is_fxp_type(var_type(b))) {
-        bool to_pdec = (var_type(a) == PKDEC || var_type(b) == PKDEC);
-        if (to_pdec) vm_warn_pdec();
-        int64_t r = var_bit_value(a) | var_bit_value(b);
-        res = to_pdec ? pdec_to_var(pdec_from_int64(r, 0))
-                      : fxp_to_var(fxp_pack(r, 0));
-      }
-      HEAP_PUSH(res);
-      break;
-    }
-
-    case OP_BIT_NOT: {
-      PaxoVar a = HEAP_POP();
-      PaxoVar res = 0;
-      switch (var_type(a)) {
-      case VBOOL:
-        res = var_bool(!var_bool_get(a));
-        break;
-      case TRIT:
-        res = var_trit(~var_trit_get(a) & 0x3u);
-        break;
-      case CHAR:
-        res = var_char(~var_char_get(a) & 0xFFFFFFFFu);
-        break;
-      case INT_FP: {
-        PaxoFxp f = var_fxp_get(a);
-        res = fxp_to_var(fxp_pack((int64_t)~(int64_t)f.value, f.scale));
-        break;
-      }
-      case PKDEC: {
-        vm_warn_pdec();
-        PaxoPdec d = var_pkdec_get(a);
-        res = pdec_to_var(pdec_from_int64(~pdec_value(d), d.scale));
-        break;
-      }
-      default:
-        break;
-      }
-      HEAP_PUSH(res);
-      break;
-    }
-
-    case OP_BIT_XOR: {
-      PaxoVar b = HEAP_POP();
-      PaxoVar a = HEAP_POP();
-      PaxoVar res = 0;
-      if (var_type(a) == VBOOL && var_type(b) == VBOOL) {
-        res = var_bool(var_bool_get(a) ^ var_bool_get(b));
-      } else if (var_type(a) == TRIT && var_type(b) == TRIT) {
-        res = var_trit(var_trit_get(a) ^ var_trit_get(b));
-      } else if (var_is_fxp_type(var_type(a)) || var_is_fxp_type(var_type(b))) {
-        bool to_pdec = (var_type(a) == PKDEC || var_type(b) == PKDEC);
-        if (to_pdec) vm_warn_pdec();
-        int64_t r = var_bit_value(a) ^ var_bit_value(b);
-        res = to_pdec ? pdec_to_var(pdec_from_int64(r, 0))
-                      : fxp_to_var(fxp_pack(r, 0));
-      }
-      HEAP_PUSH(res);
-      break;
-    }
-
-    case OP_BIT_SHL: {
-      PaxoVar b = HEAP_POP();
-      PaxoVar a = HEAP_POP();
-      PaxoVar res = 0;
-      if (var_type(a) == CHAR && var_type(b) == CHAR) {
-        res = var_char(var_char_get(a) << var_char_get(b));
-      } else if (var_type(a) == NUM64 && var_type(b) == NUM64) {
-        Num64 r = var_num64_get(a);
-        r.bc = var_num64_get(a).bc << var_num64_get(b).bc;
-        res = var_num64(r);
-      } else if (var_type(a) == NUM16 && var_type(b) == NUM16) {
-        Num16 r = var_num16_get(a);
-        r.bc = var_num16_get(a).bc << var_num16_get(b).bc;
-        res = var_num16(r);
-      } else if (var_is_fxp_type(var_type(a)) || var_is_fxp_type(var_type(b))) {
-        bool to_pdec = (var_type(a) == PKDEC || var_type(b) == PKDEC);
-        if (to_pdec) vm_warn_pdec();
-        int64_t bv = var_bit_value(b);
-        int32_t sh = (bv < 0) ? 0 : (bv > 63 ? 63 : (int32_t)bv);
-        int64_t r = var_bit_value(a) << sh;
-        res = to_pdec ? pdec_to_var(pdec_from_int64(r, 0))
-                      : fxp_to_var(fxp_pack(r, 0));
-      }
-      HEAP_PUSH(res);
-      break;
-    }
-
-    case OP_BIT_SHR: {
-      PaxoVar b = HEAP_POP();
-      PaxoVar a = HEAP_POP();
-      PaxoVar res = 0;
-      if (var_type(a) == CHAR && var_type(b) == CHAR) {
-        res = var_char(var_char_get(a) >> var_char_get(b));
-      } else if (var_type(a) == NUM64 && var_type(b) == NUM64) {
-        Num64 r = var_num64_get(a);
-        r.bc = var_num64_get(a).bc >> var_num64_get(b).bc;
-        res = var_num64(r);
-      } else if (var_type(a) == NUM16 && var_type(b) == NUM16) {
-        Num16 r = var_num16_get(a);
-        r.bc = var_num16_get(a).bc >> var_num16_get(b).bc;
-        res = var_num16(r);
-      } else if (var_is_fxp_type(var_type(a)) || var_is_fxp_type(var_type(b))) {
-        bool to_pdec = (var_type(a) == PKDEC || var_type(b) == PKDEC);
-        if (to_pdec) vm_warn_pdec();
-        int64_t bv = var_bit_value(b);
-        int32_t sh = (bv < 0) ? 0 : (bv > 63 ? 63 : (int32_t)bv);
-        int64_t r = var_bit_value(a) >> sh;
-        res = to_pdec ? pdec_to_var(pdec_from_int64(r, 0))
-                      : fxp_to_var(fxp_pack(r, 0));
-      }
-      HEAP_PUSH(res);
-      break;
-    }
-
-    // ==========================================
-    // INC / DEC
-    // ==========================================
-    case OP_INC: {
-      PaxoVar a = HEAP_POP();
-      switch (var_type(a)) {
-      case NUM16: {
-        Num16 one = {0};
-        one.bc = 1;
-        one.exp = BIAS16;
-        a = var_num16(add_num16(var_num16_get(a), one));
-        break;
-      }
-      case NUM64: {
-        Num64 one = {0};
-        one.bc = 1;
-        one.exp = BIAS64;
-        a = var_num64(add_num64(var_num64_get(a), one));
-        break;
-      }
-      case INT_FP: {
-        PaxoFxp one = {.value = 1, .scale = 0};
-        a = fxp_to_var(add_fxp(var_fxp_get(a), one));
-        break;
-      }
-      case PKDEC: {
-        vm_warn_pdec();
-        PaxoPdec one = pdec_from_int64(1, 0);
-        a = pdec_to_var(pdec_add(var_pkdec_get(a), one));
-        break;
-      }
-      default:
-        break;
-      }
-      HEAP_PUSH(a);
-      break;
-    }
-
-    case OP_DEC: {
-      PaxoVar a = HEAP_POP();
-      switch (var_type(a)) {
-      case NUM16: {
-        Num16 one = {0};
-        one.bc = 1;
-        one.exp = BIAS16;
-        a = var_num16(sub_num16(var_num16_get(a), one));
-        break;
-      }
-      case NUM64: {
-        Num64 one = {0};
-        one.bc = 1;
-        one.exp = BIAS64;
-        a = var_num64(sub_num64(var_num64_get(a), one));
-        break;
-      }
-      case INT_FP: {
-        PaxoFxp one = {.value = 1, .scale = 0};
-        a = fxp_to_var(sub_fxp(var_fxp_get(a), one));
-        break;
-      }
-      case PKDEC: {
-        vm_warn_pdec();
-        PaxoPdec one = pdec_from_int64(1, 0);
-        a = pdec_to_var(pdec_sub(var_pkdec_get(a), one));
-        break;
-      }
-      default:
-        break;
-      }
-      HEAP_PUSH(a);
-      break;
-    }
-
-    case OP_HALT:
     default:
+      vm_error(vm, "Opcode no implementado o desconocido");
       running = false;
       break;
     }
   }
-}
-
-void vm_error(VM *vm, const char *msg) {
-  text_red(stderr);
-  fprintf(stderr, "[lepvm error]");
-  reset_colors(stderr);
-  fprintf(stderr, " en IP 0x%04zX: %s\n", vm->ip, msg);
 }

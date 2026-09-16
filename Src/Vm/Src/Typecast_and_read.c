@@ -8,11 +8,12 @@
 typedef unsigned char char8_t;
 typedef uint32_t char32_t;
 
+
 static inline LEPBool booltotrit(bool bit) { return bit ? 1 : 0; }
 static inline bool trittobool(LEPBool trit) { return (trit == 1); }
 
 static inline Number booltonum(bool bit) {
-  return bit ? (Number){0, BIASNUM, 1} : (LEPVar){0};
+  return bit ? (Number){0, BIASNUM, 1} : (Number){0, BIASNUM, 0};
 }
 
 static inline bool numtobool(Number n) {
@@ -20,6 +21,10 @@ static inline bool numtobool(Number n) {
 }
 static inline LEPBool numtotrit(Number n) {
   return n.mantisa > 2 ? 2 : n.mantisa != 0 ? 1 : 0;
+}
+
+static inline char32_t numtochar(Number n){
+	return (char32_t)n.mantisa;
 }
 
 static inline Number trittonum(LEPBool trit) {
@@ -32,6 +37,10 @@ static inline char8_t trittochar(LEPBool trit) {
 
 static inline LEPBool chartotrit(char8_t c) {
   return c == '2' ? 2 : c == '1' ? 1 : 0;
+}
+
+static inline Number chartonum(char32_t c){
+	return (Number){0, BIASNUM, c};
 }
 
 static inline const char8_t *readbool(bool bit) {
@@ -90,16 +99,9 @@ static inline const char8_t *readnum(Number n) {
 // Formatea un complejo como "re±imi" (p.ej. "3+4i", "2.5-0.25i").
 static inline const char8_t *readcomplex(Complex c) {
   static char8_t buffer[320];
-  Number real = {
-      .signo = c.real.signo,
-      .exp = c.real.exp,
-      .mantisa = c.real.mantisa,
-  };
-  Number imaginary = {
-      .signo = c.imaginary.signo,
-      .exp = c.imaginary.exp,
-      .mantisa = c.imaginary.mantisa,
-  };
+  Number real = complex_part_to_num(c.real.signo, c.real.exp, c.real.mantisa);
+  Number imaginary = complex_part_to_num(c.imaginary.signo, c.imaginary.exp, c.imaginary.mantisa);
+  
   char8_t re_buffer[160];
   char8_t im_buffer[160];
   format_number(real, re_buffer, sizeof(re_buffer));
@@ -112,7 +114,7 @@ static inline const char8_t *readcomplex(Complex c) {
   }
   const char *re = re_s[0] ? (const char *)re_s : "0";
   const char *im = im_s[0] ? (const char *)im_s : "0";
-  if (im[0] == '0' && im[1] != '.') /* magnitud cero: solo "0i" */ {
+  if (im[0] == '0' && im[1] != '.') {
     snprintf((char *)buffer, sizeof(buffer), "%s+%si", re, "0");
   } else {
     snprintf((char *)buffer, sizeof(buffer), "%s%s%si", re, im_neg ? "-" : "+",

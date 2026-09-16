@@ -40,28 +40,15 @@ int main(int argc, char *argv[]) {
 
   size_t bytecode_size = 0;
   uint8_t *bytecode = load_file(argv[1], &bytecode_size);
-  if (!bytecode)
+  if (!bytecode) {
     return 1;
+  }
 
-  VM vm = {0};
+  VM vm;
   vm_init(&vm, bytecode, bytecode_size);
+  Smart_heap sheap = create_heap(8);
+  vm_run(&vm, &sheap);
 
-  Smart_heap stack = create_heap(64);
-  PaxoVar globals[256] = {0};
-
-  text_green(stderr);
-  fprintf(stderr, "[lepvm]");
-  reset_colors(stderr);
-  fprintf(stderr, " Ejecutando %s (%zu bytes)\n", argv[1], bytecode_size);
-
-  vm_run(&vm, &stack, globals);
-
-  text_green(stderr);
-  fprintf(stderr, "[lepvm]");
-  reset_colors(stderr);
-  fprintf(stderr, " Terminado OK\n");
-
-  free_heap(&stack);
   free(bytecode);
   return 0;
 }

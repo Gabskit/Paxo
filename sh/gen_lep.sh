@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# gen_lep.sh - Genera lep.h (single-header con TODAS las librerías embebidas)
-# y lep_paxo.h (solo núcleo paxo). A partir de los fuentes de la VM.
+# gen_lep.sh - Amalgama total: lep.h (C + Zig a C) y lep.zig (Zig Monolítico)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -10,128 +9,50 @@ TP="$VM_SRC/third_party"
 BUILD_DIR="$ROOT_DIR/Build"
 CC="${CC:-gcc}"
 
-# Archivos paxo (núcleo de la VM, sin dependencias externas). Se ordenan
-# igual que la TU completa: Functions.c define los nativos y Vm.c el bucle.
-PRE_FILES=(
-  "$VM_SRC/termcolor-c.h"
-)
-
-PAXO_FILES=(
-  "$VM_SRC/Calc.c"
-  "$VM_SRC/Smart_heap.c"
-  "$VM_SRC/Typecast_and_read.c"
-  "$VM_SRC/Functions.c"
-  "$VM_SRC/Vm.c"
-)
+mkdir -p "$BUILD_DIR"
 
 # ====================================================================
-# Librerías de terceros que se EMBEBEN en lep.h (implementaciones reales).
-# Header-only (stb/miniaudio) o multi-TU (chipmunk/zlib/pdfio/sokol+nanovg),
-# inlinadas en orden declaración->implementación dentro del mismo header.
+# Escaneo dinámico de fuentes y subdirectorios (C y Zig, ordenados)
 # ====================================================================
+PRE_FILES=("$VM_SRC/termcolor-c.h")
 
-# stb_*: los cuerpos llevan su propia implementación gated por
-# STB_*_IMPLEMENTATION (se define justo antes de cada uno).
-STB_FILES=(
-  stb_image.h
-  stb_image_write.h
-  stb_truetype.h
-  stb_easy_font.h
-  stb_ds.h
-)
+PAXO_C_FILES=()
+while IFS= read -r -d '' f; do
+  if [[ "$(basename "$f")" != "nanovg.c" ]]; then
+    PAXO_C_FILES+=("$f")
+  fi
+done < <(find "$VM_SRC" -maxdepth 3 -type f -name "*.c" -print0 | sort -z)
 
-# miniaudio: MA_IMPLEMENTATION activa su cuerpo.
-MA_FILES=(
-  miniaudio.h
-)
+PAXO_ZIG_FILES=()
+while IFS= read -r -d '' f; do
+  PAXO_ZIG_FILES+=("$f")
+done < <(find "$VM_SRC" -maxdepth 3 -type f -name "*.zig" -print0 | sort -z)
 
-# zlib (base para pdfio). zlib.h incluye a zconf.h; internos tras zutil.h.
-# NOTA: crc32.h NO se emite aqui: es una tabla de datos generada que zlib
-# incluye DENTRO de crc32.c (tras definir N/W/z_word_t). Se injerta en su
-# sitio natural via emit_zlib_crc32().
-ZLIB_H_FILES=(
-  zconf.h
-  zlib.h
-  zutil.h
-  inftrees.h
-  inflate.h
-  inffast.h
-  deflate.h
-  inffixed.h
-)
-# Orden de amalgamacion clasico (infback.c no se usa: pdfio solo necesita
-# crc/inflate/deflate, y ademas infback.c duplicaria statics de inflate.c).
+# ====================================================================
+# Terceros para la amalgama C
+# ====================================================================
+STB_FILES=(stb_image.h stb_image_write.h stb_truetype.h stb_easy_font.h stb_ds.h)
+MA_FILES=(miniaudio.h)
+ZLIB_H_FILES=(zconf.h zlib.h zutil.h inftrees.h inflate.h inffast.h deflate.h inffixed.h)
 ZLIB_C_FILES=(
-  "$TP/zlib/adler32.c"
-  "$TP/zlib/zutil.c"
-  "$TP/zlib/crc32.c"
-  "$TP/zlib/trees.c"
-  "$TP/zlib/deflate.c"
-  "$TP/zlib/inftrees.c"
-  "$TP/zlib/inflate.c"
-  "$TP/zlib/inffast.c"
+  "$TP/zlib/adler32.c" "$TP/zlib/zutil.c" "$TP/zlib/crc32.c"
+  "$TP/zlib/trees.c" "$TP/zlib/deflate.c" "$TP/zlib/inftrees.c"
+  "$TP/zlib/inflate.c" "$TP/zlib/inffast.c"
 )
-
-# chipmunk 2D: chipmunk.h (paraguas) contiene codigo inline que usa cpFloat/
-# cpVect/etc., asi que va el ULTIMO, tras los headers reales. CP_EXPORT se
-# cubre con un define generico en el prologo. Le siguen los headers publicos
-# en el orden de sus dependencias, luego privados, luego fuentes.
 CHIP_H_FILES=(
-  chipmunk_types.h
-  cpVect.h
-  cpBB.h
-  cpTransform.h
-  cpRobust.h
-  cpSpatialIndex.h
-  cpArbiter.h
-  cpShape.h
-  cpPolyShape.h
-  cpBody.h
-  cpPinJoint.h
-  cpSlideJoint.h
-  cpPivotJoint.h
-  cpGrooveJoint.h
-  cpDampedSpring.h
-  cpDampedRotarySpring.h
-  cpRotaryLimitJoint.h
-  cpRatchetJoint.h
-  cpGearJoint.h
-  cpSimpleMotor.h
-  cpConstraint.h
-  cpSpace.h
-  cpHastySpace.h
-  cpMarch.h
-  cpPolyline.h
-  chipmunk_structs.h
-  chipmunk_private.h
-  chipmunk.h
+  chipmunk_types.h cpVect.h cpBB.h cpTransform.h cpRobust.h cpSpatialIndex.h
+  cpArbiter.h cpShape.h cpPolyShape.h cpBody.h cpPinJoint.h cpSlideJoint.h
+  cpPivotJoint.h cpGrooveJoint.h cpDampedSpring.h cpDampedRotarySpring.h
+  cpRotaryLimitJoint.h cpRatchetJoint.h cpGearJoint.h cpSimpleMotor.h
+  cpConstraint.h cpSpace.h cpHastySpace.h cpMarch.h cpPolyline.h
+  chipmunk_structs.h chipmunk_private.h chipmunk.h
 )
-CHIP_C_FILES=( "$TP"/chipmunk/src/*.c )
+CHIP_C_FILES=()
+while IFS= read -r -d '' f; do
+  CHIP_C_FILES+=("$f")
+done < <(find "$TP/chipmunk/src" -type f -name "*.c" -print0 | sort -z)
 
-# pdfio: headers (privado requiere zlib) luego fuentes.
-PDFIO_H_FILES=(
-  pdfio.h
-  pdfio-content.h
-  pdfio-private.h
-  ttf.h
-  pdfio-base-font-widths.h
-  pdfio-cgats001-compat.h
-)
-PDFIO_C_FILES=( "$TP"/pdfio/*.c )
-
-# sokol + nanovg + fontstash: opcional (LEP_ENABLE_NVG). gl3_compat.h va
-# primero (provee <GL/gl.h> si existe). fontstash usa las declaraciones de
-# stb_truetype ya embebidas arriba (FONS_NO_STB_TT_IMPL evita duplicados).
-NVG_FILES=(
-  gl3_compat.h
-  sokol_app.h
-  sokol_gfx.h
-  sokol_time.h
-  nanovg.h
-  fontstash.h
-  nanovg.c
-  nanovg_gl.h
-)
+NVG_FILES=(gl3_compat.h sokol_app.h sokol_gfx.h sokol_time.h nanovg.h fontstash.h nanovg.c nanovg_gl.h)
 
 ALL_EMBED=()
 for f in "${STB_FILES[@]}" "${MA_FILES[@]}"; do ALL_EMBED+=("$VM_SRC/$f"); done
@@ -139,41 +60,20 @@ for f in "${ZLIB_H_FILES[@]}"; do ALL_EMBED+=("$TP/zlib/$f"); done
 for f in "${ZLIB_C_FILES[@]}"; do ALL_EMBED+=("$f"); done
 for f in "${CHIP_H_FILES[@]}"; do ALL_EMBED+=("$TP/chipmunk/chipmunk/$f"); done
 for f in "${CHIP_C_FILES[@]}"; do ALL_EMBED+=("$f"); done
-for f in "${PDFIO_H_FILES[@]}"; do ALL_EMBED+=("$TP/pdfio/$f"); done
-for f in "${PDFIO_C_FILES[@]}"; do ALL_EMBED+=("$f"); done
 for f in "${NVG_FILES[@]}"; do ALL_EMBED+=("$VM_SRC/$f"); done
 
-# Verificar que existen
-for f in "${PRE_FILES[@]}" "${PAXO_FILES[@]}" "${ALL_EMBED[@]}"; do
-  if [[ ! -f "$f" ]]; then
-    echo "Error: no se encontro $f" >&2
-    exit 1
-  fi
-done
-
-# Includes con <> que pertenecen a librerías embebidas (se eliminan del
-# cuerpo Y de la lista de includes externos): su falta se satisface con el
-# texto inlinado. El resto de includes <> del sistema se protegen con
-# __has_include para mantener lep.h portable.
 STRIP_ANGLE='(chipmunk\/[^>]+|zlib\.h|zconf\.h|ft2build\.h|memory\.h|ApplicationServices\/[^>]+|TargetConditionals\.h|OpenGL\/gl[^>]*\.h)'
 
-# Extraer includes externos únicos (<> ) de una lista de archivos, filtrando
-# los que corresponden a librerías embebidas.
 extract_includes() {
-  local files=("$@")
-  grep -hE '^[[:space:]]*#[[:space:]]*include[[:space:]]+<[^>]+>' "${files[@]}" 2>/dev/null \
+  grep -hE '^[[:space:]]*#[[:space:]]*include[[:space:]]+<[^>]+>' "$@" 2>/dev/null \
     | grep -vE "$STRIP_ANGLE" \
     | awk '!seen[$0]++'
 }
 
-# Emitir el contenido saneado de un archivo (sin #pragma once, sin includes
-# locales "", sin includes <> embebidos/inexistentes).
-# $2 = 1 -> fuerza "static inline" (solo nucleo paxo; en librerias de
-# terceros rompe macros como stbi_inline/ma_inl y no hace falta, ya que
-# dentro de una sola TU no hay riesgo de multiplo definicion).
 emit_snip() {
   local file="$1"
   local want_static_inline="${2:-0}"
+  if [[ ! -f "$file" ]]; then return 0; fi
   echo "/* --- $(basename "$file") --- */"
   if [[ "$want_static_inline" == 1 ]]; then
     sed -E '
@@ -195,13 +95,8 @@ emit_snip() {
   echo ""
 }
 
-# stb_image_resize2.h usa auto-inclusion multi-pase (#include ''STBIR__HEADER_FILENAME'').
-# Impresible de embeber textualmente, asi que se cuece con el preprocesador
-# del sistema en gen-time: se conservan SOLO las secciones marcadas con la
-# ruta de stb_image_resize2.h (los cuerpos de headers de sistema se desechan;
-# lep.h provee sus declaraciones en el prologo). El resultado no tiene
-# ninguna auto-inclusion y es independiente del compilador consumidor.
 bake_resize2() {
+  if [[ ! -f "$VM_SRC/stb_image_resize2.h" ]]; then return 0; fi
   local unit="$BUILD_DIR/.gen_resize2.c"
   {
     echo "// bootstrap bake"
@@ -209,7 +104,7 @@ bake_resize2() {
     echo "#define STB_IMAGE_RESIZE_IMPLEMENTATION"
     echo "#include \"stb_image_resize2.h\""
   } > "$unit"
-  echo "/* --- stb_image_resize2.h (cocido: multi-pase resuelto) --- */"
+  echo "/* --- stb_image_resize2.h (cocido) --- */"
   "$CC" -E "$unit" -I"$VM_SRC" | awk '
     /^# [0-9]+ "/ { f = ($0 ~ /stb_image_resize2\.h/) ? 1 : 0; next }
     f { print }
@@ -218,9 +113,6 @@ bake_resize2() {
   echo ""
 }
 
-# crc32.c incluye crc32.h en su sitio natural (tras definir N/W y z_word_t).
-# Emitirlo antes no funcionaria: crc32.h es una tabla generada que solo se
-# activa con W definido, asi que se injerta aqui en lugar de en linea.
 emit_zlib_crc32() {
   echo "/* --- crc32.c --- */"
   sed -E '/^[[:space:]]*#[[:space:]]*include[[:space:]]+"crc32.h".*$/{
@@ -235,236 +127,116 @@ emit_zlib_crc32() {
   echo ""
 }
 
-# Generar el single-header completo de la VM (con terceros embebidos)
-generate_lep_full() {
-  local guard="$1"
-  local title="$2"
-  shift 2
-  local files=("$@")
-
-  local -a includes
-  mapfile -t includes < <(extract_includes "${PRE_FILES[@]}" "${PAXO_FILES[@]}" "${ALL_EMBED[@]}")
-
-  {
-    echo "/* $title - Auto-generado por sh/gen_lep.sh"
-    echo " * No editar manualmente." 
-    echo " *"
-    echo " * EmbeNe el nucleo de la VM (Calc, Smart_heap, Typecast, Functions, Vm)"
-    echo " * junto con las librerias de terceros reales:"
-    echo " *   - stb_image/write/resize2/truetype/easy_font/ds (imagenes/fuentes)"
-    echo " *   - miniaudio (audio)"
-    echo " *   - chipmunk 2D (fisica)"
-    echo " *   - zlib + pdfio (PDF)"
-    echo " *   - sokol + nanovg (graficos, opcional: -DLEP_ENABLE_NVG)"
-    echo " * Asi, los nativos img_* font_* audio_* phys_* pdf_* sokol_* nvg_*"
-    echo " * son implementaciones reales, sin stubs ni dependencias externas."
-    echo " */"
-    echo "#ifndef $guard"
-    echo "#define $guard"
-    echo ""
-
-    for inc in "${includes[@]}"; do
-      local inc_hdr
-      inc_hdr="$(printf '%s\n' "$inc" | sed -E 's/^[[:space:]]*#[[:space:]]*include[[:space:]]+<([^>]+)>.*/\1/')"
-      if [[ "$inc_hdr" =~ $STRIP_ANGLE ]]; then
-        continue
+transpiler_zig_to_c() {
+  local zfile="$1"
+  local tmp_c="$BUILD_DIR/.tmp_$(basename "$zfile" .zig).c"
+  if command -v zig >/dev/null 2>&1; then
+    echo "/* --- Transpilado desde $(basename "$zfile") --- */"
+    if zig build-obj "$zfile" -femit-c="$tmp_c" -I"$VM_SRC" -I"$BUILD_DIR" 2>/dev/null; then
+      if [ -f "$tmp_c" ]; then
+        sed -E '
+          /^[[:space:]]*#[[:space:]]*include[[:space:]]+<'"$STRIP_ANGLE"'>/d
+        ' "$tmp_c"
+        rm -f "$tmp_c"
       fi
-      echo "#if __has_include(<$inc_hdr>)"
-      echo "$inc"
-      echo "#endif"
-    done
+    fi
     echo ""
-
-    # --- Marcadores de terceros embebidos ---
-    echo "/* ===== Terceros embebidos reales ===== */"
-    echo ""
-    echo "#ifndef LEP_EMBEDDED_LIBS"
-    echo "#define LEP_EMBEDDED_LIBS 1"
-    echo "#endif"
-    echo "#ifndef CP_SPACE_DISABLE_DEBUG_API"
-    echo "#define CP_SPACE_DISABLE_DEBUG_API 1"
-    echo "#endif"
-    echo "#ifndef CP_EXPORT"
-    echo "#define CP_EXPORT"
-    echo "#endif"
-    echo "/* chipmunk.h (paraguas) va al final, pero sus forward-declarations"
-    echo " * de structs las emiten los headers intermedios; se declaran aqui"
-    echo " * (chipmunk.h las repite de forma identica, legal en C11+)."
-    echo " */"
-    for t in cpArray cpHashSet cpBody cpShape cpCircleShape cpSegmentShape cpPolyShape \
-             cpConstraint cpPinJoint cpSlideJoint cpPivotJoint cpGrooveJoint \
-             cpDampedSpring cpDampedRotarySpring cpRotaryLimitJoint cpRatchetJoint \
-             cpGearJoint cpSimpleMotorJoint cpCollisionHandler cpContactPointSet \
-             cpArbiter cpSpace; do
-      echo "typedef struct $t $t;"
-    done
-    echo ""
-    echo "#if !defined(LEP_NO_STB)"
-    echo "#define LEP_HAS_IMG 1"
-    echo "#define LEP_HAS_FONT 1"
-    echo "#endif"
-    echo "#if !defined(LEP_NO_MINIAUDIO)"
-    echo "#define LEP_HAS_AUDIO 1"
-    echo "#endif"
-    echo "#define LEP_HAS_PHYS 1"
-    echo "#define LEP_HAS_PDF 1"
-    echo ""
-
-    # --- stb (imagenes/fuentes/ds) ---
-    echo "/* ===== stb_image ===== */"
-    echo "#ifndef STB_IMAGE_IMPLEMENTATION"
-    echo "#define STB_IMAGE_IMPLEMENTATION"
-    echo "#endif"
-    emit_snip "$VM_SRC/stb_image.h"
-    echo "/* ===== stb_image_write ===== */"
-    echo "#ifndef STB_IMAGE_WRITE_IMPLEMENTATION"
-    echo "#define STB_IMAGE_WRITE_IMPLEMENTATION"
-    echo "#endif"
-    emit_snip "$VM_SRC/stb_image_write.h"
-echo "/* ===== stb_image_resize2 (cocido) ===== */"
-    bake_resize2
-    echo "/* ===== stb_truetype ===== */"
-    echo "#ifndef STB_TRUETYPE_IMPLEMENTATION"
-    echo "#define STB_TRUETYPE_IMPLEMENTATION"
-    echo "#endif"
-    emit_snip "$VM_SRC/stb_truetype.h"
-    echo "/* ===== stb_easy_font ===== */"
-    emit_snip "$VM_SRC/stb_easy_font.h"
-    echo "/* ===== stb_ds ===== */"
-    emit_snip "$VM_SRC/stb_ds.h"
-
-    # --- miniaudio ---
-    echo "/* ===== miniaudio ===== */"
-    echo "#ifndef MA_IMPLEMENTATION"
-    echo "#define MA_IMPLEMENTATION"
-    echo "#endif"
-    emit_snip "$VM_SRC/miniaudio.h"
-
-    # --- zlib ---
-    echo "/* ===== zlib ===== */"
-    for f in "${ZLIB_H_FILES[@]}"; do
-      emit_snip "$TP/zlib/$f"
-    done
-    # trees.h usa DIST_CODE_LEN, que en la compilacion separada define trees.c.
-    echo "#ifndef DIST_CODE_LEN"
-    echo "#define DIST_CODE_LEN 512"
-    echo "#endif"
-    emit_snip "$TP/zlib/trees.h"
-    for f in "${ZLIB_C_FILES[@]}"; do
-      if [[ "$(basename "$f")" == "crc32.c" ]]; then
-        emit_zlib_crc32
-      else
-        emit_snip "$f"
-      fi
-    done
-    # crc32.c define N (5) y W (4/8) para sus tablas; se liberan para que no
-    # colisionen con variables homonimas de otros bloques (p.ej. pdfio).
-    echo "/* zlib: liberar macros temporales de crc32.c */"
-    echo "#undef N"
-    echo "#undef W"
-
-    # --- chipmunk ---
-    echo "/* ===== chipmunk 2D ===== */"
-    for f in "${CHIP_H_FILES[@]}"; do
-      emit_snip "$TP/chipmunk/chipmunk/$f"
-    done
-    emit_snip "$TP/chipmunk/src/prime.h"
-    for f in "${CHIP_C_FILES[@]}"; do
-      emit_snip "$f"
-    done
-    # cpBBTree.c define A/B/STAMP/PAIRS (atajos de union); se liberan para
-    # no romper identificadores homonimos de bloques posteriores (pdfio sha).
-    echo "/* chipmunk: liberar macros temporales de cpBBTree.c */"
-    echo "#undef A"
-    echo "#undef B"
-    echo "#undef STAMP"
-    echo "#undef PAIRS"
-
-    # --- pdfio ---
-    echo "/* ===== pdfio ===== */"
-    for f in "${PDFIO_H_FILES[@]}"; do
-      emit_snip "$TP/pdfio/$f"
-    done
-    for f in "${PDFIO_C_FILES[@]}"; do
-      emit_snip "$f"
-    done
-
-    # --- sokol + nanovg (opcional) ---
-    echo "/* ===== sokol + nanovg (LEP_ENABLE_NVG) ===== */"
-    echo "#if defined(LEP_ENABLE_NVG)"
-    echo "#ifndef SOKOL_GLCORE"
-    echo "#define SOKOL_GLCORE"
-    echo "#endif"
-    echo "#ifndef SOKOL_NO_ENTRY"
-    echo "#define SOKOL_NO_ENTRY"
-    echo "#endif"
-    echo "#ifndef SOKOL_APP_IMPL"
-    echo "#define SOKOL_APP_IMPL"
-    echo "#endif"
-    echo "#ifndef SOKOL_GFX_IMPL"
-    echo "#define SOKOL_GFX_IMPL"
-    echo "#endif"
-    echo "#ifndef SOKOL_TIME_IMPL"
-    echo "#define SOKOL_TIME_IMPL"
-    echo "#endif"
-    echo "#ifndef NANOVG_GL3_IMPLEMENTATION"
-    echo "#define NANOVG_GL3_IMPLEMENTATION"
-    echo "#endif"
-    echo "#ifndef FONTSTASH_IMPLEMENTATION"
-    echo "#define FONTSTASH_IMPLEMENTATION"
-    echo "#endif"
-    echo "#ifndef NVG_NO_STB"
-    echo "#define NVG_NO_STB"
-    echo "#endif"
-    echo "#ifndef FONS_NO_STB_TT_IMPL"
-    echo "#define FONS_NO_STB_TT_IMPL"
-    echo "#endif"
-    echo "#ifndef LEP_HAS_NVG"
-    echo "#define LEP_HAS_NVG 1"
-    echo "#endif"
-    for f in "${NVG_FILES[@]}"; do
-      emit_snip "$VM_SRC/$f"
-    done
-    echo "#endif /* LEP_ENABLE_NVG */"
-    echo ""
-
-    # --- Núcleo paxo ---
-    echo "/* ===== Nucleo paxo ===== */"
-    for f in "${files[@]}"; do
-      emit_snip "$f" 1
-    done
-
-    echo "#endif /* $guard */"
-  }
+  fi
 }
 
-# --- Generar lep.h (núcleo + terceros) ---
-generate_lep_full "LEP_H" "lep.h - Light Environment Processing VM (single-header, con terceros embebidos)" "${PRE_FILES[@]}" "${PAXO_FILES[@]}" > "$BUILD_DIR/lep.h"
-echo "lep.h generado en $BUILD_DIR/lep.h ($(wc -l < "$BUILD_DIR/lep.h") lineas)"
-
-# --- Generar lep_paxo.h (solo fuentes paxo) ---
+# ====================================================================
+# 1. AMALGAMA C (lep.h)
+# ====================================================================
 {
-  echo "/* lep_paxo.h - Auto-generado por sh/gen_lep.sh"
-  echo " * No editar manualmente."
-  echo " * Solo el nucleo de la VM (Calc, Smart_heap, Typecast, Functions, Vm)"
-  echo " * y termcolor-c.h. Los nativos de terceros degradan a fallback."
-  echo " * Usa Build/lep.h si necesitas las librerias reales."
-  echo " */"
-  echo "#ifndef LEP_PAXO_H"
-  echo "#define LEP_PAXO_H"
+  echo "/* lep.h - Single Header Amalgam para Paxo VM (C + Zig transpilado a C) */"
+  echo "#ifndef LEP_H"
+  echo "#define LEP_H"
   echo ""
-  includes_paxo=()
-  mapfile -t includes_paxo < <(extract_includes "${PRE_FILES[@]}" "${PAXO_FILES[@]}")
-  for inc in "${includes_paxo[@]}"; do
+
+  mapfile -t includes < <(extract_includes "${PRE_FILES[@]}" "${PAXO_C_FILES[@]}" "${ALL_EMBED[@]}")
+  for inc in "${includes[@]}"; do
     inc_hdr="$(printf '%s\n' "$inc" | sed -E 's/^[[:space:]]*#[[:space:]]*include[[:space:]]+<([^>]+)>.*/\1/')"
+    if [[ "$inc_hdr" =~ $STRIP_ANGLE ]]; then continue; fi
     echo "#if __has_include(<$inc_hdr>)"
     echo "$inc"
     echo "#endif"
   done
   echo ""
-  for f in "${PRE_FILES[@]}" "${PAXO_FILES[@]}"; do
-    emit_snip "$f" 1
+
+  echo "#ifndef LEP_EMBEDDED_LIBS"
+  echo "#define LEP_EMBEDDED_LIBS 1"
+  echo "#endif"
+  echo "#ifndef CP_SPACE_DISABLE_DEBUG_API"
+  echo "#define CP_SPACE_DISABLE_DEBUG_API 1"
+  echo "#endif"
+  echo "#ifndef CP_EXPORT"
+  echo "#define CP_EXPORT"
+  echo "#endif"
+
+  for t in cpArray cpHashSet cpBody cpShape cpCircleShape cpSegmentShape cpPolyShape \
+           cpConstraint cpPinJoint cpSlideJoint cpPivotJoint cpGrooveJoint \
+           cpDampedSpring cpDampedRotarySpring cpRotaryLimitJoint cpRatchetJoint \
+           cpGearJoint cpSimpleMotorJoint cpCollisionHandler cpContactPointSet \
+           cpArbiter cpSpace; do
+    echo "typedef struct $t $t;"
   done
-  echo "#endif /* LEP_PAXO_H */"
-} > "$BUILD_DIR/lep_paxo.h"
-echo "lep_paxo.h generado en $BUILD_DIR/lep_paxo.h ($(wc -l < "$BUILD_DIR/lep_paxo.h") lineas)"
+  echo ""
+
+  echo "#define STB_IMAGE_IMPLEMENTATION"
+  emit_snip "$VM_SRC/stb_image.h"
+  echo "#define STB_IMAGE_WRITE_IMPLEMENTATION"
+  emit_snip "$VM_SRC/stb_image_write.h"
+  bake_resize2
+  echo "#define STB_TRUETYPE_IMPLEMENTATION"
+  emit_snip "$VM_SRC/stb_truetype.h"
+  emit_snip "$VM_SRC/stb_easy_font.h"
+  emit_snip "$VM_SRC/stb_ds.h"
+
+  echo "#define MA_IMPLEMENTATION"
+  emit_snip "$VM_SRC/miniaudio.h"
+
+  for f in "${ZLIB_H_FILES[@]}"; do emit_snip "$TP/zlib/$f"; done
+  echo "#ifndef DIST_CODE_LEN"
+  echo "#define DIST_CODE_LEN 512"
+  echo "#endif"
+  emit_snip "$TP/zlib/trees.h"
+  for f in "${ZLIB_C_FILES[@]}"; do
+    if [[ "$(basename "$f")" == "crc32.c" ]]; then emit_zlib_crc32; else emit_snip "$f"; fi
+  done
+  echo "#undef N"
+  echo "#undef W"
+
+  for f in "${CHIP_H_FILES[@]}"; do emit_snip "$TP/chipmunk/chipmunk/$f"; done
+  emit_snip "$TP/chipmunk/src/prime.h"
+  for f in "${CHIP_C_FILES[@]}"; do emit_snip "$f"; done
+  echo "#undef A"
+  echo "#undef B"
+  echo "#undef STAMP"
+  echo "#undef PAIRS"
+
+  echo "#if defined(LEP_ENABLE_NVG)"
+  echo "#define SOKOL_GLCORE"
+  echo "#define SOKOL_NO_ENTRY"
+  echo "#define SOKOL_APP_IMPL"
+  echo "#define SOKOL_GFX_IMPL"
+  echo "#define SOKOL_TIME_IMPL"
+  echo "#define NANOVG_GL3_IMPLEMENTATION"
+  echo "#define FONTSTASH_IMPLEMENTATION"
+  echo "#define NVG_NO_STB"
+  echo "#define FONS_NO_STB_TT_IMPL"
+  for f in "${NVG_FILES[@]}"; do emit_snip "$VM_SRC/$f"; done
+  echo "#endif"
+  echo ""
+
+  for f in "${PRE_FILES[@]}" "${PAXO_C_FILES[@]}"; do
+    emit_snip "$f" 
+  done
+
+  for zf in "${PAXO_ZIG_FILES[@]}"; do
+    transpiler_zig_to_c "$zf"
+  done
+
+  echo "#endif /* LEP_H */"
+} > "$BUILD_DIR/lep.h"
+
+echo "[gen_lep] Build/lep.h generado correctamente."
