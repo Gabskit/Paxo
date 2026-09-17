@@ -264,6 +264,7 @@ const NATIVE = Object.freeze({
 
 
 const TYPE_NAME = {
+	"📥": TYPE.NUM,
   var: TYPE.NUM,
   n: TYPE.NUM,
   abc: TYPE.CHAR,
@@ -822,9 +823,15 @@ class Compiler {
 
     const name =
       ctx.constructor?.name || "";
+      
+      const s = text(ctx);
 
-    const s = text(ctx);
-
+/*console.error(
+  "DEBUG EXPR:",
+  JSON.stringify(name),
+  "TEXT:",
+  JSON.stringify(s)
+);*/
 
     /*
      * INT
@@ -1121,7 +1128,7 @@ class Compiler {
 
       const base =
         this.compileExpression(
-          expressions
+          expressions[0]
         );
 
       const id =
@@ -1182,34 +1189,36 @@ if (name.includes("ParenExpr")) {
     /*
      * LOGICAL NOT
      */
-    if (
-      name.includes("NotExpr") ||
-      name.includes("UnaryNotExpr")
-    ) {
-      const expressions =
-        ctx.expression();
+if (
+  name.includes("NotExpr") ||
+  name.includes("UnaryNotExpr") ||
+  name.includes("NotgateExpr")
+) {
+  //console.error(">>> ENTRÓ A NOT:", name);
 
-      const operand =
-        this.compileExpression(
-          Array.isArray(expressions)
-            ? expressions[0]
-            : expressions
-        );
+  const expressions = ctx.expression();
 
-      const dest = this.reg();
+  /*console.error(
+    ">>> OPERAND:",
+    Array.isArray(expressions)
+      ? expressions.map(x => x.constructor?.name)
+      : expressions?.constructor?.name
+  );*/
 
-      this.e.op(OP.NOT);
+  const operand = this.compileExpression(
+    Array.isArray(expressions)
+      ? expressions[0]
+      : expressions
+  );
 
-      this.e.reg(operand);
-      this.e.reg(dest);
+  const dest = this.reg();
 
-      return dest;
-    }
+  this.e.op(OP.NOT);
+  this.e.reg(operand);
+  this.e.reg(dest);
 
-
-    throw new Error(
-      `Expresion no soportada: ${name} -> ${s}`
-    );
+  return dest;
+}
   }
 
 
@@ -1248,48 +1257,37 @@ if (name.includes("ParenExpr")) {
   /*
    * Hace que los registros de argumentos sean contiguos.
    */
+   
   packArgs(args) {
-    if (args.length === 0) {
-      return 0;
-    }
-
-    const base =
-      Math.min(...args);
-
-    let contiguous = true;
-
-    for (
-      let i = 0;
-      i < args.length;
-      i++
-    ) {
-      if (args[i] !== base + i) {
-        contiguous = false;
-        break;
-      }
-    }
-
-    if (contiguous) {
-      return base;
-    }
-
-    const baseReg = this.reg();
-
-    for (
-      let i = 0;
-      i < args.length;
-      i++
-    ) {
-      this.e.op(OP.READ);
-
-      this.e.reg(args[i]);
-
-      this.e.reg(baseReg + i);
-    }
-
-    return baseReg;
+  if (args.length === 0) {
+    return 0;
   }
 
+  const base = Math.min(...args);
+  let contiguous = true;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] !== base + i) {
+      contiguous = false;
+      break;
+    }
+  }
+
+  if (contiguous) {
+    return base;
+  }
+
+  const baseReg = this.nextReg;
+
+  for (let i = 0; i < args.length; i++) {
+    const targetReg = this.reg(); // Avanza nextReg por cada argumento
+    this.e.op(OP.READ);
+    this.e.reg(args[i]);
+    this.e.reg(targetReg);
+  }
+
+  return baseReg;
+}
 
   /*
    * ----------------------------------------------------------
@@ -1298,87 +1296,43 @@ if (name.includes("ParenExpr")) {
    */
 
   compileCall(ctx) {
-    const name =
-      getTextSafe(ctx.IDENTIFIER());
+  const name = getTextSafe(ctx.IDENTIFIER());
+  const args = this.compileArgs(ctx.argumentList());
 
-    const args =
-      this.compileArgs(
-        ctx.argumentList()
-      );
+  /*
+   * Native
+   */
+  if (Object.prototype.hasOwnProperty.call(NATIVE, name)) {
+    const base = this.packArgs(args); // Empaquetar argumentos PRIMERO
+    const dest = this.reg();          // Reservar dest DESPUÉS
 
-
-    /*
-     * Native
-     */
-    if (
-      Object.prototype.hasOwnProperty.call(
-        NATIVE,
-        name
-      )
-    ) {
-      const dest = this.reg();
-
-      const base =
-        this.packArgs(args);
-
-      this.e.op(OP.CALL_NATIVE);
-
-      this.e.emit(
-        ...u16(NATIVE[name])
-      );
-
-      this.e.emit(
-        args.length
-      );
-
-      this.e.reg(base);
-
-      this.e.reg(dest);
-
-      return dest;
-    }
-
-
-    /*
-     * Paxo function
-     */
-    const functionReg =
-      this.loadIdentifier(
-        name,
-        ctx
-      );
-
-    const base =
-      this.packArgs(args);
-
-    this.e.op(OP.CALL);
-
-    this.e.reg(functionReg);
-
-    this.e.emit(
-      args.length
-    );
-
+    this.e.op(OP.CALL_NATIVE);
+    this.e.emit(...u16(NATIVE[name]));
+    this.e.emit(args.length);
     this.e.reg(base);
-
-
-    /*
-     * Las funciones Paxo retornan a un
-     * registro reservado por la VM.
-     *
-     * Se usa 65535 como return slot.
-     */
-    const dest = this.reg();
-
-    this.e.op(OP.READ);
-
-    this.e.reg(65535);
-
     this.e.reg(dest);
 
     return dest;
   }
 
+  /*
+   * Paxo function
+   */
+  const functionReg = this.loadIdentifier(name, ctx);
+  const base = this.packArgs(args);
+
+  this.e.op(OP.CALL);
+  this.e.reg(functionReg);
+  this.e.emit(args.length);
+  this.e.reg(base);
+
+  const dest = this.reg();
+  this.e.op(OP.READ);
+  this.e.reg(65535);
+  this.e.reg(dest);
+
+  return dest;
+}
 
   /*
    * ----------------------------------------------------------
@@ -1618,7 +1572,7 @@ if (name.includes("ParenExpr")) {
 
     const receiver =
       this.compileExpression(
-        expressions
+        expressions[0]
       );
 
     const name =
@@ -1944,197 +1898,375 @@ if (name.includes("ParenExpr")) {
    * ----------------------------------------------------------
    */
 
-  compileAssignment(a) {
+compileAssignment(a) {
+  const rawText = getTextSafe(a);
+  const text = rawText.replace(/;+$/, "");
+
+  /*
+   * La gramática es:
+   *
+   *   IDENTIFIER '=' expression ';'?
+   *   IDENTIFIER '[' expression ']' '=' expression ';'?
+   *   IDENTIFIER '++' ';'?
+   *   IDENTIFIER '--' ';'?
+   *   expression '.' IDENTIFIER '=' expression ';'?
+   *   THIS_SCOPE '.' IDENTIFIER '=' expression ';'?
+   *
+   * IMPORTANTE:
+   *
+   * NO inspeccionar "." o "[" sobre todo el texto de la asignación,
+   * porque el RHS puede contener:
+   *
+   *   .✓
+   *   .!
+   *   funciones
+   *   accesos
+   *   expresiones con "."
+   *
+   * Primero separamos el LHS del RHS.
+   */
+
+  const identifiersRaw = a.IDENTIFIER?.() ?? [];
+  const expressionsRaw = a.expression?.() ?? [];
+
+  const identifiers = Array.isArray(identifiersRaw)
+    ? identifiersRaw
+    : identifiersRaw
+      ? [identifiersRaw]
+      : [];
+
+  const expressions = Array.isArray(expressionsRaw)
+    ? expressionsRaw
+    : expressionsRaw
+      ? [expressionsRaw]
+      : [];
+
+  /*
+   * ------------------------------------------------------------
+   * 1. ++
+   * ------------------------------------------------------------
+   *
+   * Normalizamos el ";" arriba, por lo que:
+   *
+   *   fidx++;
+   *
+   * se convierte en:
+   *
+   *   fidx++
+   */
+  if (text.endsWith("++")) {
+    const id = identifiers.length > 0
+      ? getTextSafe(identifiers[0])
+      : null;
+
+    if (!id) {
+      throw new Error(`Asignación inválida: ${rawText}`);
+    }
+
+    const symbol = this.lookup(id);
+
+    if (!symbol) {
+      throw new Error(`Variable no declarada: ${id}`);
+    }
+
+    const current = this.loadIdentifier(id, a);
+
+    const one = this.reg();
+    this.emitWriteNumber(one, "1");
+
+    const dest = this.reg();
+
+    this.e.op(OP.ADD);
+    this.e.reg(current);
+    this.e.reg(one);
+    this.e.reg(dest);
+
+    if (symbol.kind === "global") {
+      this.e.op(OP.STORE_VAR);
+      this.e.reg(dest);
+      this.e.reg(symbol.index);
+    } else {
+      this.e.op(OP.STORE_LOCAL);
+      this.e.reg(dest);
+      this.e.reg(symbol.index);
+    }
+
+    return;
+  }
+
+
+  /*
+   * ------------------------------------------------------------
+   * 2. --
+   * ------------------------------------------------------------
+   */
+  if (text.endsWith("--")) {
+    const id = identifiers.length > 0
+      ? getTextSafe(identifiers[0])
+      : null;
+
+    if (!id) {
+      throw new Error(`Asignación inválida: ${rawText}`);
+    }
+
+    const symbol = this.lookup(id);
+
+    if (!symbol) {
+      throw new Error(`Variable no declarada: ${id}`);
+    }
+
+    const current = this.loadIdentifier(id, a);
+
+    const one = this.reg();
+    this.emitWriteNumber(one, "1");
+
+    const dest = this.reg();
+
+    this.e.op(OP.SUB);
+    this.e.reg(current);
+    this.e.reg(one);
+    this.e.reg(dest);
+
+    if (symbol.kind === "global") {
+      this.e.op(OP.STORE_VAR);
+      this.e.reg(dest);
+      this.e.reg(symbol.index);
+    } else {
+      this.e.op(OP.STORE_LOCAL);
+      this.e.reg(dest);
+      this.e.reg(symbol.index);
+    }
+
+    return;
+  }
+
+
+  /*
+   * ------------------------------------------------------------
+   * 3. Encontrar el "=" de asignación
+   * ------------------------------------------------------------
+   *
+   * Como estamos dentro de assignment(), el primer "=" separa
+   * LHS y RHS.
+   *
+   * Ejemplo:
+   *
+   *   fib = (n k) : n { ... .✓ ... }
+   *
+   * lhs = "fib"
+   *
+   * mientras que:
+   *
+   *   obj.campo = valor
+   *
+   * lhs = "obj.campo"
+   *
+   * y:
+   *
+   *   array[i] = valor
+   *
+   * lhs = "array[i]"
+   */
+  const eqPos = text.indexOf("=");
+
+  if (eqPos < 0) {
+    throw new Error(`Asignación no reconocida: ${rawText}`);
+  }
+
+  const lhs = text.slice(0, eqPos).trim();
+
+
+  /*
+   * ------------------------------------------------------------
+   * 4. this.campo = value
+   * ------------------------------------------------------------
+   */
+  if (
+    typeof a.THIS_SCOPE === "function" &&
+    a.THIS_SCOPE()
+  ) {
+    const field =
+      identifiers.length > 0
+        ? getTextSafe(identifiers[0])
+        : null;
+
+    if (!field) {
+      throw new Error(
+        `Asignación inválida a this: ${rawText}`
+      );
+    }
+
+    if (expressions.length < 1) {
+      throw new Error(
+        `Asignación inválida a this.${field}: falta el valor`
+      );
+    }
+
+    const value =
+      this.compileExpression(
+        expressions[expressions.length - 1]
+      );
+
+    /*
+     * THIS_SCOPE representa el objeto actual.
+     */
+    const base =
+      this.compileExpression(
+        a.THIS_SCOPE()
+      );
+
+    const fieldReg = this.reg();
+    this.emitWriteString(fieldReg, field);
+
+    this.e.op(OP.PKG_SET);
+    this.e.reg(base);
+    this.e.reg(fieldReg);
+    this.e.reg(value);
+
+    return;
+  }
+
+
+  /*
+   * ------------------------------------------------------------
+   * 5. array[index] = value
+   * ------------------------------------------------------------
+   *
+   * Aquí miramos SOLO el LHS.
+   *
+   * Por ejemplo:
+   *
+   *   a[i] = fib(k - 1)
+   *
+   * lhs = "a[i]"
+   *
+   * Esto no se confunde con un "." o "[" que aparezca en el RHS.
+   */
+  if (lhs.includes("[") && lhs.includes("]")) {
     const id =
-      a.IDENTIFIER?.()
-        ?.getText?.();
+      identifiers.length > 0
+        ? getTextSafe(identifiers[0])
+        : null;
 
-    const expressions =
-      a.expression?.();
-
-    const exprs =
-      Array.isArray(expressions)
-        ? expressions
-        : expressions
-          ? [expressions]
-          : [];
-
-
-    /*
-     * ++ / --
-     */
-    if (
-      a.getText().includes("++") ||
-      a.getText().includes("--")
-    ) {
-      const symbol =
-        this.lookup(id);
-
-      if (!symbol) {
-        throw new Error(
-          `Variable no declarada: ${id}`
-        );
-      }
-
-
-      if (symbol.kind === "global") {
-        const r =
-          this.loadIdentifier(
-            id,
-            a
-          );
-
-        this.e.op(
-          a.getText().includes("++")
-            ? OP.INC
-            : OP.DEC
-        );
-
-        this.e.reg(r);
-
-        this.e.op(
-          OP.STORE_VAR
-        );
-
-        this.e.reg(r);
-        this.e.reg(symbol.index);
-      }
-
-      else {
-        const r = this.reg();
-
-        this.e.op(
-          OP.LOAD_LOCAL
-        );
-
-        this.e.reg(symbol.index);
-        this.e.reg(r);
-
-        this.e.op(
-          a.getText().includes("++")
-            ? OP.INC
-            : OP.DEC
-        );
-
-        this.e.reg(r);
-
-        this.e.op(
-          OP.STORE_LOCAL
-        );
-
-        this.e.reg(r);
-        this.e.reg(symbol.index);
-      }
-
-      return;
+    if (!id) {
+      throw new Error(
+        `Asignación de array inválida: ${rawText}`
+      );
     }
 
-
-    /*
-     * this.field = value
-     */
-    if (a.THIS_SCOPE?.()) {
-      const name =
-        getTextSafe(a.IDENTIFIER());
-
-      const value =
-        this.compileExpression(
-          exprs[0]
-        );
-
-      const bytes =
-        utf8(name);
-
-      this.e.op(
-        OP.THIS_SET
+    if (expressions.length < 2) {
+      throw new Error(
+        `Asignación de array inválida: ${rawText}`
       );
-
-      this.e.emit(
-        ...u16(bytes.length),
-        ...bytes
-      );
-
-      this.e.reg(value);
-
-      return;
     }
 
+    const symbol = this.lookup(id);
 
-    /*
-     * array[index] = value
-     */
-    if (
-      a.getText().includes("[")
-    ) {
-      const base =
-        this.loadIdentifier(
-          id,
-          a
-        );
-
-      const index =
-        this.compileExpression(
-          exprs[0]
-        );
-
-      const value =
-        this.compileExpression(
-          exprs[1]
-        );
-
-      this.e.op(
-        OP.ARRAY_SET
-      );
-
-      this.e.reg(base);
-      this.e.reg(index);
-      this.e.reg(value);
-
-      return;
+    if (!symbol) {
+      throw new Error(`Variable no declarada: ${id}`);
     }
 
-
-    /*
-     * package.field = value
-     */
-    if (
-      a.getText().includes(".")
-    ) {
-      const base =
-        this.compileExpression(
-          exprs[0]
-        );
-
-      const value =
-        this.compileExpression(
-          exprs[1]
-        );
-
-      const name =
-        getTextSafe(a.IDENTIFIER());
-
-      const bytes =
-        utf8(name);
-
-      this.e.op(
-        OP.PKG_SET
+    const index =
+      this.compileExpression(
+        expressions[0]
       );
 
-      this.e.emit(
-        ...u16(bytes.length),
-        ...bytes
+    const value =
+      this.compileExpression(
+        expressions[expressions.length - 1]
       );
 
-      this.e.reg(base);
-      this.e.reg(value);
+    const arrayReg =
+      this.loadIdentifier(id, a);
 
-      return;
+    this.e.op(OP.ARRAY_SET);
+    this.e.reg(arrayReg);
+    this.e.reg(index);
+    this.e.reg(value);
+
+    return;
+  }
+
+
+  /*
+   * ------------------------------------------------------------
+   * 6. objeto.campo = value
+   * ------------------------------------------------------------
+   *
+   * Otra vez, "." se busca SOLO en el LHS.
+   *
+   * Esto es lo que evita romper:
+   *
+   *   fib = (n k) : n {
+   *       (k < 2) ? .✓ -> ...
+   *   }
+   *
+   * porque ahí:
+   *
+   *   lhs = "fib"
+   *
+   * aunque el RHS tenga ".✓".
+   */
+  if (lhs.includes(".")) {
+    if (identifiers.length < 1) {
+      throw new Error(
+        `Asignación de campo inválida: ${rawText}`
+      );
     }
 
+    if (expressions.length < 2) {
+      throw new Error(
+        `Asignación de campo inválida: ${rawText}`
+      );
+    }
 
-    /*
-     * Simple assignment
-     */
+    const field =
+      getTextSafe(
+        identifiers[identifiers.length - 1]
+      );
+
+    const base =
+      this.compileExpression(
+        expressions[0]
+      );
+
+    const value =
+      this.compileExpression(
+        expressions[expressions.length - 1]
+      );
+
+    const fieldReg = this.reg();
+    this.emitWriteString(fieldReg, field);
+
+    this.e.op(OP.PKG_SET);
+    this.e.reg(base);
+    this.e.reg(fieldReg);
+    this.e.reg(value);
+
+    return;
+  }
+
+
+  /*
+   * ------------------------------------------------------------
+   * 7. Asignación simple
+   * ------------------------------------------------------------
+   *
+   *   fib = function(...)
+   *
+   *   fidx = 0
+   *
+   *   x = a + b
+   *
+   * El RHS puede contener absolutamente cualquier expresión.
+   */
+  if (
+    identifiers.length >= 1 &&
+    expressions.length >= 1
+  ) {
+    const id =
+      getTextSafe(identifiers[0]);
+
     const symbol =
       this.lookup(id);
 
@@ -2146,28 +2278,32 @@ if (name.includes("ParenExpr")) {
 
     const value =
       this.compileExpression(
-        exprs[0]
+        expressions[0]
       );
-
 
     if (symbol.kind === "global") {
-      this.e.op(
-        OP.STORE_VAR
-      );
-
+      this.e.op(OP.STORE_VAR);
+      this.e.reg(value);
+      this.e.reg(symbol.index);
+    } else {
+      this.e.op(OP.STORE_LOCAL);
       this.e.reg(value);
       this.e.reg(symbol.index);
     }
 
-    else {
-      this.e.op(
-        OP.STORE_LOCAL
-      );
-
-      this.e.reg(value);
-      this.e.reg(symbol.index);
-    }
+    return;
   }
+
+
+  /*
+   * ------------------------------------------------------------
+   * 8. Nada reconocido
+   * ------------------------------------------------------------
+   */
+  throw new Error(
+    `Asignación no reconocida: ${rawText}`
+  );
+}
 
 
   /*
@@ -2464,10 +2600,12 @@ if (name.includes("ParenExpr")) {
 
 
     const parent =
-      this.currentFunction;
+  this.currentFunction;
 
+const parentNextReg =
+  this.nextReg;
 
-    const fn = {
+const fn = {
       locals: new Map(),
       returnDest: 65535,
       params: [],
@@ -2475,13 +2613,11 @@ if (name.includes("ParenExpr")) {
     };
 
 
-    this.currentFunction = fn;
+this.currentFunction =
+  fn;
 
-    /*
-     * Los temporales de una función comienzan
-     * nuevamente desde cero.
-     */
-    this.nextReg = 0;
+this.nextReg =
+  0;
 
 
     const parameterList =
@@ -2517,6 +2653,11 @@ if (name.includes("ParenExpr")) {
       fd.block()
     );
 
+this.currentFunction =
+  parent;
+
+this.nextReg =
+  parentNextReg;
 
     /*
      * Return implícito.
@@ -2535,14 +2676,6 @@ if (name.includes("ParenExpr")) {
     this.e.reg(zero);
 
     this.e.reg(65535);
-
-
-    /*
-     * Regresamos al contexto anterior.
-     */
-    this.currentFunction =
-      parent;
-
 
     /*
      * Continuamos después del cuerpo.

@@ -6,7 +6,7 @@
 
 // ----- 1. Fibonacci recursivo -----
 // (se declara la variable antes para que la función pueda llamarse a sí misma)
-📥 fib = 0
+var fib = 0
 fib = (n k) : n {
     (k < 2) ? .✓ -> {
         return k;
@@ -70,7 +70,7 @@ println("");
 
 // ----- 5. Bubble sort -----
 var nums = «5, 3, 8, 1, 9, 2»
-n blen = array_len(nums)
+n blen = arrayLen(nums)
 n bpass = 0
 (bpass < blen - 1) : |> |: {
     n bi = 0

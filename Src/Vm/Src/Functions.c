@@ -218,9 +218,18 @@ static void print_var_full(LEPVar elem) {
   case CHAR:
     printf("%c", (char)var_char_get(elem));
     return;
+
   case STRING:
     printf("%s", var_string_get(elem));
     return;
+
+  case POINT:
+    if (var_ref_sub_get(elem) == REF_SUB_STRING) {
+      printf("%s", var_string_get(elem));
+      return;
+    }
+    break;
+
   case ARRAY: {
     LEPArray *arr = var_array_get(elem);
     printf("«");
@@ -231,19 +240,22 @@ static void print_var_full(LEPVar elem) {
     printf("»");
     return;
   }
+
   case PACKAGE:
     printf("{package}");
     return;
+
   default:
     break;
   }
+
   print_var_inline(elem);
 }
 
 static LEPVar native_print(LEPVar *args, uint8_t argc) {
   if (argc < 1)
     return LEP_ZERO;
-  for (uint8_t i = 0; i < argc; i++)
+  for (uint64_t i = 0; i < argc; i++)
     print_var_full(args[i]);
   return LEP_ZERO;
 }

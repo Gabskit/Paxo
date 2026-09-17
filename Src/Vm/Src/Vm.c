@@ -108,7 +108,7 @@ void vm_init(VM *vm, const uint8_t *bytecode, size_t bytecode_size) {
 
 void vm_error(VM *vm, const char *msg) {
   text_red(stderr);
-  fprintf(stderr, "[LEP-VM Error en IP %zu]: %s\n", vm->ip, msg);
+  fprintf(stderr, "[LEP-VM Error en IP %zu]: %s \n", vm->ip, msg);
   reset_colors(stderr);
 }
 
@@ -387,10 +387,26 @@ void vm_run(VM *vm, Smart_heap *stack) {
       uint16_t r_dst = read_u16(vm);
       LEPVar a = heap_get(stack, r_a);
       LEPVar b = heap_get(stack, r_b);
+      //fprintf(stderr, "DEBUG ADD: a=%d b=%d\n", a.type, b.type);
       if (a.type == NUM && b.type == NUM)
         heap_set(stack, r_dst, var_num(add_num(var_num_get(a), var_num_get(b))));
       else if (a.type == COMPLEX && b.type == COMPLEX)
         heap_set(stack, r_dst, var_complex(add_complex(var_complex_get(a), var_complex_get(b))));
+      else if (
+    a.type == POINT &&
+    b.type == POINT &&
+    var_ref_sub_get(a) == REF_SUB_STRING &&
+    var_ref_sub_get(b) == REF_SUB_STRING
+) {
+    heap_set(
+        stack,
+        r_dst,
+        var_string(strcat(
+            var_string_get(a),
+            var_string_get(b)
+        ))
+    );
+}
       else
         vm_error(vm, "OP_ADD: tipos incompatibles");
       break;
@@ -487,11 +503,27 @@ void vm_run(VM *vm, Smart_heap *stack) {
     }
 
     case OP_STORE_VAR: {
-      uint16_t src_reg = read_u16(vm);
-      uint16_t global_idx = read_u16(vm);
-      vm->frames[0].locals[global_idx] = heap_get(stack, src_reg);
-      break;
-    }
+    uint16_t src_reg = read_u16(vm);
+    uint16_t global_idx = read_u16(vm);
+
+    LEPVar v = heap_get(stack, src_reg);
+
+    /*fprintf(stderr,
+            "STORE_VAR global=%u src=%u type=%u",
+            global_idx, src_reg, v.type);
+
+    if (v.type == POINT) {
+        fprintf(stderr,
+                " sub=%u id=%u",
+                var_ref_sub_get(v),
+                var_func_id(v));
+    }*/
+
+    //fprintf(stderr, "\n");
+
+    vm->frames[0].locals[global_idx] = v;
+    break;
+}
 
     case OP_PRINT: {
       uint16_t src_reg = read_u16(vm);
@@ -551,6 +583,15 @@ case OP_JUMP_IF_TRUE: {
       uint8_t argc = vm->bytecode[vm->ip++];
       uint16_t args_base_reg = read_u16(vm);
       LEPVar func = heap_get(stack, func_reg);
+     /* fprintf(
+    stderr,
+    "CALL ip=%zu func_reg=%u type=%u sub=%u id=%u\n",
+    vm->ip,
+    func_reg,
+    func.type,
+    var_ref_sub_get(func),
+    var_func_id(func)
+);*/
       if (func.type != POINT || var_ref_sub_get(func) != REF_SUB_FUNC) {
         vm_error(vm, "OP_CALL: El registro no contiene una funcion valida");
         running = false;
