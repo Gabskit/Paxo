@@ -176,10 +176,10 @@ typedef enum {
 
 static void print_var_inline(LEPVar elem) {
   switch (var_type(elem)) {
-  case NUM: {
-    Number n = var_num_get(elem);
-    double val = (double)n.mantisa * pow(10.0, (int)n.exp - BIASNUM);
-    printf("%g", n.signo ? -val : val);
+  case INT: {
+    int64_t n = var_int_get(elem);
+    double val = (double)n;
+    printf("%g", val);
     break;
   }
   case BOOL:
@@ -194,11 +194,6 @@ static void print_var_inline(LEPVar elem) {
   case COLOR:
     printf("#%08X", var_color_get(elem));
     break;
-  case COMPLEX: {
-    Complex c = var_complex_get(elem);
-    printf("(complex)");
-    break;
-  }
   case STRING:
     printf("\"%s\"", var_string_get(elem));
     break;
@@ -224,11 +219,8 @@ static void print_var_full(LEPVar elem) {
     return;
 
   case POINT:
-    if (var_ref_sub_get(elem) == REF_SUB_STRING) {
-      printf("%s", var_string_get(elem));
-      return;
-    }
-    break;
+    printf("<point>");
+    return;
 
   case ARRAY: {
     LEPArray *arr = var_array_get(elem);
@@ -271,7 +263,13 @@ static LEPVar native_typeof(LEPVar *args, uint8_t argc) {
     return LEP_ZERO;
   const char *type_name = "unknown";
   switch (var_type(args[0])) {
-  case NUM: type_name = "number: n"; break;
+  case INT: type_name = "integer: int"; break;
+  case UINT: type_name = "unsigned integer: uint"; break;
+  case SFP: type_name = "float16: sfp"; break;
+  case FP: type_name = "float64: fp"; break;
+  case DEC: type_name = "decimal64: dec"; break;
+  case FRAC: type_name = "fraction: frac"; break;
+  case ACCUM: type_name = "accumulator: accum"; break;
   case BOOL: type_name = "boolean: bool"; break;
   case TRIT: type_name = "trit: trit"; break;
   case CHAR: type_name = "character: abc"; break;
@@ -281,7 +279,8 @@ static LEPVar native_typeof(LEPVar *args, uint8_t argc) {
   case ARRAY: type_name = "array: var[]"; break;
   case PACKAGE: type_name = "package: pkg"; break;
   case COLOR: type_name = "color: col"; break;
-  case COMPLEX: type_name = "complex: ni"; break;
+  case SCOM: type_name = "complex16: scom"; break;
+  case COM: type_name = "complex64: com"; break;
   }
   return var_string(type_name);
 }
@@ -333,28 +332,11 @@ static LEPVar native_scan(LEPVar *args, uint8_t argc) {
 }
 
 static LEPVar num_from_i64(int64_t v) {
-  uint8_t s = 0;
-  if (v < 0) { s = 1; v = -v; }
-  if ((uint64_t)v > man_maxnum()) v = (int64_t)man_maxnum();
-  return var_num((Number){.signo = s, .exp = BIASNUM, .mantisa = (uint64_t)v});
+  return var_int(v);
 }
 
 static LEPVar num_from_double(double d) {
-  if (isnan(d)) d = 0;
-  uint8_t s = 0;
-  if (d < 0) { s = 1; d = -d; }
-  if (d == 0 || isinf(d)) {
-    return var_num((Number){.signo = s, .exp = BIASNUM, .mantisa = 0});
-  }
-  int e = 0;
-  while (d >= 1e16 && e < 31 - BIASNUM) { d /= 10.0; e++; }
-  while (d < 1e15 && d > 0 && e > -BIASNUM) { d *= 10.0; e--; }
-  uint64_t mag = (uint64_t)(d + 0.5);
-  if (mag > man_maxnum()) { mag /= 10; e++; }
-  int final_exp = BIASNUM + e;
-  if (final_exp < 0) final_exp = 0;
-  if (final_exp > 31) final_exp = 31;
-  return var_num((Number){.signo = s, .exp = (uint8_t)final_exp, .mantisa = mag});
+  return var_fp64(d);
 }
 
 static LEPVar native_array_len(LEPVar *args, uint8_t argc) {
@@ -389,18 +371,24 @@ static long gfx_width = 80;
 static long gfx_height = 24;
 
 static inline long native_arg_long(LEPVar v) {
-  if (var_type(v) != NUM) return 0;
-  Number n = var_num_get(v);
-  double d = (double)n.mantisa * pow(10.0, (int)n.exp - BIASNUM);
-  long r = (long)d;
-  return n.signo ? -r : r;
+  switch (var_type(v)) {
+    case INT: return (long)var_int_get(v);
+    case UINT: return (long)var_uint_get(v);
+    case SFP: return (long)var_fp16_get(v);
+    case FP: return (long)var_fp64_get(v);
+    default: return 0;
+  }
 }
 
 static inline double native_arg_double(LEPVar v) {
-  if (var_type(v) != NUM) return 0.0;
-  Number n = var_num_get(v);
-  double d = (double)n.mantisa * pow(10.0, (int)n.exp - BIASNUM);
-  return n.signo ? -d : d;
+  switch (var_type(v)) {
+    case INT: return (double)var_int_get(v);
+    case UINT: return (double)var_uint_get(v);
+    case SFP: return (double)var_fp16_get(v);
+    case FP: return var_fp64_get(v);
+    case DEC: return (double)var_dec_get(v);
+    default: return 0.0;
+  }
 }
 
 static inline const char *native_arg_str(LEPVar v) {

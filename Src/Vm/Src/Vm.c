@@ -1,5 +1,5 @@
 /* Light Environment Processing VM (LEP-VM) */
-/* Funcionamiento smart_heap: Arreglo dinámico indexado, no una pila */
+/* Funcionamiento smart_heap: Arreglo dinamico indexado, no una pila */
 #pragma once
 #include "Calc.c"
 #include "Smart_heap.c"
@@ -54,14 +54,14 @@ typedef enum {
   OP_HALT,
   OP_CALL,
   OP_CALL_NATIVE,
-  // --- Comparación (writeBOOL) ---
+  // --- Comparacion (writeBOOL) ---
   OP_EQ,
   OP_NEQ,
   OP_LT,
   OP_GT,
   OP_LTE,
   OP_GTE,
-  // --- Lógicos ---
+  // --- Logicos ---
   OP_AND,
   OP_OR,
   OP_NOT,
@@ -70,8 +70,8 @@ typedef enum {
   OP_BIT_OR,
   OP_BIT_NOT,
   OP_BIT_XOR,
-  OP_BIT_SHL,  // •«
-  OP_BIT_SHR,  // »•
+  OP_BIT_SHL, 
+  OP_BIT_SHR,
   // --- Incremento/Decremento ---
   OP_INC,
   OP_DEC,
@@ -116,7 +116,7 @@ static inline uint8_t read_u8(VM *vm) {
     return vm->bytecode[vm->ip++];
 }
 
-// Helpers seguros para lectura sin problemas de alineación
+// Helpers seguros para lectura sin problemas de alineacion
 static inline uint16_t read_u16(VM *vm) {
   uint16_t val;
   memcpy(&val, vm->bytecode + vm->ip, sizeof(uint16_t));
@@ -144,12 +144,6 @@ static inline uint64_t read_u64(VM *vm) {
   memcpy(&val, vm->bytecode + vm->ip, sizeof(uint64_t));
   vm->ip += sizeof(uint64_t);
   return val;
-}
-
-static inline Number zero_num(void) {
-  Number z = {0};
-  z.exp = BIASNUM;
-  return z;
 }
 
 /* Despachador de funciones nativas */
@@ -263,13 +257,9 @@ static LEPVar lep_call_native(uint16_t id, LEPVar *args, uint8_t argc) {
 
 #define FRAME (vm->frames[vm->frame_count - 1])
 
-#define AS_BOOL(v) ( \
-    (v).type == BOOL ? var_bool_get(v) \
-  : (v).type == NUM  ? numtobool(var_num_get(v)) \
-  : (v).type == TRIT ? trittobool(var_trit_get(v)) \
-  : ((v).payload != 0) )
+#define AS_BOOL(v) lep_truthy(v)
 
-/* Helpers rápidos para leer/escribir registros en el smart_heap */
+/* Helpers rapidos para leer/escribir registros en el smart_heap */
 static inline LEPVar heap_get(Smart_heap *heap, size_t idx) {
   LEPVar *v = heap_read(heap, idx);
   return v ? *v : LEP_ZERO;
@@ -278,6 +268,49 @@ static inline LEPVar heap_get(Smart_heap *heap, size_t idx) {
 static inline void heap_set(Smart_heap *heap, size_t idx, LEPVar val) {
   heap_reserve(heap, idx + 1);
   heap_write(heap, idx, val);
+}
+
+
+static inline LEPVar lep_add(LEPVar a, LEPVar b) {
+  if (a.type==STRING && b.type==STRING) {
+    const char *sa=(const char*)var_string_get(a), *sb=(const char*)var_string_get(b);
+    size_t na=sa?strlen(sa):0, nb=sb?strlen(sb):0; char *s=malloc(na+nb+1); if(!s)return LEP_ZERO;
+    if(na)memcpy(s,sa,na); if(nb)memcpy(s+na,sb,nb); s[na+nb]='\0'; return var_string((const char8_t*)s);
+  }
+  if (a.type==INT && b.type==INT) return var_int(a.payload.integer+b.payload.integer);
+  if (a.type==UINT && b.type==UINT) return var_uint(a.payload.uinteger+b.payload.uinteger);
+  if (var_is_number(a) && var_is_number(b)) return var_fp64((double)(var_to_ld(a)+var_to_ld(b)));
+  if (a.type==COM && b.type==COM) return var_com64(a.payload.com64+b.payload.com64);
+  if (a.type==SCOM && b.type==SCOM) return var_com16(a.payload.com16+b.payload.com16);
+  if (a.type==STRING && b.type==STRING) return var_string(strcat(a.payload.utf8, b.payload.utf8));
+  if (a.type==STRING && b.type==CHAR) return var_string(strcat(a.payload.utf8, readchar(b.payload.chara)));
+  return LEP_ZERO;
+}
+static inline LEPVar lep_sub(LEPVar a, LEPVar b) {
+  if(a.type==INT&&b.type==INT)return var_int(a.payload.integer-b.payload.integer);
+  if(a.type==UINT&&b.type==UINT)return var_uint(a.payload.uinteger-b.payload.uinteger);
+  if(var_is_number(a)&&var_is_number(b))return var_fp64((double)(var_to_ld(a)-var_to_ld(b)));
+  if(a.type==COM&&b.type==COM)return var_com64(a.payload.com64-b.payload.com64);
+  if(a.type==SCOM&&b.type==SCOM)return var_com16(a.payload.com16-b.payload.com16);
+  return LEP_ZERO;
+}
+static inline LEPVar lep_mul(LEPVar a, LEPVar b) {
+  if(a.type==INT&&b.type==INT)return var_int(a.payload.integer*b.payload.integer);
+  if(a.type==UINT&&b.type==UINT)return var_uint(a.payload.uinteger*b.payload.uinteger);
+  if(var_is_number(a)&&var_is_number(b))return var_fp64((double)(var_to_ld(a)*var_to_ld(b)));
+  if(a.type==COM&&b.type==COM)return var_com64(a.payload.com64*b.payload.com64);
+  if(a.type==SCOM&&b.type==SCOM)return var_com16(a.payload.com16*b.payload.com16);
+  return LEP_ZERO;
+}
+static inline LEPVar lep_div(LEPVar a, LEPVar b) {
+  long double d=var_to_ld(b); if(var_is_number(a)&&var_is_number(b)){if(d==0)return LEP_ZERO; return var_fp64((double)(var_to_ld(a)/d));}
+  if(a.type==COM&&b.type==COM)return var_com64(a.payload.com64/b.payload.com64);
+  if(a.type==SCOM&&b.type==SCOM)return var_com16(a.payload.com16/b.payload.com16);
+  return LEP_ZERO;
+}
+static inline bool lep_equal(LEPVar a, LEPVar b){
+  if(a.type!=b.type){ if(var_is_number(a)&&var_is_number(b))return var_to_ld(a)==var_to_ld(b); return false; }
+  switch(a.type){case INT:return a.payload.integer==b.payload.integer;case UINT:return a.payload.uinteger==b.payload.uinteger;case CHAR:return a.payload.chara==b.payload.chara;case BOOL:return a.payload.boolean==b.payload.boolean;case TRIT:return a.payload.trit==b.payload.trit;case SFP:return a.payload.fp16==b.payload.fp16;case FP:return a.payload.fp64==b.payload.fp64;case DEC:return a.payload.dec64==b.payload.dec64;case STRING:return strcmp((const char*)a.payload.utf8,(const char*)b.payload.utf8)==0;case POINT:return a.payload.point.ptr==b.payload.point.ptr;case FUNC:return a.payload.function.ip==b.payload.function.ip&&a.payload.function.param_count==b.payload.function.param_count;default:return a.payload.ptr==b.payload.ptr;}
 }
 
 void vm_run(VM *vm, Smart_heap *stack) {
@@ -296,51 +329,21 @@ void vm_run(VM *vm, Smart_heap *stack) {
       uint8_t t = vm->bytecode[vm->ip++];
       uint16_t target_reg = read_u16(vm);
       LEPVar v = LEP_ZERO;
-      
       switch ((LEPType)t) {
-        case NUM: {
-          uint64_t raw = read_u64(vm);
-          v = (LEPVar){.type = NUM, .payload = raw & 0x0FFFFFFFFFFFFFFFULL};
-          break;
-        }
-        case BOOL:
-          v = var_bool(vm->bytecode[vm->ip++] != 0);
-          break;
-        case TRIT:
-          v = var_trit(vm->bytecode[vm->ip++] & 0x3u);
-          break;
-        case CHAR:
-          v = var_char(read_u32(vm));
-          break;
-        case COLOR:
-          v = var_color(read_u32(vm));
-          break;
-        case COMPLEX: {
-          uint64_t raw = read_u64(vm);
-          v = (LEPVar){.type = COMPLEX, .payload = raw & 0x0FFFFFFFFFFFFFFFULL};
-          break;
-        }
-        case STRING: {
-          uint16_t len = read_u16(vm);
-          char *s = malloc(len + 1);
-          memcpy(s, vm->bytecode + vm->ip, len);
-          s[len] = '\0';
-          vm->ip += len;
-          v = var_string(s);
-          break;
-        }
-        case POINT: {
-          uint32_t func_ip = read_u32(vm);
-          uint8_t param_count = vm->bytecode[vm->ip++];
-          v = var_func(func_ip, param_count);
-          break;
-        }
-        default:
-          vm_error(vm, "OP_WRITE: tipo desconocido");
-          running = false;
-          break;
+        case INT: { int64_t x=(int64_t)read_u64(vm); memcpy(&x, vm->bytecode+vm->ip-8, 8); v=var_int(x); break; }
+        case UINT: v=var_uint(read_u64(vm)); break;
+        case BOOL: v=var_bool(vm->bytecode[vm->ip++]!=0); break;
+        case TRIT: v=var_trit(vm->bytecode[vm->ip++]&3u); break;
+        case CHAR: v=var_char(read_u32(vm)); break;
+        case COLOR: { uint32_t c=read_u32(vm); v=var_color(0,c); break; }
+        case SFP: { uint16_t raw=read_u16(vm); _Float16 x; memcpy(&x,&raw,2); v=var_fp16(x); break; }
+        case FP: { uint64_t raw=read_u64(vm); double x; memcpy(&x,&raw,8); v=var_fp64(x); break; }
+        case STRING: { uint16_t len=read_u16(vm); char *s=malloc((size_t)len+1); memcpy(s,vm->bytecode+vm->ip,len); s[len]='\0'; vm->ip+=len; v=var_string((const char8_t*)s); break; }
+        case POINT: { uint32_t p=read_u32(vm); v=var_point((void*)(uintptr_t)p); break; }
+        case FUNC: { uint32_t ip=read_u32(vm); uint8_t pc=read_u8(vm); v=var_func(ip,pc); break; }
+        default: vm_error(vm,"OP_WRITE: tipo desconocido"); running=false; break;
       }
-      heap_set(stack, target_reg, v);
+      heap_set(stack,target_reg,v);
       break;
     }
 
@@ -355,7 +358,7 @@ void vm_run(VM *vm, Smart_heap *stack) {
       uint16_t src_reg = read_u16(vm);
       uint16_t base_dest_reg = read_u16(vm);
       LEPVar arr = heap_get(stack, src_reg);
-      if (arr.type == POINT && var_ref_sub_get(arr) == REF_SUB_ARRAY) {
+      if (arr.type == ARRAY) {
         LEPArray *a = var_array_get(arr);
         if (a) {
           for (size_t i = 0; i < a->len; i++) {
@@ -382,117 +385,50 @@ void vm_run(VM *vm, Smart_heap *stack) {
     }
 
     case OP_ADD: {
-      uint16_t r_a = read_u16(vm);
-      uint16_t r_b = read_u16(vm);
-      uint16_t r_dst = read_u16(vm);
-      LEPVar a = heap_get(stack, r_a);
-      LEPVar b = heap_get(stack, r_b);
-      //fprintf(stderr, "DEBUG ADD: a=%d b=%d\n", a.type, b.type);
-      if (a.type == NUM && b.type == NUM)
-        heap_set(stack, r_dst, var_num(add_num(var_num_get(a), var_num_get(b))));
-      else if (a.type == COMPLEX && b.type == COMPLEX)
-        heap_set(stack, r_dst, var_complex(add_complex(var_complex_get(a), var_complex_get(b))));
-      else if (
-    a.type == POINT &&
-    b.type == POINT &&
-    var_ref_sub_get(a) == REF_SUB_STRING &&
-    var_ref_sub_get(b) == REF_SUB_STRING
-) {
-    heap_set(
-        stack,
-        r_dst,
-        var_string(strcat(
-            var_string_get(a),
-            var_string_get(b)
-        ))
-    );
-}
-      else
-        vm_error(vm, "OP_ADD: tipos incompatibles");
+      uint16_t r_a=read_u16(vm), r_b=read_u16(vm), r_dst=read_u16(vm);
+      LEPVar result=lep_add(heap_get(stack,r_a),heap_get(stack,r_b));
+      if(result.type==INT && result.payload.integer==0 && !(heap_get(stack,r_a).type==INT && heap_get(stack,r_b).type==INT && True)) {}
+      heap_set(stack,r_dst,result);
       break;
     }
 
     case OP_SUB: {
-      uint16_t r_a = read_u16(vm);
-      uint16_t r_b = read_u16(vm);
-      uint16_t r_dst = read_u16(vm);
-      LEPVar a = heap_get(stack, r_a);
-      LEPVar b = heap_get(stack, r_b);
-      if (a.type == NUM && b.type == NUM)
-        heap_set(stack, r_dst, var_num(sub_num(var_num_get(a), var_num_get(b))));
-      else if (a.type == COMPLEX && b.type == COMPLEX)
-        heap_set(stack, r_dst, var_complex(sub_complex(var_complex_get(a), var_complex_get(b))));
-      else
-        vm_error(vm, "OP_SUB: tipos incompatibles");
+      uint16_t r_a=read_u16(vm), r_b=read_u16(vm), r_dst=read_u16(vm);
+      LEPVar result=lep_sub(heap_get(stack,r_a),heap_get(stack,r_b));
+      if(result.type==INT && result.payload.integer==0 && !(heap_get(stack,r_a).type==INT && heap_get(stack,r_b).type==INT && False)) {}
+      heap_set(stack,r_dst,result);
       break;
     }
 
     case OP_MUL: {
-      uint16_t r_a = read_u16(vm);
-      uint16_t r_b = read_u16(vm);
-      uint16_t r_dst = read_u16(vm);
-      LEPVar a = heap_get(stack, r_a);
-      LEPVar b = heap_get(stack, r_b);
-      if (a.type == NUM && b.type == NUM)
-        heap_set(stack, r_dst, var_num(mul_num(var_num_get(a), var_num_get(b))));
-      else if (a.type == COMPLEX && b.type == COMPLEX)
-        heap_set(stack, r_dst, var_complex(mul_complex(var_complex_get(a), var_complex_get(b))));
-      else
-        vm_error(vm, "OP_MUL: tipos incompatibles");
+      uint16_t r_a=read_u16(vm), r_b=read_u16(vm), r_dst=read_u16(vm);
+      LEPVar result=lep_mul(heap_get(stack,r_a),heap_get(stack,r_b));
+      if(result.type==INT && result.payload.integer==0 && !(heap_get(stack,r_a).type==INT && heap_get(stack,r_b).type==INT && False)) {}
+      heap_set(stack,r_dst,result);
       break;
     }
 
     case OP_DIV: {
-      uint16_t r_a = read_u16(vm);
-      uint16_t r_b = read_u16(vm);
-      uint16_t r_dst = read_u16(vm);
-      LEPVar a = heap_get(stack, r_a);
-      LEPVar b = heap_get(stack, r_b);
-      if (a.type == NUM && b.type == NUM) {
-        Number nb = var_num_get(b);
-        if (nb.mantisa == 0) { vm_error(vm, "Division por cero"); break; }
-        heap_set(stack, r_dst, var_num(div_num(var_num_get(a), nb)));
-      } else if (a.type == COMPLEX && b.type == COMPLEX) {
-        heap_set(stack, r_dst, var_complex(div_complex(var_complex_get(a), var_complex_get(b))));
-      } else {
-        vm_error(vm, "OP_DIV: tipos incompatibles");
-      }
+      uint16_t r_a=read_u16(vm), r_b=read_u16(vm), r_dst=read_u16(vm);
+      LEPVar result=lep_div(heap_get(stack,r_a),heap_get(stack,r_b));
+      if(result.type==INT && result.payload.integer==0 && !(heap_get(stack,r_a).type==INT && heap_get(stack,r_b).type==INT && False)) {}
+      heap_set(stack,r_dst,result);
       break;
     }
 
     case OP_CAST: {
-      uint8_t target = vm->bytecode[vm->ip++];
-      uint16_t r_src = read_u16(vm);
-      uint16_t r_dst = read_u16(vm);
-      LEPVar v = heap_get(stack, r_src);
-      LEPVar result = LEP_ZERO;
-      switch ((LEPType)target) {
-        case NUM:
-          if (v.type == BOOL) result = var_num(booltonum(var_bool_get(v)));
-          else if (v.type == TRIT) result = var_num(trittonum(var_trit_get(v)));
-          else if (v.type == CHAR) result = var_num((Number){0, BIASNUM, (uint64_t)var_char_get(v)});
-          else result = v;
-          break;
-        case BOOL:
-          if (v.type == NUM) result = var_bool(numtobool(var_num_get(v)));
-          else if (v.type == TRIT) result = var_bool(trittobool(var_trit_get(v)));
-          else result = v;
-          break;
-        case TRIT:
-          if (v.type == NUM) result = var_trit(numtotrit(var_num_get(v)));
-          else if (v.type == BOOL) result = var_trit(booltotrit(var_bool_get(v)));
-          else result = v;
-          break;
-        case CHAR:
-          if (v.type == NUM) result = var_char(numtochar(var_num_get(v)));
-          else result = v;
-          break;
-        default:
-          result = v;
-          break;
+      uint8_t target=read_u8(vm); uint16_t r_src=read_u16(vm), r_dst=read_u16(vm); LEPVar v=heap_get(stack,r_src), result=v;
+      switch((LEPType)target){
+        case INT: result=var_int((int64_t)var_to_ld(v)); break;
+        case UINT: result=var_uint((uint64_t)var_to_ld(v)); break;
+        case CHAR: result=var_char((char32_t)var_to_ld(v)); break;
+        case BOOL: result=var_bool(lep_truthy(v)); break;
+        case TRIT: result=var_trit(lep_truthy(v)?2:0); break;
+        case FP: result=var_fp64((double)var_to_ld(v)); break;
+        case SFP: result=var_fp16((_Float16)var_to_ld(v)); break;
+        default: break;
       }
-      heap_set(stack, r_dst, result);
-      break;
+      heap_set(stack,r_dst,result); break;
     }
 
     case OP_LOAD_VAR: {
@@ -515,7 +451,7 @@ void vm_run(VM *vm, Smart_heap *stack) {
     if (v.type == POINT) {
         fprintf(stderr,
                 " sub=%u id=%u",
-                var_ref_sub_get(v),
+                v.type,
                 var_func_id(v));
     }*/
 
@@ -583,16 +519,8 @@ case OP_JUMP_IF_TRUE: {
       uint8_t argc = vm->bytecode[vm->ip++];
       uint16_t args_base_reg = read_u16(vm);
       LEPVar func = heap_get(stack, func_reg);
-     /* fprintf(
-    stderr,
-    "CALL ip=%zu func_reg=%u type=%u sub=%u id=%u\n",
-    vm->ip,
-    func_reg,
-    func.type,
-    var_ref_sub_get(func),
-    var_func_id(func)
-);*/
-      if (func.type != POINT || var_ref_sub_get(func) != REF_SUB_FUNC) {
+     /* old reference debug removed */
+      if (func.type != FUNC) {
         vm_error(vm, "OP_CALL: El registro no contiene una funcion valida");
         running = false;
         break;
@@ -626,14 +554,13 @@ case OP_JUMP_IF_TRUE: {
       LEPVar a = heap_get(stack, r_a);
       LEPVar b = heap_get(stack, r_b);
       bool eq;
-      if (a.type == NUM && b.type == NUM) eq = cmp_num(var_num_get(a), var_num_get(b)) == 0;
+      if (var_is_number(a) && var_is_number(b)) eq = var_to_ld(a) == var_to_ld(b);
       else if (a.type == BOOL && b.type == BOOL) eq = var_bool_get(a) == var_bool_get(b);
       else if (a.type == CHAR && b.type == CHAR) eq = var_char_get(a) == var_char_get(b);
       else if (a.type == TRIT && b.type == TRIT) eq = var_trit_get(a) == var_trit_get(b);
-      else if (a.type == POINT && var_ref_sub_get(a) == REF_SUB_STRING &&
-               b.type == POINT && var_ref_sub_get(b) == REF_SUB_STRING)
+      else if (a.type == STRING && b.type == STRING)
         eq = strcmp(var_string_get(a), var_string_get(b)) == 0;
-      else eq = (a.type == b.type && a.payload == b.payload);
+      else eq = lep_equal(a,b);
       heap_set(stack, r_dst, var_bool(eq));
       break;
     }
@@ -645,14 +572,13 @@ case OP_JUMP_IF_TRUE: {
       LEPVar a = heap_get(stack, r_a);
       LEPVar b = heap_get(stack, r_b);
       bool eq;
-      if (a.type == NUM && b.type == NUM) eq = cmp_num(var_num_get(a), var_num_get(b)) == 0;
+      if (var_is_number(a) && var_is_number(b)) eq = var_to_ld(a) == var_to_ld(b);
       else if (a.type == BOOL && b.type == BOOL) eq = var_bool_get(a) == var_bool_get(b);
       else if (a.type == CHAR && b.type == CHAR) eq = var_char_get(a) == var_char_get(b);
       else if (a.type == TRIT && b.type == TRIT) eq = var_trit_get(a) == var_trit_get(b);
-      else if (a.type == POINT && var_ref_sub_get(a) == REF_SUB_STRING &&
-               b.type == POINT && var_ref_sub_get(b) == REF_SUB_STRING)
+      else if (a.type == STRING && b.type == STRING)
         eq = strcmp(var_string_get(a), var_string_get(b)) == 0;
-      else eq = (a.type == b.type && a.payload == b.payload);
+      else eq = lep_equal(a,b);
       heap_set(stack, r_dst, var_bool(!eq));
       break;
     }
@@ -661,7 +587,7 @@ case OP_JUMP_IF_TRUE: {
       uint16_t r_a = read_u16(vm);
       uint16_t r_b = read_u16(vm);
       uint16_t r_dst = read_u16(vm);
-      heap_set(stack, r_dst, var_bool(cmp_num(var_num_get(heap_get(stack, r_a)), var_num_get(heap_get(stack, r_b))) < 0));
+      heap_set(stack, r_dst, var_bool(lep_cmp(heap_get(stack,r_a),heap_get(stack,r_b)) < 0));
       break;
     }
 
@@ -669,7 +595,7 @@ case OP_JUMP_IF_TRUE: {
       uint16_t r_a = read_u16(vm);
       uint16_t r_b = read_u16(vm);
       uint16_t r_dst = read_u16(vm);
-      heap_set(stack, r_dst, var_bool(cmp_num(var_num_get(heap_get(stack, r_a)), var_num_get(heap_get(stack, r_b))) > 0));
+      heap_set(stack, r_dst, var_bool(lep_cmp(heap_get(stack,r_a),heap_get(stack,r_b)) > 0));
       break;
     }
 
@@ -677,7 +603,7 @@ case OP_JUMP_IF_TRUE: {
       uint16_t r_a = read_u16(vm);
       uint16_t r_b = read_u16(vm);
       uint16_t r_dst = read_u16(vm);
-      heap_set(stack, r_dst, var_bool(cmp_num(var_num_get(heap_get(stack, r_a)), var_num_get(heap_get(stack, r_b))) <= 0));
+      heap_set(stack, r_dst, var_bool(lep_cmp(heap_get(stack,r_a),heap_get(stack,r_b)) <= 0));
       break;
     }
 
@@ -685,7 +611,7 @@ case OP_JUMP_IF_TRUE: {
       uint16_t r_a = read_u16(vm);
       uint16_t r_b = read_u16(vm);
       uint16_t r_dst = read_u16(vm);
-      heap_set(stack, r_dst, var_bool(cmp_num(var_num_get(heap_get(stack, r_a)), var_num_get(heap_get(stack, r_b))) >= 0));
+      heap_set(stack, r_dst, var_bool(lep_cmp(heap_get(stack,r_a),heap_get(stack,r_b)) >= 0));
       break;
     }
 
@@ -716,7 +642,7 @@ case OP_JUMP_IF_TRUE: {
       uint16_t r_a = read_u16(vm);
       uint16_t r_b = read_u16(vm);
       uint16_t r_dst = read_u16(vm);
-      heap_set(stack, r_dst, var_num((Number){0, BIASNUM, (var_num_get(heap_get(stack, r_a)).mantisa & var_num_get(heap_get(stack, r_b)).mantisa) & 0x3FFFFFFFFFFFFFULL}));
+      heap_set(stack,r_dst,var_int((int64_t)var_to_ld(heap_get(stack,r_a)) & (int64_t)var_to_ld(heap_get(stack,r_b))));
       break;
     }
 
@@ -724,7 +650,7 @@ case OP_JUMP_IF_TRUE: {
       uint16_t r_a = read_u16(vm);
       uint16_t r_b = read_u16(vm);
       uint16_t r_dst = read_u16(vm);
-      heap_set(stack, r_dst, var_num((Number){0, BIASNUM, (var_num_get(heap_get(stack, r_a)).mantisa | var_num_get(heap_get(stack, r_b)).mantisa) & 0x3FFFFFFFFFFFFFULL}));
+      heap_set(stack,r_dst,var_int((int64_t)var_to_ld(heap_get(stack,r_a)) | (int64_t)var_to_ld(heap_get(stack,r_b))));
       break;
     }
 
@@ -732,14 +658,14 @@ case OP_JUMP_IF_TRUE: {
       uint16_t r_a = read_u16(vm);
       uint16_t r_b = read_u16(vm);
       uint16_t r_dst = read_u16(vm);
-      heap_set(stack, r_dst, var_num((Number){0, BIASNUM, (var_num_get(heap_get(stack, r_a)).mantisa ^ var_num_get(heap_get(stack, r_b)).mantisa) & 0x3FFFFFFFFFFFFFULL}));
+      heap_set(stack,r_dst,var_int((int64_t)var_to_ld(heap_get(stack,r_a)) ^ (int64_t)var_to_ld(heap_get(stack,r_b))));
       break;
     }
 
     case OP_BIT_NOT: {
       uint16_t r_src = read_u16(vm);
       uint16_t r_dst = read_u16(vm);
-      heap_set(stack, r_dst, var_num((Number){0, BIASNUM, (~var_num_get(heap_get(stack, r_src)).mantisa) & 0x3FFFFFFFFFFFFFULL}));
+      heap_set(stack,r_dst,var_int(~(int64_t)var_to_ld(heap_get(stack,r_src))));
       break;
     }
 
@@ -747,9 +673,7 @@ case OP_JUMP_IF_TRUE: {
       uint16_t r_a = read_u16(vm);
       uint16_t r_b = read_u16(vm);
       uint16_t r_dst = read_u16(vm);
-      uint64_t shift = var_num_get(heap_get(stack, r_b)).mantisa;
-      uint64_t res = shift < 54 ? (var_num_get(heap_get(stack, r_a)).mantisa << shift) : 0;
-      heap_set(stack, r_dst, var_num((Number){0, BIASNUM, res & 0x3FFFFFFFFFFFFFULL}));
+      uint64_t shift=(uint64_t)var_to_ld(heap_get(stack,r_b)); uint64_t res=shift<64?((uint64_t)var_to_ld(heap_get(stack,r_a))<<shift):0; heap_set(stack,r_dst,var_uint(res));
       break;
     }
 
@@ -757,21 +681,19 @@ case OP_JUMP_IF_TRUE: {
       uint16_t r_a = read_u16(vm);
       uint16_t r_b = read_u16(vm);
       uint16_t r_dst = read_u16(vm);
-      uint64_t shift = var_num_get(heap_get(stack, r_b)).mantisa;
-      uint64_t res = shift < 54 ? (var_num_get(heap_get(stack, r_a)).mantisa >> shift) : 0;
-      heap_set(stack, r_dst, var_num((Number){0, BIASNUM, res}));
+      uint64_t shift=(uint64_t)var_to_ld(heap_get(stack,r_b)); uint64_t res=shift<64?((uint64_t)var_to_ld(heap_get(stack,r_a))>>shift):0; heap_set(stack,r_dst,var_uint(res));
       break;
     }
 
     case OP_INC: {
       uint16_t r_reg = read_u16(vm);
-      heap_set(stack, r_reg, var_num(add_num(var_num_get(heap_get(stack, r_reg)), (Number){0, BIASNUM, 1})));
+      heap_set(stack,r_reg,lep_add(heap_get(stack,r_reg),var_int(1)));
       break;
     }
 
     case OP_DEC: {
       uint16_t r_reg = read_u16(vm);
-      heap_set(stack, r_reg, var_num(sub_num(var_num_get(heap_get(stack, r_reg)), (Number){0, BIASNUM, 1})));
+      heap_set(stack,r_reg,lep_sub(heap_get(stack,r_reg),var_int(1)));
       break;
     }
 
@@ -791,7 +713,7 @@ case OP_JUMP_IF_TRUE: {
       uint8_t argc = vm->bytecode[vm->ip++];
       uint16_t args_base_reg = read_u16(vm);
       LEPVar func = FRAME.locals[local_func_idx];
-      if (func.type != POINT || var_ref_sub_get(func) != REF_SUB_FUNC) {
+      if (func.type != FUNC) {
         vm_error(vm, "OP_CALL_VAR: Variable local no es funcion");
         running = false;
         break;
@@ -826,9 +748,9 @@ case OP_JUMP_IF_TRUE: {
       uint16_t dest_reg = read_u16(vm);
       LEPVar arr_v = heap_get(stack, arr_reg);
       LEPVar idx_v = heap_get(stack, idx_reg);
-      if (arr_v.type == POINT && var_ref_sub_get(arr_v) == REF_SUB_ARRAY) {
+      if (arr_v.type == ARRAY) {
         LEPArray *arr = var_array_get(arr_v);
-        size_t idx = (idx_v.type == NUM) ? (size_t)var_num_get(idx_v).mantisa : 0;
+        size_t idx = (var_is_integral(idx_v) ? (size_t)var_to_ld(idx_v) : 0);
         if (arr && idx < arr->len) heap_set(stack, dest_reg, arr->items[idx]);
       }
       break;
@@ -840,9 +762,9 @@ case OP_JUMP_IF_TRUE: {
       uint16_t val_reg = read_u16(vm);
       LEPVar arr_v = heap_get(stack, arr_reg);
       LEPVar idx_v = heap_get(stack, idx_reg);
-      if (arr_v.type == POINT && var_ref_sub_get(arr_v) == REF_SUB_ARRAY) {
+      if (arr_v.type == ARRAY) {
         LEPArray *arr = var_array_get(arr_v);
-        size_t idx = (idx_v.type == NUM) ? (size_t)var_num_get(idx_v).mantisa : 0;
+        size_t idx = (var_is_integral(idx_v) ? (size_t)var_to_ld(idx_v) : 0);
         if (arr && idx < arr->len) arr->items[idx] = heap_get(stack, val_reg);
       }
       break;
@@ -856,7 +778,7 @@ case OP_JUMP_IF_TRUE: {
       for (uint16_t i = 0; i < field_count; i++) {
         LEPVar name_v = heap_get(stack, src_base_pairs + (i * 2));
         LEPVar val_v = heap_get(stack, src_base_pairs + (i * 2) + 1);
-        const char *key = (name_v.type == POINT && var_ref_sub_get(name_v) == REF_SUB_STRING) ? var_string_get(name_v) : "?";
+        const char *key = (name_v.type == STRING) ? (const char*)var_string_get(name_v) : "?";
         LEPPackageField *f = malloc(sizeof(LEPPackageField));
         f->key = strdup(key);
         f->value = val_v;
@@ -877,7 +799,7 @@ case OP_JUMP_IF_TRUE: {
       uint16_t pkg_reg = read_u16(vm);
       uint16_t dest_reg = read_u16(vm);
       LEPVar pkg_v = heap_get(stack, pkg_reg);
-      if (pkg_v.type == POINT && var_ref_sub_get(pkg_v) == REF_SUB_PKG) {
+      if (pkg_v.type == PACKAGE) {
         LEPVar result = LEP_ZERO;
         for (LEPPackageField *f = var_pkg_get(pkg_v); f; f = f->next) {
           if (strcmp(f->key, name) == 0) { result = f->value; break; }
@@ -896,7 +818,7 @@ case OP_JUMP_IF_TRUE: {
       uint16_t pkg_reg = read_u16(vm);
       uint16_t val_reg = read_u16(vm);
       LEPVar pkg_v = heap_get(stack, pkg_reg);
-      if (pkg_v.type == POINT && var_ref_sub_get(pkg_v) == REF_SUB_PKG) {
+      if (pkg_v.type == PACKAGE) {
         bool found = false;
         for (LEPPackageField *f = var_pkg_get(pkg_v); f; f = f->next) {
           if (strcmp(f->key, name) == 0) { f->value = heap_get(stack, val_reg); found = true; break; }
@@ -907,7 +829,7 @@ case OP_JUMP_IF_TRUE: {
           nf->value = heap_get(stack, val_reg);
           nf->hidden = false;
           nf->next = var_pkg_get(pkg_v);
-          LEP_objects[var_ref_punt_get(pkg_v)].ptr = nf;
+          pkg_v.payload.ptr = nf;
         }
       }
       break;
@@ -934,7 +856,7 @@ case OP_JUMP_IF_TRUE: {
       LEPVar err = heap_get(stack, err_reg);
       if (vm->try_frame_count == 0) {
         text_red(stderr); fprintf(stderr, "[lepvm] Excepcion no capturada"); reset_colors(stderr);
-        if (err.type == POINT && var_ref_sub_get(err) == REF_SUB_STRING) fprintf(stderr, ": %s", var_string_get(err));
+        if (err.type == STRING) fprintf(stderr, ": %s", var_string_get(err));
         fprintf(stderr, "\n"); running = false; break;
       }
       TryFrame *tf = &vm->try_frames[--vm->try_frame_count];
@@ -966,7 +888,7 @@ case OP_JUMP_IF_TRUE: {
       uint16_t receiver_reg = read_u16(vm);
       LEPVar func = heap_get(stack, func_reg);
       LEPVar recv = heap_get(stack, receiver_reg);
-      if (func.type != POINT || var_ref_sub_get(func) != REF_SUB_FUNC) {
+      if (func.type != FUNC) {
         vm_error(vm, "OP_CALL_METHOD: No es funcion"); running = false; break;
       }
       CallFrame *frame = &vm->frames[vm->frame_count++];
@@ -987,7 +909,7 @@ case OP_JUMP_IF_TRUE: {
       vm->ip += nlen;
       uint16_t dest_reg = read_u16(vm);
       LEPVar self = FRAME.locals[0];
-      if (self.type == POINT && var_ref_sub_get(self) == REF_SUB_PKG) {
+      if (self.type == PACKAGE) {
         LEPVar result = LEP_ZERO;
         for (LEPPackageField *f = var_pkg_get(self); f; f = f->next) {
           if (strcmp(f->key, name) == 0) { result = f->value; break; }
@@ -1005,7 +927,7 @@ case OP_JUMP_IF_TRUE: {
       vm->ip += nlen;
       uint16_t val_reg = read_u16(vm);
       LEPVar self = FRAME.locals[0];
-      if (self.type == POINT && var_ref_sub_get(self) == REF_SUB_PKG) {
+      if (self.type == PACKAGE) {
         bool found = false;
         for (LEPPackageField *f = var_pkg_get(self); f; f = f->next) {
           if (strcmp(f->key, name) == 0) { f->value = heap_get(stack, val_reg); found = true; break; }
@@ -1016,7 +938,7 @@ case OP_JUMP_IF_TRUE: {
           nf->value = heap_get(stack, val_reg);
           nf->hidden = true;
           nf->next = var_pkg_get(self);
-          LEP_objects[var_ref_punt_get(self)].ptr = nf;
+          self.payload.ptr = nf;
         }
       }
       break;

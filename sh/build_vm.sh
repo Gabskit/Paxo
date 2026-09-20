@@ -5,7 +5,7 @@ echo "Compilando Lepvm (C23)..."
 
 mkdir -p Build
 
-clang -std=gnu23 -O3 \
+gcc-15 -std=gnu23 -O3 \
   -I./Src/Vm/Src \
   -I./Src/Vm/Src/third_party/chipmunk \
   -I./Src/Vm/Src/third_party/chipmunk/chipmunk \
