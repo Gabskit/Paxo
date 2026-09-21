@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "vars.c" // Arena y variables
+#include "cast.c"
+#include "Ffi.c"
 
 // 1. Sincronización estricta con el objeto OP de abytec.js
 typedef enum : uint8_t {
@@ -23,7 +25,7 @@ typedef enum : uint8_t {
 } LEPOpCode;
 
 // Macro para leer punteros como u16 generados por writeUInt16LE en el compilador
-#define READ_U16(ip) (*(uint16_t*)(ip))
+#define READ_U16(ip) ((uint16_t)((uint16_t)(ip)[0] | ((uint16_t)(ip)[1] << 8)))
 
 // Estructura de pila para saltos de funciones sin usar la recursividad de C
 typedef struct {
@@ -48,6 +50,7 @@ typedef struct {
     
     // El "Return Slot" físico persistente asignado en el inicio
     uint32_t universal_return_id;
+    PaxoNativeRegistry ffi;
 } PaxoVM;
 
 PaxoVM init_vm() {
@@ -60,6 +63,7 @@ PaxoVM init_vm() {
     vm.universal_return_id = lep_push_var(&vm.env, INT, L, (void*)EMPTY_SLOT, 16);
     
     vm.current_regs = vm.registers;
+    paxo_ffi_init(&vm.ffi);
     vm.is_running = true;
     return vm;
 }
@@ -95,6 +99,47 @@ void vm_execute(PaxoVM* vm, uint8_t* bytecode) {
                 vm->current_regs[reg_dest] = LEP_PUSH(&(vm->env), val_a + val_b);
                 
                 vm->ip += 7;
+                break;
+            }
+
+            case OP_CALL_NATIVE: {
+                // opcode(1) + nativeId(2) + argc(1) + base(2) + dest(2) = 8 bytes
+                uint16_t native_id = READ_U16(vm->ip + 1);
+                uint8_t argc = *(vm->ip + 3);
+                uint16_t base_reg = READ_U16(vm->ip + 4);
+                uint16_t dest_reg = READ_U16(vm->ip + 6);
+                bool ok = false;
+                uint32_t result = 0;
+                uint32_t *args = vm->current_regs + base_reg;
+
+                // 100 = ffiCall(name, ...args)
+                if (native_id == 100) {
+                    if (argc >= 1) {
+                        uint32_t name_id = args[0];
+                        if (name_id < vm->env.var_count && vm->env.tags[name_id].type == STRING) {
+                            const char *name = (const char *)lep_get_var_data(&(vm->env), name_id);
+                            result = paxo_ffi_call_name(&vm->ffi, &(vm->env), name, args + 1, (uint8_t)(argc - 1), &ok);
+                        }
+                    }
+                } else if (native_id == 101) {
+                    if (argc == 1) {
+                        uint32_t path_id = args[0];
+                        if (path_id < vm->env.var_count && vm->env.tags[path_id].type == STRING) {
+                            const char *path = (const char *)lep_get_var_data(&(vm->env), path_id);
+                            ok = paxo_ffi_load(&vm->ffi, path);
+                            int64_t b = ok ? 1 : 0;
+                            result = lep_push_var(&(vm->env), INT, M, &b, sizeof(b));
+                        }
+                    }
+                } else {
+                    result = paxo_ffi_call_id(&vm->ffi, &(vm->env), native_id, args, argc, &ok);
+                }
+                if (!ok) {
+                    int64_t zero = 0;
+                    result = lep_push_var(&(vm->env), INT, M, &zero, sizeof(zero));
+                }
+                vm->current_regs[dest_reg] = result;
+                vm->ip += 8;
                 break;
             }
 

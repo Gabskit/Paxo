@@ -5,13 +5,14 @@ echo "Compilando Lepvm (C23)..."
 
 mkdir -p Build
 
-clang -std=c23 -O3 \
+clang -std=c23 -O2 -Wall -Wextra \
+  -D_POSIX_C_SOURCE=200809L \
   -I./Src/Vm \
   -I./Src/Vm/third_party/chipmunk \
   -I./Src/Vm/third_party/chipmunk/chipmunk \
   Src/Vm/Main.c \
   Src/Vm/third_party/chipmunk/src/*.c \
   -o Build/lep \
-  -lm -ldl
+  -lm -ldl -rdynamic
 
 echo "¡Compilación exitosa! Binario en: Build/lep"

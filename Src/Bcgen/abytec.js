@@ -260,6 +260,10 @@ const NATIVE = Object.freeze({
   nvgStrokeWidth: 97,
   nvgFill: 98,
   nvgStroke: 99,
+
+  // Extensible FFI: ffiCall("module_function", ...args)
+  ffiCall: 100,
+  ffiLoad: 101,
 });
 
 

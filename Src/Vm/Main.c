@@ -1,29 +1,18 @@
 #include "Vm.c"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static uint8_t *load_file(const char *path, size_t *out_size) {
   FILE *f = fopen(path, "rb");
-  if (!f) {
-    text_red(stderr);
-    fprintf(stderr, "[lepvm]");
-    reset_colors(stderr);
-    fprintf(stderr, " No se pudo abrir '%s'\n", path);
-    return NULL;
-  }
-  fseek(f, 0, SEEK_END);
+  if (!f) { fprintf(stderr, "[lepvm] No se pudo abrir '%s'\n", path); return NULL; }
+  if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return NULL; }
   long size = ftell(f);
-  if (size <= 0) {
-    fclose(f);
-    return NULL;
-  }
+  if (size <= 0) { fclose(f); return NULL; }
   rewind(f);
   uint8_t *buf = malloc((size_t)size);
-  if (!buf) {
-    fclose(f);
-    return NULL;
-  }
-  fread(buf, 1, (size_t)size, f);
+  if (!buf) { fclose(f); return NULL; }
+  if (fread(buf, 1, (size_t)size, f) != (size_t)size) { free(buf); fclose(f); return NULL; }
   fclose(f);
   *out_size = (size_t)size;
   return buf;
@@ -31,24 +20,34 @@ static uint8_t *load_file(const char *path, size_t *out_size) {
 
 int main(int argc, char *argv[]) {
   if (argc < 2) {
-    text_yellow(stderr);
-    fprintf(stderr, "LEP-VM v3.14\n");
-    reset_colors(stderr);
-    fprintf(stderr, "Uso: %s <archivo.pbc>\n", argv[0]);
+    fprintf(stderr, "LEP-VM v3.14\nUso: %s <archivo.pbc> [modulo.so ...]\n", argv[0]);
     return 1;
   }
-
   size_t bytecode_size = 0;
   uint8_t *bytecode = load_file(argv[1], &bytecode_size);
-  if (!bytecode) {
-    return 1;
+  if (!bytecode) return 1;
+
+  PaxoVM vm = init_vm();
+  for (int i = 2; i < argc; ++i) {
+    if (!paxo_ffi_load(&vm.ffi, argv[i])) {
+      fprintf(stderr, "[lepvm] No se pudo cargar FFI '%s'\n", argv[i]);
+      free(bytecode); paxo_ffi_destroy(&vm.ffi); free(vm.env.tags); free(vm.env.start_ptr); return 2;
+    }
+  }
+  const char *mods = getenv("PAXO_FFI_MODULES");
+  if (mods && *mods) {
+    char *copy = strdup(mods);
+    for (char *p = copy; p;) {
+      char *next = strchr(p, ':');
+      if (next) *next++ = '\0';
+      if (*p && !paxo_ffi_load(&vm.ffi, p)) fprintf(stderr, "[lepvm] Aviso: FFI no cargada '%s'\n", p);
+      p = next;
+    }
+    free(copy);
   }
 
-  VM vm;
-  vm_init(&vm, bytecode, bytecode_size);
-  Smart_heap sheap = create_heap(8);
-  vm_run(&vm, &sheap);
-
-  free(bytecode);
+  vm_execute(&vm, bytecode);
+  paxo_ffi_destroy(&vm.ffi);
+  free(vm.env.tags); free(vm.env.start_ptr); free(bytecode);
   return 0;
 }

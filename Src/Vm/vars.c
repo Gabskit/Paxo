@@ -95,7 +95,7 @@ typedef struct {
 } LEPFunction;
 
 // 4. Funciones de Arena
-uint32_t lep_push_var(LEPEnv* env, LEPType type, LEPSize size, void* raw_data, size_t bytes) {
+static inline uint32_t lep_push_var(LEPEnv* env, LEPType type, LEPSize size, void* raw_data, size_t bytes) {
     uint32_t var_id = env->var_count++;
     env->tags[var_id].type = type;
     env->tags[var_id].bytesize = size;
@@ -108,42 +108,51 @@ uint32_t lep_push_var(LEPEnv* env, LEPType type, LEPSize size, void* raw_data, s
     return var_id; 
 }
 
-void* lep_get_var_data(LEPEnv* env, uint32_t var_id) {
+static inline void* lep_get_var_data(LEPEnv* env, uint32_t var_id) {
     uint32_t offset = env->tags[var_id].offset;
     return (void*)((uintptr_t)env->start_ptr + offset);
 }
 
 // 5. La nueva Macro de Inserción Dinámica
 // Crea un puntero temporal usando Literales Compuestos &(tipo){X} y lo empuja a la Arena
+static inline uint32_t lep_push_i64(LEPEnv *env, int64_t x) { return lep_push_var(env, INT, M, &x, sizeof(x)); }
+static inline uint32_t lep_push_u64(LEPEnv *env, uint64_t x) { return lep_push_var(env, UINT, M, &x, sizeof(x)); }
+static inline uint32_t lep_push_bool(LEPEnv *env, bool x) { return lep_push_var(env, BOOL, XXS, &x, sizeof(x)); }
+static inline uint32_t lep_push_fp16(LEPEnv *env, _Float16 x) { return lep_push_var(env, SFP, XS, &x, sizeof(x)); }
+static inline uint32_t lep_push_fp64(LEPEnv *env, double x) { return lep_push_var(env, FP, M, &x, sizeof(x)); }
+static inline uint32_t lep_push_dec64(LEPEnv *env, decimal64 x) { return lep_push_var(env, DEC, M, &x, sizeof(x)); }
+static inline uint32_t lep_push_string_ptr(LEPEnv *env, const char *x) { return lep_push_var(env, STRING, M, &x, sizeof(x)); }
+static inline uint32_t lep_push_char32(LEPEnv *env, char32_t x) { return lep_push_var(env, CHAR, S, &x, sizeof(x)); }
+
+/* C11/C23 _Generic cannot distinguish typedef aliases such as char32_t/uint32_t.
+ * The associations below therefore use only distinct standard types. */
 #define LEP_PUSH(ENV, X) _Generic((X), \
-    /* Enteros */ \
-    int:                   lep_push_var(ENV, INT,  M, &(int64_t){(X)}, sizeof(int64_t)), \
-    long:                  lep_push_var(ENV, INT,  M, &(int64_t){(X)}, sizeof(int64_t)), \
-    long long:             lep_push_var(ENV, INT,  M, &(int64_t){(X)}, sizeof(int64_t)), \
-    unsigned int:          lep_push_var(ENV, UINT, M, &(uint64_t){(X)}, sizeof(uint64_t)), \
-    unsigned long:         lep_push_var(ENV, UINT, M, &(uint64_t){(X)}, sizeof(uint64_t)), \
-    unsigned long long:    lep_push_var(ENV, UINT, M, &(uint64_t){(X)}, sizeof(uint64_t)), \
-    \
-    /* Caracteres, Bools y Trits */ \
-    char32_t:              lep_push_var(ENV, CHAR, S,   &(char32_t){(X)}, sizeof(char32_t)), \
-    LEPBool:               lep_push_var(ENV, TRIT, XXS, &(LEPBool){(X)}, sizeof(LEPBool)), \
-    bool:                  lep_push_var(ENV, BOOL, XXS, &(bool){(X)}, sizeof(bool)), \
-    \
-    /* Flotantes y Decimales */ \
-    _Float16:              lep_push_var(ENV, SFP, XS, &(_Float16){(X)}, sizeof(_Float16)), \
-    float:                 lep_push_var(ENV, FP,  M,  &(double){(X)}, sizeof(double)), \
-    double:                lep_push_var(ENV, FP,  M,  &(double){(X)}, sizeof(double)), \
-    decimal64:             lep_push_var(ENV, DEC, M,  &(decimal64){(X)}, sizeof(decimal64)), \
-    \
-    /* Complejos */ \
-    _Float16 _Complex:     lep_push_var(ENV, SCOM, S, &(_Float16 _Complex){(X)}, sizeof(_Float16 _Complex)), \
-    double _Complex:       lep_push_var(ENV, COM,  L, &(double _Complex){(X)}, sizeof(double _Complex)), \
-    \
-    /* Cadenas (Guardamos el puntero a la cadena original) */ \
-    char*:                 lep_push_var(ENV, STRING, M, &(char*){(X)}, sizeof(char*)), \
-    const char*:           lep_push_var(ENV, STRING, M, &(const char*){(X)}, sizeof(const char*)), \
-    \
-    /* Estructuras Complejas */ \
-    color:                 lep_push_var(ENV, COLOR, M, &(color){(X)}, sizeof(color)), \
-    LEPFunction:           lep_push_var(ENV, FUNC,  M, &(LEPFunction){(X)}, sizeof(LEPFunction)) \
-)
+    int: lep_push_i64, \
+    long: lep_push_i64, \
+    long long: lep_push_i64, \
+    unsigned long: lep_push_u64, \
+    unsigned long long: lep_push_u64, \
+    bool: lep_push_bool, \
+    _Float16: lep_push_fp16, \
+    float: lep_push_fp64, \
+    double: lep_push_fp64, \
+    decimal64: lep_push_dec64, \
+    char*: lep_push_string_ptr, \
+    const char*: lep_push_string_ptr, \
+    char32_t: lep_push_char32 \
+)(ENV, (X))
+
+#ifndef LEP_AS
+#define LEP_AS(ENV, ID, TYPE) (*(TYPE*)lep_get_var_data((ENV), (ID)))
+#endif
+
+#ifndef LEP_TRANS_USE
+#define LEP_TRANS_USE
+static inline void lep_transmute_var(LEPEnv* env, uint32_t id, LEPType type, LEPSize size, const void* data, size_t bytes) {
+    if (!env || id >= env->var_count) return;
+    void *dst = lep_get_var_data(env, id);
+    env->tags[id].type = type;
+    env->tags[id].bytesize = size;
+    if (dst && data && bytes) memcpy(dst, data, bytes);
+}
+#endif
