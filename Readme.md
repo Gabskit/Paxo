@@ -11,16 +11,14 @@ Paxo/
 │   │   ├── main.js # Entry point del compilador
 │   │   ├── Paxo.g4     # Gramática ANTLR
 │   │   └── abytec.js   # Generador de bytecode
-│   └── Vm/Src/         # Virtual Machine (C)
+│   └── Vm/       # Virtual Machine (C)
 │       ├── Main.c      # Entry point de la VM (lepvm)
 │       ├── Vm.c        # Intérprete de bytecode
 │       ├── Functions.c # Funciones nativas (print, colores, etc.)
-│       ├── Calc.c      # Tipos y estructuras de datos (incluye arrays, packages)
+│       ├── vars.c      # Tipos y estructuras de datos (incluye arrays, packages)
 │       ├── Smart_heap.c     # Smart heap (registros extensibles)
-│       ├── Typecast_and_read.c # Conversión de tipos
-│       └── termcolor-c.h       # Colores ANSI en terminal
-├── sh/
-│   └── gen_lep.sh      # Genera lep.h (single-header)
+│       ├── cast.c # Conversión de tipos
+├── sh/	#scripts para compilar
 ├── Build/              # Binarios generados
 ├── package.json
 └── Readme.md
@@ -61,10 +59,16 @@ npm run antlr        # Regenerar parser desde Paxo.g4
 ## Tipos
 
 ```
-var foo = 6.7          // número (inferido, siempre num64)
-n foo = 6.7
+var foo = 404 //entero
+int foo = -404
+uint foo = 97
 
-var foo = •            // trit (ternario: •, ↑, ↓)
+var foo = 6.7          //coma flotante 
+flt foo = 6.7
+sflt 16foo = 6.9 //float16
+dec foo = 0.3 // decimal monetario
+
+var foo = •            // trit (ternario: •, ✓, ∅)
 trit foo = •
 
 var foo = 'C'          // caracter
@@ -79,7 +83,8 @@ pin goo = @foo
 var foo = .×            // booleano bit (.× = false, .✓ = true)
 bool foo = .×
 
-col foo = #FF8000       // color RGBA (nanbox 11010 + flag); #RRGGBB o #RRGGBBAA
+var foo = #ABCDEF
+col foo = #FF8000       // color RGBA #RRGGBB o #RRGGBBAA
 ```
 
 ## Arrays
