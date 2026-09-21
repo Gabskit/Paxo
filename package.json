@@ -28,6 +28,6 @@
 	"devDependencies": {
 		"antlr-ng": "^1.0.10",
 		"antlr4": "^4.13.2",
-		"esbuild": "^0.20.0"
+		"esbuild": "^0.28.2"
 	}
 }
