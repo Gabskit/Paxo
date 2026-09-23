@@ -27,27 +27,27 @@ int main(int argc, char *argv[]) {
   uint8_t *bytecode = load_file(argv[1], &bytecode_size);
   if (!bytecode) return 1;
 
-  PaxoVM vm = init_vm();
+  LEPVM vm = init_vm();
   for (int i = 2; i < argc; ++i) {
-    if (!paxo_ffi_load(&vm.ffi, argv[i])) {
+    if (!LEP_ffi_load(&vm.ffi, argv[i])) {
       fprintf(stderr, "[lepvm] No se pudo cargar FFI '%s'\n", argv[i]);
-      free(bytecode); paxo_ffi_destroy(&vm.ffi); free(vm.env.tags); free(vm.env.start_ptr); return 2;
+      free(bytecode); LEP_ffi_destroy(&vm.ffi); free(vm.env.tags); free(vm.env.start_ptr); return 2;
     }
   }
-  const char *mods = getenv("PAXO_FFI_MODULES");
+  const char *mods = getenv("LEP_FFI_MODULES");
   if (mods && *mods) {
     char *copy = strdup(mods);
     for (char *p = copy; p;) {
       char *next = strchr(p, ':');
       if (next) *next++ = '\0';
-      if (*p && !paxo_ffi_load(&vm.ffi, p)) fprintf(stderr, "[lepvm] Aviso: FFI no cargada '%s'\n", p);
+      if (*p && !LEP_ffi_load(&vm.ffi, p)) fprintf(stderr, "[lepvm] Aviso: FFI no cargada '%s'\n", p);
       p = next;
     }
     free(copy);
   }
 
   vm_execute(&vm, bytecode);
-  paxo_ffi_destroy(&vm.ffi);
+  LEP_ffi_destroy(&vm.ffi);
   free(vm.env.tags); free(vm.env.start_ptr); free(bytecode);
   return 0;
 }

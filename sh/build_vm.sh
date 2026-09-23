@@ -5,7 +5,7 @@ echo "Compilando Lepvm (C23)..."
 
 mkdir -p Build
 
-clang -std=c23 -O2 -Wall -Wextra \
+clang -std=c23 -O3 -Wall -Wextra -ffixed-point \
   -D_POSIX_C_SOURCE=200809L \
   -I./Src/Vm \
   -I./Src/Vm/third_party/chipmunk \

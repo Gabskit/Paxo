@@ -1,6 +1,6 @@
 // jshint ignore: start
 import antlr4 from 'antlr4';
-const serializedATN = [4,1,79,406,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,
+const serializedATN = [4,1,87,406,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,
 4,2,5,7,5,2,6,7,6,2,7,7,7,2,8,7,8,2,9,7,9,2,10,7,10,2,11,7,11,2,12,7,12,
 2,13,7,13,2,14,7,14,2,15,7,15,2,16,7,16,2,17,7,17,2,18,7,18,2,19,7,19,2,
 20,7,20,2,21,7,21,1,0,5,0,46,8,0,10,0,12,0,49,9,0,1,0,1,0,1,1,1,1,1,1,1,
@@ -30,39 +30,39 @@ const serializedATN = [4,1,79,406,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,
 21,5,21,375,8,21,10,21,12,21,378,9,21,1,21,1,21,1,21,1,21,1,21,1,21,5,21,
 386,8,21,10,21,12,21,389,9,21,1,21,1,21,1,21,1,21,1,21,1,21,5,21,397,8,21,
 10,21,12,21,400,9,21,1,21,1,21,3,21,404,8,21,1,21,1,159,1,40,22,0,2,4,6,
-8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,0,11,1,0,46,55,1,0,
-56,57,1,0,64,65,1,0,16,17,1,0,18,19,1,0,42,43,1,0,25,26,1,0,27,28,1,0,29,
-30,3,0,2,2,4,4,31,37,1,0,38,41,467,0,47,1,0,0,0,2,72,1,0,0,0,4,101,1,0,0,
-0,6,103,1,0,0,0,8,105,1,0,0,0,10,148,1,0,0,0,12,150,1,0,0,0,14,172,1,0,0,
-0,16,174,1,0,0,0,18,186,1,0,0,0,20,188,1,0,0,0,22,190,1,0,0,0,24,192,1,0,
-0,0,26,204,1,0,0,0,28,215,1,0,0,0,30,261,1,0,0,0,32,263,1,0,0,0,34,274,1,
-0,0,0,36,281,1,0,0,0,38,294,1,0,0,0,40,325,1,0,0,0,42,403,1,0,0,0,44,46,
+8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,0,11,2,0,52,52,54,64,
+1,0,65,66,1,0,72,73,1,0,16,17,1,0,18,19,1,0,47,48,1,0,25,28,1,0,29,30,1,
+0,31,34,3,0,2,2,4,4,35,41,1,0,42,46,467,0,47,1,0,0,0,2,72,1,0,0,0,4,101,
+1,0,0,0,6,103,1,0,0,0,8,105,1,0,0,0,10,148,1,0,0,0,12,150,1,0,0,0,14,172,
+1,0,0,0,16,174,1,0,0,0,18,186,1,0,0,0,20,188,1,0,0,0,22,190,1,0,0,0,24,192,
+1,0,0,0,26,204,1,0,0,0,28,215,1,0,0,0,30,261,1,0,0,0,32,263,1,0,0,0,34,274,
+1,0,0,0,36,281,1,0,0,0,38,294,1,0,0,0,40,325,1,0,0,0,42,403,1,0,0,0,44,46,
 3,2,1,0,45,44,1,0,0,0,46,49,1,0,0,0,47,45,1,0,0,0,47,48,1,0,0,0,48,50,1,
 0,0,0,49,47,1,0,0,0,50,51,5,0,0,1,51,1,1,0,0,0,52,73,5,1,0,0,53,73,3,4,2,
 0,54,73,3,10,5,0,55,73,3,12,6,0,56,73,3,16,8,0,57,73,3,24,12,0,58,73,3,36,
 18,0,59,73,3,34,17,0,60,62,3,40,20,0,61,63,5,1,0,0,62,61,1,0,0,0,62,63,1,
-0,0,0,63,73,1,0,0,0,64,65,5,61,0,0,65,66,5,2,0,0,66,69,5,74,0,0,67,68,5,
-3,0,0,68,70,5,74,0,0,69,67,1,0,0,0,69,70,1,0,0,0,70,71,1,0,0,0,71,73,5,4,
+0,0,0,63,73,1,0,0,0,64,65,5,51,0,0,65,66,5,2,0,0,66,69,5,82,0,0,67,68,5,
+3,0,0,68,70,5,82,0,0,69,67,1,0,0,0,69,70,1,0,0,0,70,71,1,0,0,0,71,73,5,4,
 0,0,72,52,1,0,0,0,72,53,1,0,0,0,72,54,1,0,0,0,72,55,1,0,0,0,72,56,1,0,0,
 0,72,57,1,0,0,0,72,58,1,0,0,0,72,59,1,0,0,0,72,60,1,0,0,0,72,64,1,0,0,0,
 73,3,1,0,0,0,74,76,3,8,4,0,75,74,1,0,0,0,75,76,1,0,0,0,76,77,1,0,0,0,77,
-78,3,6,3,0,78,79,5,74,0,0,79,80,5,5,0,0,80,81,3,40,20,0,81,102,1,0,0,0,82,
+78,3,6,3,0,78,79,5,82,0,0,79,80,5,5,0,0,80,81,3,40,20,0,81,102,1,0,0,0,82,
 84,3,8,4,0,83,82,1,0,0,0,83,84,1,0,0,0,84,85,1,0,0,0,85,86,3,6,3,0,86,87,
-5,74,0,0,87,89,5,6,0,0,88,90,5,66,0,0,89,88,1,0,0,0,89,90,1,0,0,0,90,91,
+5,82,0,0,87,89,5,6,0,0,88,90,5,74,0,0,89,88,1,0,0,0,89,90,1,0,0,0,90,91,
 1,0,0,0,91,92,5,7,0,0,92,93,5,5,0,0,93,94,3,42,21,0,94,102,1,0,0,0,95,97,
 3,8,4,0,96,95,1,0,0,0,96,97,1,0,0,0,97,98,1,0,0,0,98,99,3,6,3,0,99,100,5,
-74,0,0,100,102,1,0,0,0,101,75,1,0,0,0,101,83,1,0,0,0,101,96,1,0,0,0,102,
+82,0,0,100,102,1,0,0,0,101,75,1,0,0,0,101,83,1,0,0,0,101,96,1,0,0,0,102,
 5,1,0,0,0,103,104,7,0,0,0,104,7,1,0,0,0,105,106,7,1,0,0,106,9,1,0,0,0,107,
-108,5,74,0,0,108,109,5,5,0,0,109,111,3,40,20,0,110,112,5,1,0,0,111,110,1,
-0,0,0,111,112,1,0,0,0,112,149,1,0,0,0,113,114,5,74,0,0,114,115,5,6,0,0,115,
+108,5,82,0,0,108,109,5,5,0,0,109,111,3,40,20,0,110,112,5,1,0,0,111,110,1,
+0,0,0,111,112,1,0,0,0,112,149,1,0,0,0,113,114,5,82,0,0,114,115,5,6,0,0,115,
 116,3,40,20,0,116,117,5,7,0,0,117,118,5,5,0,0,118,120,3,40,20,0,119,121,
-5,1,0,0,120,119,1,0,0,0,120,121,1,0,0,0,121,149,1,0,0,0,122,123,5,74,0,0,
+5,1,0,0,120,119,1,0,0,0,120,121,1,0,0,0,121,149,1,0,0,0,122,123,5,82,0,0,
 123,125,5,8,0,0,124,126,5,1,0,0,125,124,1,0,0,0,125,126,1,0,0,0,126,149,
-1,0,0,0,127,128,5,74,0,0,128,130,5,9,0,0,129,131,5,1,0,0,130,129,1,0,0,0,
+1,0,0,0,127,128,5,82,0,0,128,130,5,9,0,0,129,131,5,1,0,0,130,129,1,0,0,0,
 130,131,1,0,0,0,131,149,1,0,0,0,132,133,3,40,20,0,133,134,5,3,0,0,134,135,
-5,74,0,0,135,136,5,5,0,0,136,138,3,40,20,0,137,139,5,1,0,0,138,137,1,0,0,
-0,138,139,1,0,0,0,139,149,1,0,0,0,140,141,5,73,0,0,141,142,5,3,0,0,142,143,
-5,74,0,0,143,144,5,5,0,0,144,146,3,40,20,0,145,147,5,1,0,0,146,145,1,0,0,
+5,82,0,0,135,136,5,5,0,0,136,138,3,40,20,0,137,139,5,1,0,0,138,137,1,0,0,
+0,138,139,1,0,0,0,139,149,1,0,0,0,140,141,5,81,0,0,141,142,5,3,0,0,142,143,
+5,82,0,0,143,144,5,5,0,0,144,146,3,40,20,0,145,147,5,1,0,0,146,145,1,0,0,
 0,146,147,1,0,0,0,147,149,1,0,0,0,148,107,1,0,0,0,148,113,1,0,0,0,148,122,
 1,0,0,0,148,127,1,0,0,0,148,132,1,0,0,0,148,140,1,0,0,0,149,11,1,0,0,0,150,
 151,5,10,0,0,151,152,3,40,20,0,152,153,5,11,0,0,153,154,5,12,0,0,154,159,
@@ -75,9 +75,9 @@ const serializedATN = [4,1,79,406,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,
 0,178,180,3,18,9,0,179,181,3,20,10,0,180,179,1,0,0,0,180,181,1,0,0,0,181,
 182,1,0,0,0,182,184,3,30,15,0,183,185,3,22,11,0,184,183,1,0,0,0,184,185,
 1,0,0,0,185,17,1,0,0,0,186,187,7,2,0,0,187,19,1,0,0,0,188,189,7,3,0,0,189,
-21,1,0,0,0,190,191,7,4,0,0,191,23,1,0,0,0,192,193,5,58,0,0,193,194,3,30,
-15,0,194,195,5,59,0,0,195,196,5,10,0,0,196,199,5,74,0,0,197,198,5,3,0,0,
-198,200,5,74,0,0,199,197,1,0,0,0,199,200,1,0,0,0,200,201,1,0,0,0,201,202,
+21,1,0,0,0,190,191,7,4,0,0,191,23,1,0,0,0,192,193,5,67,0,0,193,194,3,30,
+15,0,194,195,5,68,0,0,195,196,5,10,0,0,196,199,5,82,0,0,197,198,5,3,0,0,
+198,200,5,82,0,0,199,197,1,0,0,0,199,200,1,0,0,0,200,201,1,0,0,0,201,202,
 5,11,0,0,202,203,3,30,15,0,203,25,1,0,0,0,204,206,5,10,0,0,205,207,3,32,
 16,0,206,205,1,0,0,0,206,207,1,0,0,0,207,208,1,0,0,0,208,211,5,11,0,0,209,
 210,5,13,0,0,210,212,3,6,3,0,211,209,1,0,0,0,211,212,1,0,0,0,212,213,1,0,
@@ -94,22 +94,22 @@ const serializedATN = [4,1,79,406,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,
 0,0,252,262,5,24,0,0,253,257,5,13,0,0,254,256,3,2,1,0,255,254,1,0,0,0,256,
 259,1,0,0,0,257,255,1,0,0,0,257,258,1,0,0,0,258,260,1,0,0,0,259,257,1,0,
 0,0,260,262,5,1,0,0,261,230,1,0,0,0,261,238,1,0,0,0,261,249,1,0,0,0,261,
-253,1,0,0,0,262,31,1,0,0,0,263,264,3,6,3,0,264,271,5,74,0,0,265,266,5,21,
-0,0,266,267,3,6,3,0,267,268,5,74,0,0,268,270,1,0,0,0,269,265,1,0,0,0,270,
+253,1,0,0,0,262,31,1,0,0,0,263,264,3,6,3,0,264,271,5,82,0,0,265,266,5,21,
+0,0,266,267,3,6,3,0,267,268,5,82,0,0,268,270,1,0,0,0,269,265,1,0,0,0,270,
 273,1,0,0,0,271,269,1,0,0,0,271,272,1,0,0,0,272,33,1,0,0,0,273,271,1,0,0,
-0,274,276,5,62,0,0,275,277,3,40,20,0,276,275,1,0,0,0,276,277,1,0,0,0,277,
+0,274,276,5,70,0,0,275,277,3,40,20,0,276,275,1,0,0,0,276,277,1,0,0,0,277,
 279,1,0,0,0,278,280,5,1,0,0,279,278,1,0,0,0,279,280,1,0,0,0,280,35,1,0,0,
-0,281,282,5,63,0,0,282,284,3,40,20,0,283,285,5,1,0,0,284,283,1,0,0,0,284,
+0,281,282,5,71,0,0,282,284,3,40,20,0,283,285,5,1,0,0,284,283,1,0,0,0,284,
 285,1,0,0,0,285,37,1,0,0,0,286,291,3,40,20,0,287,288,5,21,0,0,288,290,3,
 40,20,0,289,287,1,0,0,0,290,293,1,0,0,0,291,289,1,0,0,0,291,292,1,0,0,0,
 292,295,1,0,0,0,293,291,1,0,0,0,294,286,1,0,0,0,294,295,1,0,0,0,295,39,1,
-0,0,0,296,297,6,20,-1,0,297,298,5,74,0,0,298,300,5,10,0,0,299,301,3,38,19,
+0,0,0,296,297,6,20,-1,0,297,298,5,82,0,0,298,300,5,10,0,0,299,301,3,38,19,
 0,300,299,1,0,0,0,300,301,1,0,0,0,301,302,1,0,0,0,302,326,5,11,0,0,303,304,
 5,10,0,0,304,305,3,40,20,0,305,306,5,11,0,0,306,326,1,0,0,0,307,308,7,5,
-0,0,308,326,3,40,20,15,309,310,5,73,0,0,310,311,5,3,0,0,311,326,5,74,0,0,
-312,326,5,66,0,0,313,326,5,67,0,0,314,326,5,76,0,0,315,326,5,75,0,0,316,
-326,5,69,0,0,317,326,5,70,0,0,318,326,5,71,0,0,319,326,5,72,0,0,320,326,
-5,68,0,0,321,326,3,42,21,0,322,326,5,74,0,0,323,326,3,28,14,0,324,326,3,
+0,0,308,326,3,40,20,15,309,310,5,81,0,0,310,311,5,3,0,0,311,326,5,82,0,0,
+312,326,5,74,0,0,313,326,5,75,0,0,314,326,5,84,0,0,315,326,5,83,0,0,316,
+326,5,77,0,0,317,326,5,78,0,0,318,326,5,79,0,0,319,326,5,80,0,0,320,326,
+5,76,0,0,321,326,3,42,21,0,322,326,5,82,0,0,323,326,3,28,14,0,324,326,3,
 26,13,0,325,296,1,0,0,0,325,303,1,0,0,0,325,307,1,0,0,0,325,309,1,0,0,0,
 325,312,1,0,0,0,325,313,1,0,0,0,325,314,1,0,0,0,325,315,1,0,0,0,325,316,
 1,0,0,0,325,317,1,0,0,0,325,318,1,0,0,0,325,319,1,0,0,0,325,320,1,0,0,0,
@@ -121,14 +121,14 @@ const serializedATN = [4,1,79,406,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,
 0,343,344,5,6,0,0,344,345,3,40,20,0,345,346,5,7,0,0,346,347,5,10,0,0,347,
 348,3,38,19,0,348,349,5,11,0,0,349,366,1,0,0,0,350,351,10,23,0,0,351,352,
 5,6,0,0,352,353,3,40,20,0,353,354,5,7,0,0,354,366,1,0,0,0,355,356,10,22,
-0,0,356,357,5,3,0,0,357,358,5,74,0,0,358,359,5,10,0,0,359,360,3,38,19,0,
+0,0,356,357,5,3,0,0,357,358,5,82,0,0,358,359,5,10,0,0,359,360,3,38,19,0,
 360,361,5,11,0,0,361,366,1,0,0,0,362,363,10,21,0,0,363,364,5,3,0,0,364,366,
-5,74,0,0,365,327,1,0,0,0,365,330,1,0,0,0,365,333,1,0,0,0,365,336,1,0,0,0,
+5,82,0,0,365,327,1,0,0,0,365,330,1,0,0,0,365,333,1,0,0,0,365,336,1,0,0,0,
 365,339,1,0,0,0,365,342,1,0,0,0,365,350,1,0,0,0,365,355,1,0,0,0,365,362,
 1,0,0,0,366,369,1,0,0,0,367,365,1,0,0,0,367,368,1,0,0,0,368,41,1,0,0,0,369,
-367,1,0,0,0,370,371,5,44,0,0,371,376,3,40,20,0,372,373,5,21,0,0,373,375,
+367,1,0,0,0,370,371,5,49,0,0,371,376,3,40,20,0,372,373,5,21,0,0,373,375,
 3,40,20,0,374,372,1,0,0,0,375,378,1,0,0,0,376,374,1,0,0,0,376,377,1,0,0,
-0,377,379,1,0,0,0,378,376,1,0,0,0,379,380,5,45,0,0,380,404,1,0,0,0,381,382,
+0,377,379,1,0,0,0,378,376,1,0,0,0,379,380,5,50,0,0,380,404,1,0,0,0,381,382,
 5,20,0,0,382,387,3,40,20,0,383,384,5,21,0,0,384,386,3,40,20,0,385,383,1,
 0,0,0,386,389,1,0,0,0,387,385,1,0,0,0,387,388,1,0,0,0,388,390,1,0,0,0,389,
 387,1,0,0,0,390,391,5,22,0,0,391,404,1,0,0,0,392,393,5,6,0,0,393,398,3,40,
@@ -154,29 +154,31 @@ export default class PaxoParser extends antlr4.Parser {
                             "':'", "'->'", "'_'", "'|:'", "'\\uD834\uDD06'", 
                             "':|'", "'\\uD834\uDD07'", "'{'", "','", "'}'", 
                             "'\\uD83C\uDFC1'", "'end'", "'\\u00F7'", "'\\u00D7'", 
-                            "'+'", "'-'", "'\\u2022\\u00AB'", "'\\u00BB\\u2022'", 
-                            "'\\u2264'", "'<='", "'\\u2265'", "'>='", "'=='", 
-                            "'!='", "'\\u2260'", "'&'", "'|'", "'.&'", "'.|'", 
+                            "'/'", "'*'", "'+'", "'-'", "'\\u2022\\u00AB'", 
+                            "'\\u00BB\\u2022'", "'<<'", "'>>'", "'\\u2264'", 
+                            "'<='", "'\\u2265'", "'>='", "'=='", "'!='", 
+                            "'\\u2260'", "'&'", "'|'", "'.&'", "'.|'", "'^'", 
                             "'!'", "'.!'", "'\\u00AB'", "'\\u00BB'", null, 
-                            "'n'", "'ni'", "'abc'", "'trit'", "'bool'", 
-                            "'pin'", "'fx'", null, "'col'", null, "'local'", 
-                            null, null, null, null, "'return'" ];
+                            null, "'n'", null, null, null, null, "'abc'", 
+                            "'trit'", "'bool'", "'fx'", null, "'col'", null, 
+                            null, "'local'", null, null, null, "'return'" ];
     static symbolicNames = [ null, null, null, null, null, null, null, null, 
                              null, null, null, null, null, null, null, null, 
                              null, null, null, null, null, null, null, null, 
                              null, null, null, null, null, null, null, null, 
                              null, null, null, null, null, null, null, null, 
-                             null, null, null, null, null, null, "VAR_TYPE", 
-                             "NUM_TYPE", "COMPLEX_TYPE", "CHARA_TYPE", "TRIT_TYPE", 
-                             "BOOLEAN_TYPE", "POINTER_TYPE", "FUNC_TYPE", 
-                             "PKG_TYPE", "COLOR_TYPE", "GLOBAL", "LOCAL", 
-                             "TRY", "CATCH", "ARROW", "INCLUDE", "RETURN", 
-                             "THROW", "PAUSE_MODE", "PLAY_MODE", "INT_LITERAL", 
-                             "DECIMAL_LITERAL", "COMPLEX_LITERAL", "BOOLEAN_BIT", 
-                             "BOOLEAN_TRIT", "POINTER_LITERAL", "COLOR_LITERAL", 
-                             "THIS_SCOPE", "IDENTIFIER", "STRING_LITERAL", 
-                             "CHAR_LITERAL", "LINE_COMMENT", "BLOCK_COMMENT", 
-                             "WS" ];
+                             null, null, null, null, null, null, null, null, 
+                             null, null, null, "INCLUDE", "VAR_TYPE", "NUM_TYPE", 
+                             "INT_TYPE", "FLOAT_TYPE", "COMPLEX_TYPE", "FIXED_TYPE", 
+                             "CHARA_TYPE", "TRIT_TYPE", "BOOLEAN_TYPE", 
+                             "FUNC_TYPE", "PKG_TYPE", "COLOR_TYPE", "POINTER_TYPE", 
+                             "GLOBAL", "LOCAL", "TRY", "CATCH", "ARROW", 
+                             "RETURN", "THROW", "PAUSE_MODE", "PLAY_MODE", 
+                             "INT_LITERAL", "DECIMAL_LITERAL", "COMPLEX_LITERAL", 
+                             "BOOLEAN_BIT", "BOOLEAN_TRIT", "POINTER_LITERAL", 
+                             "COLOR_LITERAL", "THIS_SCOPE", "IDENTIFIER", 
+                             "STRING_LITERAL", "CHAR_LITERAL", "LINE_COMMENT", 
+                             "BLOCK_COMMENT", "WS" ];
     static ruleNames = [ "program", "statement", "varDeclaration", "type", 
                          "scope", "assignment", "condStatement", "matchCase", 
                          "loopStatement", "loopMode", "loopDelimiter", "loopEndDelimiter", 
@@ -238,7 +240,7 @@ export default class PaxoParser extends antlr4.Parser {
 	        this.state = 47;
 	        this._errHandler.sync(this);
 	        _la = this._input.LA(1);
-	        while((((_la) & ~0x1f) === 0 && ((1 << _la) & 1049666) !== 0) || ((((_la - 42)) & ~0x1f) === 0 && ((1 << (_la - 42)) & 4281991159) !== 0) || ((((_la - 74)) & ~0x1f) === 0 && ((1 << (_la - 74)) & 7) !== 0)) {
+	        while((((_la) & ~0x1f) === 0 && ((1 << _la) & 1049666) !== 0) || ((((_la - 47)) & ~0x1f) === 0 && ((1 << (_la - 47)) & 4188012471) !== 0) || ((((_la - 79)) & ~0x1f) === 0 && ((1 << (_la - 79)) & 63) !== 0)) {
 	            this.state = 44;
 	            this.statement();
 	            this.state = 49;
@@ -387,7 +389,7 @@ export default class PaxoParser extends antlr4.Parser {
 	            this.state = 75;
 	            this._errHandler.sync(this);
 	            _la = this._input.LA(1);
-	            if(_la===56 || _la===57) {
+	            if(_la===65 || _la===66) {
 	                this.state = 74;
 	                this.scope();
 	            }
@@ -407,7 +409,7 @@ export default class PaxoParser extends antlr4.Parser {
 	            this.state = 83;
 	            this._errHandler.sync(this);
 	            _la = this._input.LA(1);
-	            if(_la===56 || _la===57) {
+	            if(_la===65 || _la===66) {
 	                this.state = 82;
 	                this.scope();
 	            }
@@ -421,7 +423,7 @@ export default class PaxoParser extends antlr4.Parser {
 	            this.state = 89;
 	            this._errHandler.sync(this);
 	            _la = this._input.LA(1);
-	            if(_la===66) {
+	            if(_la===74) {
 	                this.state = 88;
 	                this.match(PaxoParser.INT_LITERAL);
 	            }
@@ -439,7 +441,7 @@ export default class PaxoParser extends antlr4.Parser {
 	            this.state = 96;
 	            this._errHandler.sync(this);
 	            _la = this._input.LA(1);
-	            if(_la===56 || _la===57) {
+	            if(_la===65 || _la===66) {
 	                this.state = 95;
 	                this.scope();
 	            }
@@ -475,7 +477,7 @@ export default class PaxoParser extends antlr4.Parser {
 	        this.enterOuterAlt(localctx, 1);
 	        this.state = 103;
 	        _la = this._input.LA(1);
-	        if(!(((((_la - 46)) & ~0x1f) === 0 && ((1 << (_la - 46)) & 1023) !== 0))) {
+	        if(!(((((_la - 52)) & ~0x1f) === 0 && ((1 << (_la - 52)) & 8189) !== 0))) {
 	        this._errHandler.recoverInline(this);
 	        }
 	        else {
@@ -506,7 +508,7 @@ export default class PaxoParser extends antlr4.Parser {
 	        this.enterOuterAlt(localctx, 1);
 	        this.state = 105;
 	        _la = this._input.LA(1);
-	        if(!(_la===56 || _la===57)) {
+	        if(!(_la===65 || _la===66)) {
 	        this._errHandler.recoverInline(this);
 	        }
 	        else {
@@ -736,20 +738,20 @@ export default class PaxoParser extends antlr4.Parser {
 	        case 6:
 	        case 10:
 	        case 20:
-	        case 42:
-	        case 43:
-	        case 44:
-	        case 66:
-	        case 67:
-	        case 68:
-	        case 69:
-	        case 70:
-	        case 71:
-	        case 72:
-	        case 73:
+	        case 47:
+	        case 48:
+	        case 49:
 	        case 74:
 	        case 75:
 	        case 76:
+	        case 77:
+	        case 78:
+	        case 79:
+	        case 80:
+	        case 81:
+	        case 82:
+	        case 83:
+	        case 84:
 	            this.enterOuterAlt(localctx, 1);
 	            this.state = 165;
 	            this.expression(0);
@@ -844,7 +846,7 @@ export default class PaxoParser extends antlr4.Parser {
 	        this.enterOuterAlt(localctx, 1);
 	        this.state = 186;
 	        _la = this._input.LA(1);
-	        if(!(_la===64 || _la===65)) {
+	        if(!(_la===72 || _la===73)) {
 	        this._errHandler.recoverInline(this);
 	        }
 	        else {
@@ -986,7 +988,7 @@ export default class PaxoParser extends antlr4.Parser {
 	        this.state = 206;
 	        this._errHandler.sync(this);
 	        _la = this._input.LA(1);
-	        if(((((_la - 46)) & ~0x1f) === 0 && ((1 << (_la - 46)) & 1023) !== 0)) {
+	        if(((((_la - 52)) & ~0x1f) === 0 && ((1 << (_la - 52)) & 8189) !== 0)) {
 	            this.state = 205;
 	            this.parameterList();
 	        }
@@ -1092,7 +1094,7 @@ export default class PaxoParser extends antlr4.Parser {
 	            this.state = 234;
 	            this._errHandler.sync(this);
 	            _la = this._input.LA(1);
-	            while((((_la) & ~0x1f) === 0 && ((1 << _la) & 1049666) !== 0) || ((((_la - 42)) & ~0x1f) === 0 && ((1 << (_la - 42)) & 4281991159) !== 0) || ((((_la - 74)) & ~0x1f) === 0 && ((1 << (_la - 74)) & 7) !== 0)) {
+	            while((((_la) & ~0x1f) === 0 && ((1 << _la) & 1049666) !== 0) || ((((_la - 47)) & ~0x1f) === 0 && ((1 << (_la - 47)) & 4188012471) !== 0) || ((((_la - 79)) & ~0x1f) === 0 && ((1 << (_la - 79)) & 63) !== 0)) {
 	                this.state = 231;
 	                this.statement();
 	                this.state = 236;
@@ -1110,7 +1112,7 @@ export default class PaxoParser extends antlr4.Parser {
 	            this.state = 242;
 	            this._errHandler.sync(this);
 	            _la = this._input.LA(1);
-	            while((((_la) & ~0x1f) === 0 && ((1 << _la) & 1049666) !== 0) || ((((_la - 42)) & ~0x1f) === 0 && ((1 << (_la - 42)) & 4281991159) !== 0) || ((((_la - 74)) & ~0x1f) === 0 && ((1 << (_la - 74)) & 7) !== 0)) {
+	            while((((_la) & ~0x1f) === 0 && ((1 << _la) & 1049666) !== 0) || ((((_la - 47)) & ~0x1f) === 0 && ((1 << (_la - 47)) & 4188012471) !== 0) || ((((_la - 79)) & ~0x1f) === 0 && ((1 << (_la - 79)) & 63) !== 0)) {
 	                this.state = 239;
 	                this.statement();
 	                this.state = 244;
@@ -1126,7 +1128,7 @@ export default class PaxoParser extends antlr4.Parser {
 	            this.state = 249;
 	            this._errHandler.sync(this);
 	            _la = this._input.LA(1);
-	            while((((_la) & ~0x1f) === 0 && ((1 << _la) & 1049666) !== 0) || ((((_la - 42)) & ~0x1f) === 0 && ((1 << (_la - 42)) & 4281991159) !== 0) || ((((_la - 74)) & ~0x1f) === 0 && ((1 << (_la - 74)) & 7) !== 0)) {
+	            while((((_la) & ~0x1f) === 0 && ((1 << _la) & 1049666) !== 0) || ((((_la - 47)) & ~0x1f) === 0 && ((1 << (_la - 47)) & 4188012471) !== 0) || ((((_la - 79)) & ~0x1f) === 0 && ((1 << (_la - 79)) & 63) !== 0)) {
 	                this.state = 246;
 	                this.statement();
 	                this.state = 251;
@@ -1296,7 +1298,7 @@ export default class PaxoParser extends antlr4.Parser {
 	        this.state = 294;
 	        this._errHandler.sync(this);
 	        _la = this._input.LA(1);
-	        if((((_la) & ~0x1f) === 0 && ((1 << _la) & 1049664) !== 0) || ((((_la - 42)) & ~0x1f) === 0 && ((1 << (_la - 42)) & 4278190087) !== 0) || ((((_la - 74)) & ~0x1f) === 0 && ((1 << (_la - 74)) & 7) !== 0)) {
+	        if((((_la) & ~0x1f) === 0 && ((1 << _la) & 1049664) !== 0) || ((((_la - 47)) & ~0x1f) === 0 && ((1 << (_la - 47)) & 4160749575) !== 0) || ((((_la - 79)) & ~0x1f) === 0 && ((1 << (_la - 79)) & 63) !== 0)) {
 	            this.state = 286;
 	            this.expression(0);
 	            this.state = 291;
@@ -1384,7 +1386,7 @@ export default class PaxoParser extends antlr4.Parser {
 	            _prevctx = localctx;
 	            this.state = 307;
 	            _la = this._input.LA(1);
-	            if(!(_la===42 || _la===43)) {
+	            if(!(_la===47 || _la===48)) {
 	            this._errHandler.recoverInline(this);
 	            }
 	            else {
@@ -1535,7 +1537,7 @@ export default class PaxoParser extends antlr4.Parser {
 	                    }
 	                    this.state = 328;
 	                    _la = this._input.LA(1);
-	                    if(!(_la===25 || _la===26)) {
+	                    if(!((((_la) & ~0x1f) === 0 && ((1 << _la) & 503316480) !== 0))) {
 	                    this._errHandler.recoverInline(this);
 	                    }
 	                    else {
@@ -1555,7 +1557,7 @@ export default class PaxoParser extends antlr4.Parser {
 	                    }
 	                    this.state = 331;
 	                    _la = this._input.LA(1);
-	                    if(!(_la===27 || _la===28)) {
+	                    if(!(_la===29 || _la===30)) {
 	                    this._errHandler.recoverInline(this);
 	                    }
 	                    else {
@@ -1575,7 +1577,7 @@ export default class PaxoParser extends antlr4.Parser {
 	                    }
 	                    this.state = 334;
 	                    _la = this._input.LA(1);
-	                    if(!(_la===29 || _la===30)) {
+	                    if(!(((((_la - 31)) & ~0x1f) === 0 && ((1 << (_la - 31)) & 15) !== 0))) {
 	                    this._errHandler.recoverInline(this);
 	                    }
 	                    else {
@@ -1595,7 +1597,7 @@ export default class PaxoParser extends antlr4.Parser {
 	                    }
 	                    this.state = 337;
 	                    _la = this._input.LA(1);
-	                    if(!((((_la) & ~0x1f) === 0 && ((1 << _la) & 2147483668) !== 0) || ((((_la - 32)) & ~0x1f) === 0 && ((1 << (_la - 32)) & 63) !== 0))) {
+	                    if(!(_la===2 || _la===4 || ((((_la - 35)) & ~0x1f) === 0 && ((1 << (_la - 35)) & 127) !== 0))) {
 	                    this._errHandler.recoverInline(this);
 	                    }
 	                    else {
@@ -1615,7 +1617,7 @@ export default class PaxoParser extends antlr4.Parser {
 	                    }
 	                    this.state = 340;
 	                    _la = this._input.LA(1);
-	                    if(!(((((_la - 38)) & ~0x1f) === 0 && ((1 << (_la - 38)) & 15) !== 0))) {
+	                    if(!(((((_la - 42)) & ~0x1f) === 0 && ((1 << (_la - 42)) & 31) !== 0))) {
 	                    this._errHandler.recoverInline(this);
 	                    }
 	                    else {
@@ -1725,10 +1727,10 @@ export default class PaxoParser extends antlr4.Parser {
 	        this.state = 403;
 	        this._errHandler.sync(this);
 	        switch(this._input.LA(1)) {
-	        case 44:
+	        case 49:
 	            this.enterOuterAlt(localctx, 1);
 	            this.state = 370;
-	            this.match(PaxoParser.T__43);
+	            this.match(PaxoParser.T__48);
 	            this.state = 371;
 	            this.expression(0);
 	            this.state = 376;
@@ -1744,7 +1746,7 @@ export default class PaxoParser extends antlr4.Parser {
 	                _la = this._input.LA(1);
 	            }
 	            this.state = 379;
-	            this.match(PaxoParser.T__44);
+	            this.match(PaxoParser.T__49);
 	            break;
 	        case 20:
 	            this.enterOuterAlt(localctx, 2);
@@ -1854,40 +1856,48 @@ PaxoParser.T__41 = 42;
 PaxoParser.T__42 = 43;
 PaxoParser.T__43 = 44;
 PaxoParser.T__44 = 45;
-PaxoParser.VAR_TYPE = 46;
-PaxoParser.NUM_TYPE = 47;
-PaxoParser.COMPLEX_TYPE = 48;
-PaxoParser.CHARA_TYPE = 49;
-PaxoParser.TRIT_TYPE = 50;
-PaxoParser.BOOLEAN_TYPE = 51;
-PaxoParser.POINTER_TYPE = 52;
-PaxoParser.FUNC_TYPE = 53;
-PaxoParser.PKG_TYPE = 54;
-PaxoParser.COLOR_TYPE = 55;
-PaxoParser.GLOBAL = 56;
-PaxoParser.LOCAL = 57;
-PaxoParser.TRY = 58;
-PaxoParser.CATCH = 59;
-PaxoParser.ARROW = 60;
-PaxoParser.INCLUDE = 61;
-PaxoParser.RETURN = 62;
-PaxoParser.THROW = 63;
-PaxoParser.PAUSE_MODE = 64;
-PaxoParser.PLAY_MODE = 65;
-PaxoParser.INT_LITERAL = 66;
-PaxoParser.DECIMAL_LITERAL = 67;
-PaxoParser.COMPLEX_LITERAL = 68;
-PaxoParser.BOOLEAN_BIT = 69;
-PaxoParser.BOOLEAN_TRIT = 70;
-PaxoParser.POINTER_LITERAL = 71;
-PaxoParser.COLOR_LITERAL = 72;
-PaxoParser.THIS_SCOPE = 73;
-PaxoParser.IDENTIFIER = 74;
-PaxoParser.STRING_LITERAL = 75;
-PaxoParser.CHAR_LITERAL = 76;
-PaxoParser.LINE_COMMENT = 77;
-PaxoParser.BLOCK_COMMENT = 78;
-PaxoParser.WS = 79;
+PaxoParser.T__45 = 46;
+PaxoParser.T__46 = 47;
+PaxoParser.T__47 = 48;
+PaxoParser.T__48 = 49;
+PaxoParser.T__49 = 50;
+PaxoParser.INCLUDE = 51;
+PaxoParser.VAR_TYPE = 52;
+PaxoParser.NUM_TYPE = 53;
+PaxoParser.INT_TYPE = 54;
+PaxoParser.FLOAT_TYPE = 55;
+PaxoParser.COMPLEX_TYPE = 56;
+PaxoParser.FIXED_TYPE = 57;
+PaxoParser.CHARA_TYPE = 58;
+PaxoParser.TRIT_TYPE = 59;
+PaxoParser.BOOLEAN_TYPE = 60;
+PaxoParser.FUNC_TYPE = 61;
+PaxoParser.PKG_TYPE = 62;
+PaxoParser.COLOR_TYPE = 63;
+PaxoParser.POINTER_TYPE = 64;
+PaxoParser.GLOBAL = 65;
+PaxoParser.LOCAL = 66;
+PaxoParser.TRY = 67;
+PaxoParser.CATCH = 68;
+PaxoParser.ARROW = 69;
+PaxoParser.RETURN = 70;
+PaxoParser.THROW = 71;
+PaxoParser.PAUSE_MODE = 72;
+PaxoParser.PLAY_MODE = 73;
+PaxoParser.INT_LITERAL = 74;
+PaxoParser.DECIMAL_LITERAL = 75;
+PaxoParser.COMPLEX_LITERAL = 76;
+PaxoParser.BOOLEAN_BIT = 77;
+PaxoParser.BOOLEAN_TRIT = 78;
+PaxoParser.POINTER_LITERAL = 79;
+PaxoParser.COLOR_LITERAL = 80;
+PaxoParser.THIS_SCOPE = 81;
+PaxoParser.IDENTIFIER = 82;
+PaxoParser.STRING_LITERAL = 83;
+PaxoParser.CHAR_LITERAL = 84;
+PaxoParser.LINE_COMMENT = 85;
+PaxoParser.BLOCK_COMMENT = 86;
+PaxoParser.WS = 87;
 
 PaxoParser.RULE_program = 0;
 PaxoParser.RULE_statement = 1;
@@ -2074,8 +2084,16 @@ class TypeContext extends antlr4.ParserRuleContext {
 	    return this.getToken(PaxoParser.VAR_TYPE, 0);
 	};
 
-	NUM_TYPE() {
-	    return this.getToken(PaxoParser.NUM_TYPE, 0);
+	INT_TYPE() {
+	    return this.getToken(PaxoParser.INT_TYPE, 0);
+	};
+
+	FLOAT_TYPE() {
+	    return this.getToken(PaxoParser.FLOAT_TYPE, 0);
+	};
+
+	FIXED_TYPE() {
+	    return this.getToken(PaxoParser.FIXED_TYPE, 0);
 	};
 
 	CHARA_TYPE() {

@@ -28,10 +28,12 @@ varDeclaration
     ;
 
 type
-		: VAR_TYPE | NUM_TYPE | CHARA_TYPE | POINTER_TYPE | TRIT_TYPE | BOOLEAN_TYPE | FUNC_TYPE | PKG_TYPE | COLOR_TYPE | COMPLEX_TYPE ;
+    : VAR_TYPE | INT_TYPE | FLOAT_TYPE | FIXED_TYPE | CHARA_TYPE | POINTER_TYPE | TRIT_TYPE | BOOLEAN_TYPE | FUNC_TYPE | PKG_TYPE | COLOR_TYPE | COMPLEX_TYPE
+    ;
 
 scope
-	: GLOBAL | LOCAL ;
+    : GLOBAL | LOCAL
+    ;
 
 assignment
     : IDENTIFIER '=' expression ';'?
@@ -56,14 +58,13 @@ loopStatement
     ;
 
 loopMode
-    : PAUSE_MODE // ⏸️
-    | PLAY_MODE  // ▶️
+    : PAUSE_MODE // ⏸️ / stop / ||
+    | PLAY_MODE  // ▶️ / go / |>
     ;
 
-		//Deprecados
+// Deprecados
 loopDelimiter    : '|:' | '𝄆' ;
 loopEndDelimiter : ':|' | '𝄇' ;
-
 
 tryCatchStatement
     : TRY block CATCH '(' IDENTIFIER ('.' IDENTIFIER)? ')' block
@@ -79,9 +80,9 @@ pkgDeclaration
 
 block
     : '{' statement* '}' 
-		| ':' statement* '🏁'
-		| statement* 'end'
-		| ':' statement* ';'
+    | ':' statement* '🏁'
+    | statement* 'end'
+    | ':' statement* ';'
     ;
 
 parameterList
@@ -101,80 +102,82 @@ argumentList
     ;
 
 expression
-    : IDENTIFIER '(' argumentList? ')' # callExpr
-    | '(' expression ')'	#parenExpr
-    | expression '[' expression ']' '(' argumentList ')' # indexedCallExpr
+    : IDENTIFIER '(' argumentList? ')'                     # callExpr
+    | '(' expression ')'                                    # parenExpr
+    | expression '[' expression ']' '(' argumentList ')'   # indexedCallExpr
     | expression '[' expression ']'                        # indexedAccessExpr
-    | expression '.' IDENTIFIER '(' argumentList ')' # methodCallExpr
+    | expression '.' IDENTIFIER '(' argumentList ')'       # methodCallExpr
     | expression '.' IDENTIFIER                             # dotAccessExpr
-    | expression ( '÷' | '×' ) expression       # multDivExpr
+    | expression ( '÷' | '×' | '/' | '*' ) expression      # multDivExpr
     | expression ( '+' | '-' ) expression                   # addSubExpr
-    | expression ( '•«' | '»•' ) expression                 # shiftExpr
-    | expression ( '<'|'>'|'≤'|'<='|'≥'|'>='|'=='|'!='|'≠' ) expression   # relationalExpr
-    | expression ( '&' | '|' | '.&' | '.|' ) expression     # bitwiseExpr
-    | ( '!' | '.!' ) expression # notgateExpr
-		| THIS_SCOPE '.' IDENTIFIER # thisScopeExpr
-    | INT_LITERAL # intLitExpr
-    | DECIMAL_LITERAL # decLitExpr
-    | CHAR_LITERAL # charLitExpr
-    | STRING_LITERAL # stringLitExpr
-    | BOOLEAN_BIT # boolBitExpr
-    | BOOLEAN_TRIT # boolTritExpr
-		| POINTER_LITERAL # ptrLitExpr
-		| COLOR_LITERAL # colLitExpr
-		| COMPLEX_LITERAL # comLitExpr
-    | arrayLiteral # arrayLitExpr
-    | IDENTIFIER # identExpr
-		| pkgDeclaration # pkgExpr
-		| functionDeclaration # funcExpr
+    | expression ( '•«' | '»•' | '<<' | '>>' ) expression   # shiftExpr
+    | expression ( '<'|'>'|'≤'|'<='|'≥'|'>='|'=='|'!='|'≠' ) expression # relationalExpr
+    | expression ( '&' | '|' | '.&' | '.|' | '^' ) expression # bitwiseExpr
+    | ( '!' | '.!' ) expression                             # notgateExpr
+    | THIS_SCOPE '.' IDENTIFIER                             # thisScopeExpr
+    | INT_LITERAL                                           # intLitExpr
+    | DECIMAL_LITERAL                                       # decLitExpr
+    | CHAR_LITERAL                                          # charLitExpr
+    | STRING_LITERAL                                        # stringLitExpr
+    | BOOLEAN_BIT                                           # boolBitExpr
+    | BOOLEAN_TRIT                                          # boolTritExpr
+    | POINTER_LITERAL                                       # ptrLitExpr
+    | COLOR_LITERAL                                         # colLitExpr
+    | COMPLEX_LITERAL                                       # comLitExpr
+    | arrayLiteral                                          # arrayLitExpr
+    | IDENTIFIER                                            # identExpr
+    | pkgDeclaration                                        # pkgExpr
+    | functionDeclaration                                  # funcExpr
     ;
 
 arrayLiteral
     : '«' expression (',' expression)* '»'
-		| '{' expression (',' expression)* '}'
-		| '[' expression (',' expression)* ']'
+    | '{' expression (',' expression)* '}'
+    | '[' expression (',' expression)* ']'
     ;
 
 // ==========================================
 // 2. REGLAS DEL LEXER (Tokens con Aliases Móvil/ASCII)
 // ==========================================
 
-VAR_TYPE: 'var' | '📥' ;
-NUM_TYPE: 'n';
-COMPLEX_TYPE: 'ni';
-CHARA_TYPE: 'abc' ;
-TRIT_TYPE: 'trit' ;
-BOOLEAN_TYPE: 'bool' ;
-POINTER_TYPE: 'pin' ;
-FUNC_TYPE: 'fx' ;
-PKG_TYPE: '📦' | 'pkg' ;
-COLOR_TYPE: 'col' ;
+INCLUDE      : '+📚' | 'add' ;
 
-// DEPRECADOS: no cambian el comportamiento (todo vive en un array flat de
-// globals). Se aceptan por retrocompatibilidad; el compilador emite warning.
-GLOBAL: 'pub' | '🌎' ;
-LOCAL: 'local';
+VAR_TYPE     : 'var' | '📥' ;
+NUM_TYPE     : 'n' ;
+INT_TYPE     : 'int' | 'uint' ;
+FLOAT_TYPE   : 'flt' | 'sflt' | 'dec' ;
+COMPLEX_TYPE : 'com' | 'scom' ;
+FIXED_TYPE   : 'frac' | 'acc' ;
+CHARA_TYPE   : 'abc' ;
+TRIT_TYPE    : 'trit' ;
+BOOLEAN_TYPE : 'bool' ;
+FUNC_TYPE    : 'fx' ;
+PKG_TYPE     : '📦' | 'pkg' ;
+COLOR_TYPE   : 'col' ;
+POINTER_TYPE : 'pin' | 'ptr' ;
 
-TRY        : '↻' | 'try' ;
-CATCH      : '🪤' | 'catch' | '/]' ;
-ARROW      : '→' | '->';
-INCLUDE    : '+📚' | 'add' ;
-RETURN     : 'return' ;
-THROW      : 'throw' | '⚡' ;
+GLOBAL       : 'pub' | '🌎' ;
+LOCAL        : 'local' ;
 
-PAUSE_MODE : '⏸️' | 'stop' | '||' ;
-PLAY_MODE  : '▶️' | 'go' | '|>' ;
+TRY          : '↻' | 'try' ;
+CATCH        : '🪤' | 'catch' | '/]' ;
+ARROW        : '→' | '->' ;
+RETURN       : 'return' ;
+THROW        : 'throw' | '⚡' ;
+
+PAUSE_MODE   : '⏸️' | 'stop' | '||' ;
+PLAY_MODE    : '▶️' | 'go' | '|>' ;
 
 // Literales
 INT_LITERAL     : [+-]? [0-9]+ ;
 DECIMAL_LITERAL : [+-]? [0-9]+ '.' [0-9]+ ;
-COMPLEX_LITERAL: ([+-]? [0-9]+ ('.' [0-9]+)?)? [+-] [0-9]+ ('.' [0-9]+)? 'i' ;
-BOOLEAN_BIT			: '.×' | '.✓' ;
+COMPLEX_LITERAL : ([+-]? [0-9]+ ('.' [0-9]+)? [+-])? [0-9]+ ('.' [0-9]+)? 'i' ;
+BOOLEAN_BIT     : '.×' | '.✓' ;
 BOOLEAN_TRIT    : '×' | '•' | '✓' ;
 POINTER_LITERAL : '@' IDENTIFIER ;
-COLOR_LITERAL : '#' ([0-9A-F])+ ;
+COLOR_LITERAL   : '#' ([0-9A-F])+ ;
 
-THIS_SCOPE: 'this' | '📍';
+THIS_SCOPE      : 'this' | '📍' ;
 
 IDENTIFIER      : [a-zA-Z_\p{L}\p{Emoji}][a-zA-Z0-9_\p{L}\p{Emoji}]* ;
 STRING_LITERAL  : '"' (~["\r\n])* '"' ;

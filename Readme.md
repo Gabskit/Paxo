@@ -68,6 +68,13 @@ flt foo = 6.7
 sflt 16foo = 6.9 //float16
 dec foo = 0.3 // decimal monetario
 
+var foo = 5 + 9i	// Complejo
+com foo = 6i	
+scom 16foo = 4 + 0i	//complex 16
+
+frac foo = .876	//fracción 
+acc foo = 4.8	//punto fijo
+
 var foo = •            // trit (ternario: •, ✓, ∅)
 trit foo = •
 
@@ -76,9 +83,6 @@ abc foo = 'C'
 
 var foo = "Texto"      // string
 abc foo = "Texto"
-
-var goo = @foo          // puntero
-pin goo = @foo
 
 var foo = .×            // booleano bit (.× = false, .✓ = true)
 bool foo = .×

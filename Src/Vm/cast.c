@@ -36,6 +36,30 @@ uint32_t lep_cast_var(LEPEnv* env, uint32_t src_id, LEPType target_type) {
         }
         return LEP_PUSH(env, result);
     }
+    // Convertir a FRAC (_Fract)
+if (target_type == FRAC) {
+    _Fract result = 0.0r;
+    switch (src_tag.type) {
+        case FP:    result = (_Fract)LEP_AS(env, src_id, double); break;
+        case INT:   result = (_Fract)LEP_AS(env, src_id, int64_t); break;
+        case ACCUM: result = (_Fract)LEP_AS(env, src_id, _Accum); break;
+        default: break;
+    }
+    return LEP_PUSH(env, result);
+}
+
+// Convertir a ACCUM (_Accum)
+if (target_type == ACCUM) {
+    _Accum result = 0.0k;
+    switch (src_tag.type) {
+        case FP:   result = (_Accum)LEP_AS(env, src_id, double); break;
+        case INT:  result = (_Accum)LEP_AS(env, src_id, int64_t); break;
+        case FRAC: result = (_Accum)LEP_AS(env, src_id, _Fract); break;
+        default: break;
+    }
+    return LEP_PUSH(env, result);
+}
+
 
     // Por defecto, si no sabe cómo convertir, devuelve 0 entero o dispara un error
     return LEP_PUSH(env, (int64_t)0);

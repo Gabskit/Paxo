@@ -652,7 +652,7 @@ static LEPVar native_img_resize(LEPVar *args, uint8_t argc) { (void)args; (void)
 #endif
 
 #ifdef LEP_HAS_FONT
-typedef struct { unsigned char *buf; stbtt_fontinfo info; } PaxoFont;
+typedef struct { unsigned char *buf; stbtt_fontinfo info; } LEPFont;
 static NativeReg font_reg = {0};
 static LEPVar native_font_load(LEPVar *args, uint8_t argc) {
   const char *path = argc >= 1 ? native_arg_str(args[0]) : NULL;
@@ -661,7 +661,7 @@ static LEPVar native_font_load(LEPVar *args, uint8_t argc) {
   if (!f) return num_from_i64(0);
   fseek(f, 0, SEEK_END); long size = ftell(f); rewind(f);
   if (size <= 0) { fclose(f); return num_from_i64(0); }
-  PaxoFont *pf = malloc(sizeof(PaxoFont));
+  LEPFont *pf = malloc(sizeof(LEPFont));
   pf->buf = malloc((size_t)size);
   size_t rd = fread(pf->buf, 1, (size_t)size, f);
   fclose(f);
@@ -671,12 +671,12 @@ static LEPVar native_font_load(LEPVar *args, uint8_t argc) {
   if (font_reg.cap == 0) reg_init(&font_reg);
   return num_from_i64(reg_add(&font_reg, pf, NULL));
 }
-static PaxoFont *font_from_args(LEPVar v) {
+static LEPFont *font_from_args(LEPVar v) {
   if (font_reg.cap == 0) return NULL;
-  return (PaxoFont *)reg_get(&font_reg, (int64_t)native_arg_long(v));
+  return (LEPFont *)reg_get(&font_reg, (int64_t)native_arg_long(v));
 }
 static LEPVar native_font_glyph(LEPVar *args, uint8_t argc) {
-  PaxoFont *pf = argc >= 1 ? font_from_args(args[0]) : NULL;
+  LEPFont *pf = argc >= 1 ? font_from_args(args[0]) : NULL;
   if (!pf) return var_array(arr_new(0));
   long cp = native_arg_long(args[1]);
   float size = (float)native_arg_double(args[2]);
@@ -696,7 +696,7 @@ static LEPVar native_font_glyph(LEPVar *args, uint8_t argc) {
   return var_array(a);
 }
 static LEPVar native_font_metrics(LEPVar *args, uint8_t argc) {
-  PaxoFont *pf = argc >= 1 ? font_from_args(args[0]) : NULL;
+  LEPFont *pf = argc >= 1 ? font_from_args(args[0]) : NULL;
   if (!pf) return var_array(arr_new(0));
   float size = (float)native_arg_double(args[1]);
   if (size <= 0) size = 16;
@@ -712,7 +712,7 @@ static LEPVar native_font_metrics(LEPVar *args, uint8_t argc) {
 static LEPVar native_font_free(LEPVar *args, uint8_t argc) {
   if (argc >= 1 && font_reg.cap != 0) {
     int64_t id = (int64_t)native_arg_long(args[0]);
-    PaxoFont *pf = (PaxoFont *)reg_get(&font_reg, id);
+    LEPFont *pf = (LEPFont *)reg_get(&font_reg, id);
     if (pf) { free(pf->buf); reg_del(&font_reg, id, true); }
   }
   return LEP_ZERO;
@@ -1205,7 +1205,7 @@ static LEPVar native_sokol_clear(LEPVar *args, uint8_t argc) {
 
 static LEPVar native_sokol_show(LEPVar *args, uint8_t argc) {
   (void)args; (void)argc;
-  const char *title = argc >= 1 && var_type(args[0]) == STRING ? var_string_get(args[0]) : "Paxo Window";
+  const char *title = argc >= 1 && var_type(args[0]) == STRING ? var_string_get(args[0]) : "LEP Window";
   g_sok_master = 1;
   sapp_run(&(sapp_desc){
       .init_cb = lep_sapp_init,

@@ -7,6 +7,15 @@
 #include <stdint.h>
 #include <uchar.h>
 #include <complex.h>
+#if __has_include(<stdfix.h>)
+    #include <stdfix.h>
+#else
+    // Si la cabecera no existe en el sistema pero el compilador soporta punto fijo
+    #define fract _Fract
+    #define accum _Accum
+    #define sat   _Sat
+#endif
+
 #include "dconfig.h"
 #include "decContext.h"
 #include "decimal64.h"
@@ -38,7 +47,7 @@ typedef enum type : uint8_t {
     FUNC,
     STRING, ARRAY, PACKAGE, COLOR,
     SCOM, COM,
-    SFP, FP, DEC,
+    SFP, FP, DEC, FRAC, ACCUM,
 } LEPType;
 
 typedef enum sizes : uint8_t {
@@ -56,13 +65,17 @@ typedef struct {
     uint32_t offset;   
 } LEPVartag;
 
+// 2. Mapas de Memoria
 typedef struct {
     void* start_ptr;      
     size_t pivot;         
+    size_t arena_capacity; // NUEVO: Límite dinámico de la Arena
     
     LEPVartag* tags;      
     size_t var_count;     
+    size_t tag_capacity;   // NUEVO: Límite dinámico de etiquetas
 } LEPEnv;
+
 
 // 3. Estructuras Complejas (Ahora almacenan IDs, no estructuras pesadas)
 typedef struct LEPPackageVar {
@@ -96,10 +109,38 @@ typedef struct {
 
 // 4. Funciones de Arena
 static inline uint32_t lep_push_var(LEPEnv* env, LEPType type, LEPSize size, void* raw_data, size_t bytes) {
-    uint32_t var_id = env->var_count++;
+    // A) Redimensionar el arreglo de etiquetas (tags) si llegamos al límite
+    if (env->var_count >= env->tag_capacity) {
+        size_t new_tag_cap = (env->tag_capacity == 0) ? 1024 : env->tag_capacity * 2;
+        LEPVartag* new_tags = (LEPVartag*)realloc(env->tags, sizeof(LEPVartag) * new_tag_cap);
+        if (!new_tags) {
+            fprintf(stderr, "[PAXO FATAL] Out of memory: no se pudo expandir env->tags\n");
+            exit(1);
+        }
+        env->tags = new_tags;
+        env->tag_capacity = new_tag_cap;
+    }
+
+    // B) Redimensionar el buffer de la Arena (start_ptr) si no caben los nuevos bytes
+    if (env->pivot + bytes > env->arena_capacity) {
+        size_t new_arena_cap = (env->arena_capacity == 0) ? (1024 * 1024) : env->arena_capacity * 2;
+        while (env->pivot + bytes > new_arena_cap) {
+            new_arena_cap *= 2;
+        }
+        void* new_ptr = realloc(env->start_ptr, new_arena_cap);
+        if (!new_ptr) {
+            fprintf(stderr, "[PAXO FATAL] Out of memory: no se pudo expandir la Arena\n");
+            exit(1);
+        }
+        env->start_ptr = new_ptr;
+        env->arena_capacity = new_arena_cap;
+    }
+
+    // C) Inserción normal
+    uint32_t var_id = (uint32_t)env->var_count++;
     env->tags[var_id].type = type;
     env->tags[var_id].bytesize = size;
-    env->tags[var_id].offset = env->pivot; 
+    env->tags[var_id].offset = (uint32_t)env->pivot; 
 
     void* dest = (void*)((uintptr_t)env->start_ptr + env->pivot);
     memcpy(dest, raw_data, bytes); 
@@ -108,10 +149,13 @@ static inline uint32_t lep_push_var(LEPEnv* env, LEPType type, LEPSize size, voi
     return var_id; 
 }
 
+
 static inline void* lep_get_var_data(LEPEnv* env, uint32_t var_id) {
     uint32_t offset = env->tags[var_id].offset;
     return (void*)((uintptr_t)env->start_ptr + offset);
 }
+
+color lep_create_color(uint8_t code, uint32_t val) { return (color){ code, val }; }
 
 // 5. La nueva Macro de Inserción Dinámica
 // Crea un puntero temporal usando Literales Compuestos &(tipo){X} y lo empuja a la Arena
@@ -123,6 +167,11 @@ static inline uint32_t lep_push_fp64(LEPEnv *env, double x) { return lep_push_va
 static inline uint32_t lep_push_dec64(LEPEnv *env, decimal64 x) { return lep_push_var(env, DEC, M, &x, sizeof(x)); }
 static inline uint32_t lep_push_string_ptr(LEPEnv *env, const char *x) { return lep_push_var(env, STRING, M, &x, sizeof(x)); }
 static inline uint32_t lep_push_char32(LEPEnv *env, char32_t x) { return lep_push_var(env, CHAR, S, &x, sizeof(x)); }
+static inline uint32_t lep_push_com16(LEPEnv *env, _Float16 complex x) { return lep_push_var(env, SCOM, S, &x, sizeof(x)); }
+static inline uint32_t lep_push_com64(LEPEnv *env, double complex x) { return lep_push_var(env, COM, L, &x, sizeof(x)); } 
+static inline uint32_t lep_push_frac(LEPEnv *env, fract x) { return lep_push_var(env, FRAC, XS, &x, sizeof(x)); }
+static inline uint32_t lep_push_acc(LEPEnv *env, accum x) { return lep_push_var(env, ACCUM, S, &x, sizeof(x)); } 
+
 
 /* C11/C23 _Generic cannot distinguish typedef aliases such as char32_t/uint32_t.
  * The associations below therefore use only distinct standard types. */
@@ -139,8 +188,13 @@ static inline uint32_t lep_push_char32(LEPEnv *env, char32_t x) { return lep_pus
     decimal64: lep_push_dec64, \
     char*: lep_push_string_ptr, \
     const char*: lep_push_string_ptr, \
-    char32_t: lep_push_char32 \
+    char32_t: lep_push_char32, \
+    _Float16 complex: lep_push_com16, \
+    double complex: lep_push_com64, \
+    _Fract: lep_push_frac, \
+    _Accum: lep_push_acc \
 )(ENV, (X))
+
 
 #ifndef LEP_AS
 #define LEP_AS(ENV, ID, TYPE) (*(TYPE*)lep_get_var_data((ENV), (ID)))

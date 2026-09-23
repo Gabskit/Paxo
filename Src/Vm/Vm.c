@@ -50,25 +50,33 @@ typedef struct {
     
     // El "Return Slot" físico persistente asignado en el inicio
     uint32_t universal_return_id;
-    PaxoNativeRegistry ffi;
-} PaxoVM;
+    LEPNativeRegistry ffi;
+} LEPVM;
 
-PaxoVM init_vm() {
-    PaxoVM vm = {0};
-    vm.env.start_ptr = malloc(20 * 1024 * 1024); // 20MB
-    vm.env.tags = malloc(sizeof(LEPVartag) * 65536);
-    
+LEPVM init_vm() {
+    LEPVM vm = {0};
+
+    // Capacidad inicial del buffer de datos (ej. 20 MB)
+    vm.env.arena_capacity = 20 * 1024 * 1024;
+    vm.env.start_ptr = malloc(vm.env.arena_capacity);
+
+    // Capacidad inicial de la tabla de etiquetas (ej. 65,536 variables)
+    vm.env.tag_capacity = 65536;
+    vm.env.tags = malloc(sizeof(LEPVartag) * vm.env.tag_capacity);
+
     // Creamos el registro virtual 65535 como Return Slot permanente
     static const uint8_t EMPTY_SLOT[16] = {0};
     vm.universal_return_id = lep_push_var(&vm.env, INT, L, (void*)EMPTY_SLOT, 16);
-    
+
     vm.current_regs = vm.registers;
-    paxo_ffi_init(&vm.ffi);
+    LEP_ffi_init(&vm.ffi);
     vm.is_running = true;
+
     return vm;
 }
 
-void vm_execute(PaxoVM* vm, uint8_t* bytecode) {
+
+void vm_execute(LEPVM* vm, uint8_t* bytecode) {
     vm->ip = bytecode;
     
     while (vm->is_running) {
@@ -82,25 +90,44 @@ void vm_execute(PaxoVM* vm, uint8_t* bytecode) {
             }
 
             case OP_ADD: {
-                // Leer: opcode(1) + left(2) + right(2) + dest(2) = 7 bytes
-                uint16_t reg_left = READ_U16(vm->ip + 1);
-                uint16_t reg_right = READ_U16(vm->ip + 3);
-                uint16_t reg_dest = READ_U16(vm->ip + 5);
-                
-                // Mapear el registro virtual del compilador al ID físico en memoria
-                uint32_t id_a = vm->current_regs[reg_left];
-                uint32_t id_b = vm->current_regs[reg_right];
-                
-                // Extracción y operación
-                int64_t val_a = LEP_AS(&(vm->env), id_a, int64_t);
-                int64_t val_b = LEP_AS(&(vm->env), id_b, int64_t);
-                
-                // Generar resultado en Arena y mapear al registro de destino
-                vm->current_regs[reg_dest] = LEP_PUSH(&(vm->env), val_a + val_b);
-                
-                vm->ip += 7;
-                break;
-            }
+    uint16_t reg_left  = READ_U16(vm->ip + 1);
+    uint16_t reg_right = READ_U16(vm->ip + 3);
+    uint16_t reg_dest  = READ_U16(vm->ip + 5);
+
+    uint32_t id_a = vm->current_regs[reg_left];
+    uint32_t id_b = vm->current_regs[reg_right];
+
+    LEPType type_a = vm->env.tags[id_a].type;
+    LEPType type_b = vm->env.tags[id_b].type;
+
+    // Caso 1: Enteros puros
+    if (type_a == INT && type_b == INT) {
+        int64_t res = LEP_AS(&(vm->env), id_a, int64_t) + LEP_AS(&(vm->env), id_b, int64_t);
+        vm->current_regs[reg_dest] = LEP_PUSH(&(vm->env), res);
+    }
+    // Caso 2: Punto Fijo (FRAC / ACCUM C23)
+    else if (type_a == FRAC && type_b == FRAC) {
+        _Fract res = LEP_AS(&(vm->env), id_a, _Fract) + LEP_AS(&(vm->env), id_b, _Fract);
+        vm->current_regs[reg_dest] = LEP_PUSH(&(vm->env), res);
+    }
+    else if (type_a == ACCUM && type_b == ACCUM) {
+        _Accum res = LEP_AS(&(vm->env), id_a, _Accum) + LEP_AS(&(vm->env), id_b, _Accum);
+        vm->current_regs[reg_dest] = LEP_PUSH(&(vm->env), res);
+    }
+    // Caso 3: Flotantes
+    else if (type_a == FP || type_b == FP) {
+		double res = LEP_AS(&(vm->env), id_a, double) + LEP_AS(&(vm->env), id_b, double);
+		vm->current_regs[reg_dest] = LEP_PUSH(&(vm->env), res);
+    }
+    else if (type_a == SFP || type_b == SFP) {
+    	_Float16 res = LEP_AS(&(vm->env), id_a, _Float16) + LEP_AS(&(vm->env), id_b, double);
+    	vm->current_regs[reg_dest] = LEP_PUSH(&(vm->env), res);
+	}
+    
+    vm->ip += 7;
+    break;
+}
+
 
             case OP_CALL_NATIVE: {
                 // opcode(1) + nativeId(2) + argc(1) + base(2) + dest(2) = 8 bytes
@@ -118,7 +145,7 @@ void vm_execute(PaxoVM* vm, uint8_t* bytecode) {
                         uint32_t name_id = args[0];
                         if (name_id < vm->env.var_count && vm->env.tags[name_id].type == STRING) {
                             const char *name = (const char *)lep_get_var_data(&(vm->env), name_id);
-                            result = paxo_ffi_call_name(&vm->ffi, &(vm->env), name, args + 1, (uint8_t)(argc - 1), &ok);
+                            result = LEP_ffi_call_name(&vm->ffi, &(vm->env), name, args + 1, (uint8_t)(argc - 1), &ok);
                         }
                     }
                 } else if (native_id == 101) {
@@ -126,13 +153,13 @@ void vm_execute(PaxoVM* vm, uint8_t* bytecode) {
                         uint32_t path_id = args[0];
                         if (path_id < vm->env.var_count && vm->env.tags[path_id].type == STRING) {
                             const char *path = (const char *)lep_get_var_data(&(vm->env), path_id);
-                            ok = paxo_ffi_load(&vm->ffi, path);
+                            ok = LEP_ffi_load(&vm->ffi, path);
                             int64_t b = ok ? 1 : 0;
                             result = lep_push_var(&(vm->env), INT, M, &b, sizeof(b));
                         }
                     }
                 } else {
-                    result = paxo_ffi_call_id(&vm->ffi, &(vm->env), native_id, args, argc, &ok);
+                    result = LEP_ffi_call_id(&vm->ffi, &(vm->env), native_id, args, argc, &ok);
                 }
                 if (!ok) {
                     int64_t zero = 0;
@@ -291,13 +318,18 @@ void vm_execute(PaxoVM* vm, uint8_t* bytecode) {
                 bool is_true = false;
                 
                 // Evaluación "Truthness" rápida
-                if (cond_tag.type == BOOL) {
-                    is_true = *(bool*)cond_data;
-                } else if (cond_tag.type == TRIT) {
-                    is_true = (*(uint8_t*)cond_data == 1); // 1 = ✓, 2 = •
-                } else if (cond_tag.type == INT) {
-                    is_true = (*(int64_t*)cond_data != 0);
-                }
+                // Extensión para Truthness completa en Vm.c:
+switch (cond_tag.type) {
+    case BOOL:  is_true = *(bool*)cond_data; break;
+    case TRIT:  is_true = (*(uint8_t*)cond_data == 1); break;
+    case INT:   is_true = (*(int64_t*)cond_data != 0); break;
+    case UINT:  is_true = (*(uint64_t*)cond_data != 0); break;
+    case FP:    is_true = (*(double*)cond_data != 0.0); break;
+    case FRAC:  is_true = (*(_Fract*)cond_data != 0.0r); break;
+    case ACCUM: is_true = (*(_Accum*)cond_data != 0.0k); break;
+    default: break;
+}
+
                 
                 if (!is_true) {
                     vm->ip += 5 + offset; // Saltar
